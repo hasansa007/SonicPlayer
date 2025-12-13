@@ -400,7 +400,7 @@ struct FolderCard: View {
             Text(folder.name)
                 .font(.headline)
                 .fontWeight(.semibold)
-                .lineLimit(2)
+                .lineLimit(1)
                 .truncationMode(.tail)
                 .foregroundColor(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
