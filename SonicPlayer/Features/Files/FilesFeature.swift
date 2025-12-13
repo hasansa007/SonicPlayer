@@ -377,6 +377,9 @@ struct FilesFeature {
             case let .importFiles(urls):
                 let directory = state.currentDirectory
                 return .run { send in
+                    print("📥 Starting import of \(urls.count) file(s)")
+                    print("   Current directory: \(directory?.path ?? "root")")
+
                     var successCount = 0
                     var failCount = 0
 
@@ -385,31 +388,36 @@ struct FilesFeature {
                     if directory == nil {
                         do {
                             targetDirectory = try await fileManager.createFolderForImport()
+                            print("📁 Created import folder: \(targetDirectory?.path ?? "nil")")
                         } catch {
-                            print("Failed to create import folder: \(error.localizedDescription)")
+                            print("❌ Failed to create import folder: \(error.localizedDescription)")
                             // Fall back to importing to root
                         }
                     }
 
-                    for url in urls {
+                    for (index, url) in urls.enumerated() {
+                        print("📄 Importing file \(index + 1)/\(urls.count): \(url.lastPathComponent)")
                         do {
                             try await fileManager.importFile(url, targetDirectory)
                             successCount += 1
                         } catch {
-                            print("Failed to import \(url.lastPathComponent): \(error.localizedDescription)")
+                            print("❌ Failed to import \(url.lastPathComponent): \(error.localizedDescription)")
                             failCount += 1
                         }
                     }
+
+                    print("📊 Import complete: \(successCount) succeeded, \(failCount) failed")
+                    print("🔄 Refreshing files...")
 
                     await send(.refreshFiles)
 
                     // Show feedback to user
                     if successCount > 0 && failCount == 0 {
-                        print("Successfully imported \(successCount) file(s)")
+                        print("✅ Successfully imported \(successCount) file(s)")
                     } else if successCount > 0 && failCount > 0 {
-                        print("Imported \(successCount) file(s), \(failCount) failed")
+                        print("⚠️ Imported \(successCount) file(s), \(failCount) failed")
                     } else if failCount > 0 {
-                        print("Failed to import \(failCount) file(s)")
+                        print("❌ Failed to import \(failCount) file(s)")
                     }
                 }
 

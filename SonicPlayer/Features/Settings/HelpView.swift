@@ -158,7 +158,7 @@ struct HelpView: View {
                 SupportButton(
                     icon: "envelope.fill",
                     title: "Email Support",
-                    subtitle: "support@sonicplayer.app"
+                    subtitle: "hasansa007@gmail.com"
                 ) {}
 
                 SupportButton(
