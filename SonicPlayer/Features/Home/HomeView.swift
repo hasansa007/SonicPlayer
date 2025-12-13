@@ -9,7 +9,7 @@ struct HomeView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     // 1. Playing Now / Keep Listening
-                    if let lastTrack = store.lastPlayedTrack {
+                    if let lastTrack = store.lastPlayedTrack, lastTrack.duration > 0  {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Playing Now")
                                 .font(.title2)

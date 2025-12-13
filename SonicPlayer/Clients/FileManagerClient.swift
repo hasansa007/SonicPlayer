@@ -20,8 +20,17 @@ extension FileManagerClient: DependencyKey {
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
         let getMetadata: @Sendable (URL) async throws -> AudioFile = { url in
-            let asset = AVAsset(url: url)
-            let duration = try await asset.load(.duration).seconds
+            // Get duration with fallback to AVAudioPlayer
+            var duration: TimeInterval = 0
+            do {
+                let asset = AVAsset(url: url)
+                duration = try await asset.load(.duration).seconds
+            } catch {
+                // Fallback: try AVAudioPlayer which is more forgiving for MP3s
+                if let player = try? AVAudioPlayer(contentsOf: url) {
+                    duration = player.duration
+                }
+            }
 
             let resources = try url.resourceValues(forKeys: [.fileSizeKey])
             let fileSize = Int64(resources.fileSize ?? 0)
@@ -170,8 +179,7 @@ extension FileManagerClient: DependencyKey {
                 let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                 let finalDestinationDirectory = destinationDirectory ?? documentsDirectory
 
-                // When using asCopy: true, the file is already accessible
-                // Try with security-scoped access first, but don't fail if it returns false
+                // Start accessing security-scoped resource
                 let needsAccess = sourceURL.startAccessingSecurityScopedResource()
                 defer {
                     if needsAccess {
@@ -179,9 +187,9 @@ extension FileManagerClient: DependencyKey {
                     }
                 }
 
-                // Verify source file exists
-                guard FileManager.default.fileExists(atPath: sourceURL.path) else {
-                    throw NSError(domain: "FileManagerClient", code: 3, userInfo: [NSLocalizedDescriptionKey: "Source file not found: \(sourceURL.path)"])
+                // Verify source file is readable
+                guard FileManager.default.isReadableFile(atPath: sourceURL.path) else {
+                    throw NSError(domain: "FileManagerClient", code: 3, userInfo: [NSLocalizedDescriptionKey: "Source file not readable: \(sourceURL.lastPathComponent)"])
                 }
 
                 let fileName = sourceURL.lastPathComponent
@@ -198,8 +206,22 @@ extension FileManagerClient: DependencyKey {
                     counter += 1
                 }
 
-                // Copy the file to Documents directory
-                try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+                // Use Data read/write instead of copyItem to avoid corruption
+                do {
+                    let fileData = try Data(contentsOf: sourceURL)
+                    try fileData.write(to: destinationURL, options: .atomic)
+                } catch {
+                    throw NSError(domain: "FileManagerClient", code: 4, userInfo: [NSLocalizedDescriptionKey: "Failed to import \(fileName): \(error.localizedDescription)"])
+                }
+
+                // Validate the imported file can be read as audio
+                do {
+                    _ = try AVAudioPlayer(contentsOf: destinationURL)
+                } catch {
+                    // File is corrupted, delete it and throw error
+                    try? FileManager.default.removeItem(at: destinationURL)
+                    throw NSError(domain: "FileManagerClient", code: 5, userInfo: [NSLocalizedDescriptionKey: "Imported file is corrupted or invalid: \(fileName)"])
+                }
             },
             getMetadata: getMetadata,
             documentsDirectory: { documentsDirectory }
