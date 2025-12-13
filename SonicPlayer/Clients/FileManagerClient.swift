@@ -170,18 +170,18 @@ extension FileManagerClient: DependencyKey {
                 let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                 let finalDestinationDirectory = destinationDirectory ?? documentsDirectory
 
-                // Start accessing security-scoped resource
-                let didStartAccess = sourceURL.startAccessingSecurityScopedResource()
+                // When using asCopy: true, the file is already accessible
+                // Try with security-scoped access first, but don't fail if it returns false
+                let needsAccess = sourceURL.startAccessingSecurityScopedResource()
                 defer {
-                    if didStartAccess {
+                    if needsAccess {
                         sourceURL.stopAccessingSecurityScopedResource()
                     }
                 }
 
-                // Verify source file exists and is readable
-                guard FileManager.default.isReadableFile(atPath: sourceURL.path) else {
-                    print("❌ Source file not readable: \(sourceURL.path)")
-                    throw NSError(domain: "FileManagerClient", code: 3, userInfo: [NSLocalizedDescriptionKey: "Source file not accessible: \(sourceURL.lastPathComponent)"])
+                // Verify source file exists
+                guard FileManager.default.fileExists(atPath: sourceURL.path) else {
+                    throw NSError(domain: "FileManagerClient", code: 3, userInfo: [NSLocalizedDescriptionKey: "Source file not found: \(sourceURL.path)"])
                 }
 
                 let fileName = sourceURL.lastPathComponent
@@ -199,15 +199,7 @@ extension FileManagerClient: DependencyKey {
                 }
 
                 // Copy the file to Documents directory
-                do {
-                    try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
-                    print("✅ Successfully imported: \(fileName) to \(destinationURL.path)")
-                } catch {
-                    print("❌ Failed to copy file: \(error.localizedDescription)")
-                    print("   Source: \(sourceURL.path)")
-                    print("   Destination: \(destinationURL.path)")
-                    throw error
-                }
+                try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
             },
             getMetadata: getMetadata,
             documentsDirectory: { documentsDirectory }
