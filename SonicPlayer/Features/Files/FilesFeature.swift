@@ -380,9 +380,20 @@ struct FilesFeature {
                     var successCount = 0
                     var failCount = 0
 
+                    // If importing to root, always create a new folder for the files
+                    var targetDirectory = directory
+                    if directory == nil {
+                        do {
+                            targetDirectory = try await fileManager.createFolderForImport()
+                        } catch {
+                            print("Failed to create import folder: \(error.localizedDescription)")
+                            // Fall back to importing to root
+                        }
+                    }
+
                     for url in urls {
                         do {
-                            try await fileManager.importFile(url, directory)
+                            try await fileManager.importFile(url, targetDirectory)
                             successCount += 1
                         } catch {
                             print("Failed to import \(url.lastPathComponent): \(error.localizedDescription)")

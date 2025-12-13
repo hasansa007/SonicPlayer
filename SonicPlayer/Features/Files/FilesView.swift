@@ -122,11 +122,6 @@ struct FilesView: View {
                 // Folders Section
                 if !store.filteredFolderCards.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(secondaryFoldersSectionPath)
-                            .font(.subheadline)
-                            .foregroundColor(.sonicTextMuted)
-                            .padding(.horizontal)
-                        
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 16) {
                             ForEach(store.scope(state: \.filteredFolderCards, action: \.folderCards)) { cardStore in
                                 FolderCardView(store: cardStore)
@@ -193,24 +188,6 @@ struct FilesView: View {
         }
         .refreshable {
             await store.send(.refreshFiles).finish()
-        }
-    }
-    
-    private var secondaryFoldersSectionPath: String {
-        if store.currentDirectory == nil || store.currentDirectory == store.documentsDirectoryURL {
-            return "(~/Root/)"
-        } else {
-            var relativePath = ""
-            if let currentPath = store.currentDirectory?.path,
-               let documentsPath = store.documentsDirectoryURL?.path {
-                if currentPath.hasPrefix(documentsPath) {
-                    let suffix = currentPath.dropFirst(documentsPath.count)
-                    if !suffix.isEmpty {
-                        relativePath = String(suffix)
-                    }
-                }
-            }
-            return "(~/Root\(relativePath))"
         }
     }
 

@@ -8,10 +8,10 @@ struct HomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // 1. Up Next / Keep Listening
+                    // 1. Playing Now / Keep Listening
                     if let lastTrack = store.lastPlayedTrack {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Up Next")
+                            Text("Playing Now")
                                 .font(.title2)
                                 .fontWeight(.bold)
                                 .padding(.horizontal)

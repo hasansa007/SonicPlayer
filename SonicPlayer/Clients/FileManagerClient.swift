@@ -6,6 +6,7 @@ import Foundation
 struct FileManagerClient {
     var listItems: @Sendable (URL?) async throws -> [FileSystemItem]
     var createFolder: @Sendable (String, URL?) async throws -> Void
+    var createFolderForImport: @Sendable () async throws -> URL
     var deleteItem: @Sendable (URL) async throws -> Void
     var moveItem: @Sendable (URL, URL) async throws -> Void
     var renameItem: @Sendable (URL, String) async throws -> Void
@@ -112,18 +113,32 @@ extension FileManagerClient: DependencyKey {
             },
             createFolder: { name, parentURL in
                 let targetPath = parentURL ?? documentsDirectory
-                
+
                 var finalName = name
                 var newFolderURL = targetPath.appendingPathComponent(finalName)
                 var counter = 2
-                
+
                 while FileManager.default.fileExists(atPath: newFolderURL.path) {
                     finalName = "\(name) \(counter)"
                     newFolderURL = targetPath.appendingPathComponent(finalName)
                     counter += 1
                 }
-                
+
                 try FileManager.default.createDirectory(at: newFolderURL, withIntermediateDirectories: false)
+            },
+            createFolderForImport: {
+                var newFolderName = "New Folder"
+                var counter = 1
+                var proposedFolderURL = documentsDirectory.appendingPathComponent(newFolderName)
+
+                while FileManager.default.fileExists(atPath: proposedFolderURL.path) {
+                    counter += 1
+                    newFolderName = "New Folder \(counter)"
+                    proposedFolderURL = documentsDirectory.appendingPathComponent(newFolderName)
+                }
+
+                try FileManager.default.createDirectory(at: proposedFolderURL, withIntermediateDirectories: false)
+                return proposedFolderURL
             },
             deleteItem: { url in
                 try FileManager.default.removeItem(at: url)
@@ -153,23 +168,7 @@ extension FileManagerClient: DependencyKey {
             },
             importFile: { sourceURL, destinationDirectory in
                 let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                var finalDestinationDirectory = destinationDirectory ?? documentsDirectory
-
-                // If importing into root (destinationDirectory is nil), create a subfolder first
-                if destinationDirectory == nil {
-                    var newFolderName = "New Folder"
-                    var counter = 1
-                    var proposedFolderURL = documentsDirectory.appendingPathComponent(newFolderName)
-
-                    while FileManager.default.fileExists(atPath: proposedFolderURL.path) {
-                        counter += 1
-                        newFolderName = "New Folder \(counter)"
-                        proposedFolderURL = documentsDirectory.appendingPathComponent(newFolderName)
-                    }
-                    
-                    try FileManager.default.createDirectory(at: proposedFolderURL, withIntermediateDirectories: false)
-                    finalDestinationDirectory = proposedFolderURL
-                }
+                let finalDestinationDirectory = destinationDirectory ?? documentsDirectory
 
                 // When using asCopy: true, the file is already accessible
                 // Try with security-scoped access first, but don't fail if it returns false
@@ -210,6 +209,7 @@ extension FileManagerClient: DependencyKey {
     static let testValue = Self(
         listItems: { _ in [] },
         createFolder: { _, _ in },
+        createFolderForImport: { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] },
         deleteItem: { _ in },
         moveItem: { _, _ in },
         renameItem: { _, _ in },
