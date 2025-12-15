@@ -111,7 +111,7 @@ struct PlayerView: View {
                         Image(uiImage: artwork)
                             .resizable()
                             .aspectRatio(1, contentMode: .fill)
-                            .frame(width: 250)
+                            .frame(width: showQueue ? 80 : 250, height: showQueue ? 80 : 250)
                             .clipShape(RoundedRectangle(cornerRadius: 24))
                             .overlay {
                                 RoundedRectangle(cornerRadius: 24)

@@ -20,12 +20,6 @@ struct AboutView: View {
 
                     // Tech stack section
                     techStackSection
-
-                    // Credits section
-                    creditsSection
-
-                    // Stats section
-                    statsSection
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 24)
@@ -137,34 +131,6 @@ struct AboutView: View {
                 TechBadge(name: "TCA (The Composable Architecture)", icon: "building.columns.fill")
                 TechBadge(name: "AVFoundation", icon: "waveform")
             }
-        }
-    }
-
-    private var creditsSection: some View {
-        InfoCard(
-            title: "Open Source",
-            icon: "heart.fill",
-            iconColor: .red
-        ) {
-            VStack(spacing: 12) {
-                Text("SonicPlayer is an open-source initiative. Built with ❤️ by Hassan Sawaed.")
-                    .font(.body)
-                    .foregroundColor(.sonicTextSecondary)
-                    .lineHeight(1.6)
-
-                HStack(spacing: 12) {
-                    SocialButton(icon: "link", label: "GitHub") {}
-                    SocialButton(icon: "envelope.fill", label: "Contact") {}
-                }
-            }
-        }
-    }
-
-    private var statsSection: some View {
-        HStack(spacing: 16) {
-            StatBox(value: "2-3", label: "Weeks to Launch", color: .sonicPrimary)
-            StatBox(value: "100%", label: "Free & Open", color: .green)
-            StatBox(value: "iOS 17+", label: "Compatible", color: .blue)
         }
     }
 }

@@ -185,7 +185,7 @@ struct UpNextCard: View {
                         Image(uiImage: artwork)
                             .resizable()
                             .scaledToFill()
-                            .frame(width: width, height: width)
+                            .frame(width: width)
                             .clipped()
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .overlay {
@@ -204,6 +204,7 @@ struct UpNextCard: View {
                             .overlay {
                                 RoundedRectangle(cornerRadius: 12)
                                     .fill(Color.sonicPrimaryLight.opacity(0.15))
+                                    .frame(width: width, height: 220)
                             }
                     } else {
                         RoundedRectangle(cornerRadius: 12)
@@ -214,15 +215,8 @@ struct UpNextCard: View {
                                     endPoint: .bottomTrailing
                                 )
                             )
-                            .aspectRatio(1, contentMode: .fit)
-                            .overlay(alignment: .center) { // Centered overlay for waveform or music note
-                                if isPlaying {
-                                    waveframeOverlay
-                                } else { // Always show music.note if no artwork and not playing
-                                    Image(systemName: "music.note")
-                                        .font(.system(size: 44))
-                                        .foregroundColor(.white)
-                                }
+                            .overlay(alignment: .center) {
+                                waveframeOverlay
                             }
                     }
                     
@@ -253,9 +247,9 @@ struct UpNextCard: View {
                             lineWidth: 1.5
                         )
                 }
-                .frame(width: width, height: width)
                 .shadow(color: colors.first?.opacity(0.4) ?? .sonicPrimary.opacity(0.3), radius: 12, x: 0, y: 6)
                 .scaleEffect(isPressed ? 0.95 : 1.0)
+                .frame(width: width, height: 220)
                 .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
 
                 // Text Details
@@ -292,7 +286,6 @@ struct UpNextCard: View {
             }
         }
         .buttonStyle(.plain)
-        .frame(width: width)
         .contentShape(Rectangle())
         .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, pressing: { pressing in
             isPressed = pressing
