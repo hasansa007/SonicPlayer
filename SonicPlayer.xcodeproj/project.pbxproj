@@ -123,13 +123,6 @@
 			path = Recording;
 			sourceTree = "<group>";
 		};
-		86662FE82EF7E7FD000577F1 /* Shared */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Shared;
-			sourceTree = "<group>";
-		};
 		A1000040000000000000001 = {
 			isa = PBXGroup;
 			children = (
@@ -174,7 +167,6 @@
 		A1000044000000000000001 /* Features */ = {
 			isa = PBXGroup;
 			children = (
-				86662FE82EF7E7FD000577F1 /* Shared */,
 				86662FE32EF7E7D7000577F1 /* Recording */,
 				A1000049000000000000001 /* Player */,
 				A1000050000000000000001 /* Files */,
