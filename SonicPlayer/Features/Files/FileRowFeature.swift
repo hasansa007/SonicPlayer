@@ -31,6 +31,7 @@ struct FileRowFeature {
         case tapped
         case moveTapped
         case renameTapped
+        case editTapped
         case deleteTapped
         case toggleSelection
     }
@@ -72,6 +73,9 @@ struct FileRowFeature {
                 return .none // Handled by parent
 
             case .renameTapped:
+                return .none // Handled by parent
+
+            case .editTapped:
                 return .none // Handled by parent
 
             case .deleteTapped:

@@ -42,20 +42,16 @@ struct AboutView: View {
 
     private var heroSection: some View {
         VStack(spacing: 20) {
-            // Animated logo
-            ZStack {
-                Circle()
-                    .fill(LinearGradient.sonicGradient)
-                    .frame(width: 120, height: 120)
-                    .shadow(color: Color.sonicPrimary.opacity(0.4), radius: 30, x: 0, y: 15)
-
-                Image(systemName: "waveform.circle.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.white)
-            }
+            // App logo
+            Image("AppLogo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 120, height: 120)
+                .clipShape(RoundedRectangle(cornerRadius: 26))
+                .shadow(color: Color.sonicPrimary.opacity(0.4), radius: 30, x: 0, y: 15)
 
             VStack(spacing: 8) {
-                Text("SonicPlayer")
+                Text("Sonic Player")
                     .font(.system(size: 32, weight: .bold))
                     .foregroundStyle(LinearGradient.sonicGradient)
 
@@ -78,7 +74,7 @@ struct AboutView: View {
             icon: "target",
             iconColor: .sonicPrimary
         ) {
-            Text("SonicPlayer is built with passion to improve the audio learning experience for students and learners worldwide. We believe that accessing educational content should be simple, efficient, and enjoyable.")
+            Text("Sonic Player is built with passion to improve the audio learning experience for students and learners worldwide. We believe that accessing educational content should be simple, efficient, and enjoyable.")
                 .font(.body)
                 .foregroundColor(.sonicTextSecondary)
                 .lineHeight(1.6)

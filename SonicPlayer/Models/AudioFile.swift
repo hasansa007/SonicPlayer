@@ -7,6 +7,7 @@ struct AudioFile: Identifiable, Equatable, Codable, Hashable {
     let duration: TimeInterval
     let fileSize: Int64
     let format: AudioFormat
+    let creationDate: Date
 
     init(
         id: UUID = UUID(),
@@ -14,7 +15,8 @@ struct AudioFile: Identifiable, Equatable, Codable, Hashable {
         title: String,
         duration: TimeInterval,
         fileSize: Int64,
-        format: AudioFormat
+        format: AudioFormat,
+        creationDate: Date = Date()
     ) {
         self.id = id
         self.url = url
@@ -22,6 +24,7 @@ struct AudioFile: Identifiable, Equatable, Codable, Hashable {
         self.duration = duration
         self.fileSize = fileSize
         self.format = format
+        self.creationDate = creationDate
     }
 
     var durationFormatted: String {
@@ -47,12 +50,22 @@ enum AudioFormat: String, Codable, Hashable {
     case mp3 = "mp3"
     case m4a = "m4a"
     case wav = "wav"
+    case aac = "aac"
+    case flac = "flac"
+    case aiff = "aiff"
+    case m4b = "m4b"
+    case mp4 = "mp4"
 
     var displayName: String {
         switch self {
         case .mp3: return "MP3"
         case .m4a: return "M4A"
         case .wav: return "WAV"
+        case .aac: return "AAC"
+        case .flac: return "FLAC"
+        case .aiff: return "AIFF"
+        case .m4b: return "M4B"
+        case .mp4: return "MP4"
         }
     }
 }

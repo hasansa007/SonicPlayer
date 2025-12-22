@@ -56,7 +56,7 @@ struct HelpView: View {
                 StepCard(
                     number: 2,
                     title: "Browse Your Files",
-                    description: "Go to the Files tab to see all your audio files. Tap on any file to start playing it."
+                    description: "Go to the Library tab to see all your audio files. Tap on any file to start playing it."
                 )
 
                 StepCard(
@@ -77,12 +77,12 @@ struct HelpView: View {
             VStack(spacing: 12) {
                 FAQItem(
                     question: "How do I add audio files?",
-                    answer: "Connect your device to your computer and use iTunes or Finder to add files to the SonicPlayer Documents folder. Supported formats: MP3, M4A, WAV."
+                    answer: "Connect your device to your computer and use iTunes or Finder to add files to the Sonic Player Documents folder. Supported formats: MP3, M4A, WAV."
                 )
 
                 FAQItem(
-                    question: "Can I use SonicPlayer offline?",
-                    answer: "Yes! SonicPlayer is designed to work completely offline. All your audio files are stored locally on your device."
+                    question: "Can I use Sonic Player offline?",
+                    answer: "Yes! Sonic Player is designed to work completely offline. All your audio files are stored locally on your device."
                 )
 
                 FAQItem(
@@ -97,7 +97,7 @@ struct HelpView: View {
 
                 FAQItem(
                     question: "Does it work with headphones?",
-                    answer: "Absolutely! SonicPlayer supports headphone controls, Bluetooth devices, and lock screen controls for seamless playback."
+                    answer: "Absolutely! Sonic Player supports headphone controls, Bluetooth devices, and lock screen controls for seamless playback."
                 )
             }
         }
@@ -134,7 +134,7 @@ struct HelpView: View {
                     issue: "Background playback not working",
                     solutions: [
                         "Check that Low Power Mode is not enabled",
-                        "Ensure Background App Refresh is enabled for SonicPlayer",
+                        "Ensure Background App Refresh is enabled for Sonic Player",
                         "Check your device's audio session settings"
                     ]
                 )

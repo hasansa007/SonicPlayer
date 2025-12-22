@@ -25,13 +25,6 @@ struct FilesView: View {
         .toolbar {
             toolbarContent
         }
-        .toolbar {
-            if store.isSelectionMode {
-                ToolbarItem(placement: .bottomBar) {
-                    bottomToolbarContent
-                }
-            }
-        }
         .searchable(
             text: Binding(
                 get: { store.searchText },
@@ -82,6 +75,9 @@ struct FilesView: View {
         )) {
             FolderPickerView(store: store)
         }
+        .sheet(item: $store.scope(state: \.editAudio, action: \.editAudio)) { editStore in
+            EditRecordingView(store: editStore)
+        }
         .onAppear {
             store.send(.onAppear)
         }
@@ -103,7 +99,7 @@ struct FilesView: View {
             Image(systemName: "folder.badge.questionmark")
                 .font(.system(size: 64))
                 .foregroundStyle(LinearGradient.sonicGradientPurple)
-            
+
             Text("Folder is Empty")
                 .font(.title3)
                 .fontWeight(.semibold)
@@ -125,12 +121,6 @@ struct FilesView: View {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 16) {
                             ForEach(store.scope(state: \.filteredFolderCards, action: \.folderCards)) { cardStore in
                                 FolderCardView(store: cardStore)
-                                    // Add visual selection state if needed
-                                    .opacity(cardStore.isSelected ? 0.7 : 1.0)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color.sonicPurple, lineWidth: cardStore.isSelected ? 3 : 0)
-                                    )
                                     .contextMenu {
                                         Button {
                                             cardStore.send(.moveTapped)
@@ -159,7 +149,7 @@ struct FilesView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         LazyVStack(spacing: 8) {
                             ForEach(store.scope(state: \.filteredFileRows, action: \.fileRows)) { rowStore in
-                                FileItemRow(store: rowStore, isSelectionMode: store.isSelectionMode)
+                                FileItemRow(store: rowStore, isSelectionMode: false)
                                 .contextMenu {
                                     Button {
                                         rowStore.send(.moveTapped)
@@ -194,24 +184,20 @@ struct FilesView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
-            if store.isSelectionMode {
-                Button("Done") {
-                    store.send(.toggleSelectionMode)
-                }
-            } else {
-                optionsMenu
-            }
+            optionsMenu
         }
     }
     
     private var optionsMenu: some View {
         Menu {
+            // Import Files
             Button {
                 showingDocumentPicker = true
             } label: {
                 Label("Import Files", systemImage: "square.and.arrow.down")
             }
 
+            // Create New Folder
             Button {
                 store.send(.createFolderTapped)
             } label: {
@@ -220,6 +206,17 @@ struct FilesView: View {
 
             Divider()
 
+            // Share (SharePlay) - Disabled
+            Button {
+                // SharePlay not yet implemented
+            } label: {
+                Label("Share", systemImage: "shareplay")
+            }
+            .disabled(true)
+
+            Divider()
+
+            // Sort By
             Menu("Sort By") {
                 Picker("Sort By", selection: $store.sortOption.sending(\.setSortOption)) {
                     Text("Name").tag(FilesFeature.SortOption.name)
@@ -229,36 +226,11 @@ struct FilesView: View {
             }
         } label: {
             Image(systemName: "ellipsis.circle")
+                .font(.title3)
                 .foregroundColor(.sonicPrimaryDark)
         }
     }
-    
-    @ViewBuilder
-    private var bottomToolbarContent: some View {
-        HStack {
-            Button(role: .destructive) {
-                store.send(.deleteSelectedTapped)
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-            .disabled(store.selectedItems.isEmpty)
-            
-            Spacer()
-            
-            Text("\(store.selectedItems.count) selected")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
-            Spacer()
-            
-            Button {
-                store.send(.moveSelectedTapped)
-            } label: {
-                Label("Move", systemImage: "folder")
-            }
-            .disabled(store.selectedItems.isEmpty)
-        }
-    }
+
 }
 
 // MARK: - Document Picker
@@ -269,12 +241,13 @@ struct DocumentPicker: UIViewControllerRepresentable {
     let onPick: ([URL]) -> Void
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        // Support multiple audio formats
+        // Support multiple audio formats and folders
         let types: [UTType] = [
             .mp3,
             .mpeg4Audio,  // m4a
             .wav,
-            .audio  // Fallback for other audio types
+            .audio,  // Fallback for other audio types
+            .folder  // Allow folder selection
         ].compactMap { $0 }
 
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)

@@ -8,22 +8,30 @@ struct AppFeature {
     struct State: Equatable { // Keep manual Equatable.
         var selectedTab: Tab = .home
         var player = PlayerFeature.State()
-        
+
         var home = HomeFeature.State()
-        
+
         // Navigation Stack for Files
         var filesPath = StackState<FilesFeature.State>()
         var filesRoot = FilesFeature.State(currentDirectory: nil) // Root
-        
+
         var settings = SettingsFeature.State()
+        var recording = RecordingFeature.State()
+
+        // App Mode
+        var isRecordingMode: Bool {
+            settings.isRecordingMode
+        }
 
         static func == (lhs: State, rhs: State) -> Bool {
             lhs.selectedTab == rhs.selectedTab &&
             lhs.player == rhs.player &&
             lhs.home == rhs.home &&
-            lhs.filesPath == rhs.filesPath //&&
-//            lhs.filesRoot == rhs.filesRoot &&
-//            lhs.settings == rhs.settings
+            lhs.filesPath == rhs.filesPath &&
+            lhs.recording == rhs.recording
+            // Intentionally ignore:
+            // - `filesRoot`: can be large and changes frequently while browsing.
+            // - `settings`: persists via UserDefaults and doesn't need to drive app-level equality.
         }
     }
 
@@ -37,6 +45,7 @@ struct AppFeature {
         case filesRoot(FilesFeature.Action)
 
         case settings(SettingsFeature.Action)
+        case recording(RecordingFeature.Action)
 
         // Refresh logic
         case checkAndRefreshSuggestions
@@ -48,6 +57,7 @@ struct AppFeature {
     enum Tab: Hashable {
         case home
         case files
+        case sharing
         case settings
     }
 
@@ -68,24 +78,23 @@ struct AppFeature {
             SettingsFeature()
         }
 
+        Scope(state: \.recording, action: \.recording) {
+            RecordingFeature()
+        }
+
         Reduce { state, action in
             switch action {
             case let .selectTab(tab):
-                state.selectedTab = tab
+                state.selectedTab = state.isTabAvailable(tab) ? tab : .home
                 return .none
                 
             // Home Actions
             case .home(.libraryTapped):
-                state.selectedTab = .files
+                state.selectedTab = state.isTabAvailable(.files) ? .files : .home
                 return .none
                 
             case let .home(.folderTapped(folder)):
-                state.selectedTab = .files
-                // Reset stack to root then push? Or just push?
-                // For simplicity, let's append to the existing path or reset.
-                // A cleaner "Navigate to" would reset path to root and push the specific folder.
-                state.filesPath.removeAll()
-                state.filesPath.append(FilesFeature.State(currentDirectory: folder.url))
+                state.navigateToFolderInLibrary(folder.url)
                 return .none
                 
             case let .home(.playTrack(track)):
@@ -136,6 +145,11 @@ struct AppFeature {
             case let .settings(.setDefaultPlaybackSpeed(speed)):
                 return .send(.player(.setPlaybackSpeed(speed)))
 
+            case .settings(.toggleRecordingMode):
+                // When switching modes, always stop and clear the player (PlayerView + MiniPlayer).
+                state.ensureValidTabForCurrentMode()
+                return .send(.player(.clearSession))
+
             case .player(.trackLoaded), .player(.sessionLoaded):
                 state.home.lastPlayedTrack = state.player.currentTrack
                 state.home.isPlaying = state.player.isPlaying
@@ -173,13 +187,39 @@ struct AppFeature {
                 state.home.isPlaying = false
                 state.home.playbackProgress = 0
                 return .none
-                
-            case .player, .home, .filesRoot, .filesPath, .settings:
+
+            case .player, .home, .filesRoot, .filesPath, .settings, .recording:
                 return .none
             }
         }
         .forEach(\.filesPath, action: \.filesPath) {
             FilesFeature()
         }
+    }
+}
+
+private extension AppFeature.State {
+    func isTabAvailable(_ tab: AppFeature.Tab) -> Bool {
+        guard isRecordingMode else { return true }
+        return tab != .files && tab != .sharing
+    }
+
+    mutating func ensureValidTabForCurrentMode() {
+        if !isTabAvailable(selectedTab) {
+            selectedTab = .home
+        }
+        if isRecordingMode {
+            filesPath.removeAll()
+        }
+    }
+
+    mutating func navigateToFolderInLibrary(_ folderURL: URL) {
+        guard isTabAvailable(.files) else {
+            selectedTab = .home
+            return
+        }
+        selectedTab = .files
+        filesPath.removeAll()
+        filesPath.append(FilesFeature.State(currentDirectory: folderURL))
     }
 }

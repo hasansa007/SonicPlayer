@@ -19,6 +19,7 @@ struct FilesFeature {
         var isSelectionMode = false
         var selectedItems: Set<FileSystemItem> = []
         @Presents var alert: AlertState<Action.Alert>?
+        @Presents var editAudio: EditRecordingFeature.State?
 
         // Input State
         var isCreatingFolder = false
@@ -113,6 +114,7 @@ struct FilesFeature {
         case createFolderInPicker(String)
         case cancelMove
         case alert(PresentationAction<Alert>)
+        case editAudio(PresentationAction<EditRecordingFeature.Action>)
 
         enum Alert: Equatable {
             case confirmDelete
@@ -259,7 +261,13 @@ struct FilesFeature {
                     return .send(.deleteSelectedTapped)
                 }
                 return .none
-                
+
+            case let .fileRows(.element(id: id, action: .editTapped)):
+                if let file = state.fileRows[id: id]?.file {
+                    state.editAudio = EditRecordingFeature.State(recording: file)
+                }
+                return .none
+
             case let .fileRows(.element(id: id, action: .toggleSelection)):
                 if let file = state.fileRows[id: id]?.file {
                     return .send(.toggleSelection(.file(file)))
@@ -448,6 +456,9 @@ struct FilesFeature {
             case .alert:
                 return .none
 
+            case .editAudio:
+                return .none
+
             case let .moveItemTapped(item):
                 state.itemsToMove = [item]
                 return .send(.loadFoldersForMove)
@@ -538,6 +549,9 @@ struct FilesFeature {
             }
         }
         .ifLet(\.$alert, action: \.alert)
+        .ifLet(\.$editAudio, action: \.editAudio) {
+            EditRecordingFeature()
+        }
         .forEach(\.folderCards, action: \.folderCards) {
             FolderCardFeature()
         }
