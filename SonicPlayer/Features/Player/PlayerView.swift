@@ -69,8 +69,8 @@ struct PlayerView: View {
             let isLandscape = geometry.size.width > geometry.size.height
 
             ZStack(alignment: .top) {
-                if isLandscape && !showQueue {
-                    // Landscape layout: artwork left, controls right
+                if isLandscape {
+                    // Landscape layout: artwork, controls, queue
                     landscapeLayout(geometry: geometry)
                 } else {
                     // Portrait layout: vertical stack
@@ -115,47 +115,48 @@ struct PlayerView: View {
     }
 
     private func landscapeLayout(geometry: GeometryProxy) -> some View {
-        HStack(spacing: 24) {
-            // Left side: Artwork and track info
+        HStack(spacing: 20) {
+            // Left: Artwork + track info
             VStack(spacing: 16) {
                 Spacer()
-
-                // Artwork
                 landscapeArtwork
-
-                // Track info
                 trackInfoView
-
                 Spacer()
             }
-            .frame(width: geometry.size.width * 0.35)
+            .frame(width: geometry.size.width * 0.30)
 
-            // Right side: Controls
+            // Middle: Controls
             VStack(spacing: 16) {
                 headerView
-
-                Spacer()
-
-                // Progress slider with skips
                 progressSliderWithSkipsView
-
-                // Playback controls
                 controlsView
-
-                // Volume
                 VolumeView()
                     .frame(height: 40)
                     .padding(.horizontal)
-
-                // Bottom controls
                 bottomControlsView
-
-                Spacer()
+                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: showQueue ? geometry.size.width * 0.34 : .infinity)
+
+            if showQueue {
+                // Right: Queue
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Up Next")
+                        .font(.headline)
+                        .foregroundColor(.sonicTextPrimary)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 10)
+
+                    queueListView
+                        .padding(.vertical, 12)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .padding(4)
+            }
         }
-        .padding(.horizontal, 24)
-        .padding(.bottom, 16)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 12)
     }
 
     private var landscapeArtwork: some View {
@@ -462,6 +463,7 @@ struct PlayerView: View {
                 .fontWeight(.semibold)
                 .foregroundColor(.sonicTextPrimary)
                 .frame(height: 28)
+                .padding(.horizontal, 10)
 
             if let format = store.currentTrack?.format {
                 Text(format.displayName)
@@ -695,7 +697,7 @@ struct VolumeView: UIViewRepresentable {
 
 struct ScrollingText: View {
     let text: String
-    @State private var offset: CGFloat = 0
+    @State private var offset: CGFloat = 10
     @State private var textWidth: CGFloat = 0
     @State private var containerWidth: CGFloat = 0
 
