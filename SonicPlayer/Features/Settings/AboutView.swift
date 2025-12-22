@@ -42,33 +42,45 @@ struct AboutView: View {
 
     private var heroSection: some View {
         VStack(spacing: 20) {
-            // Animated logo
-            ZStack {
-                Circle()
-                    .fill(LinearGradient.sonicGradient)
-                    .frame(width: 120, height: 120)
-                    .shadow(color: Color.sonicPrimary.opacity(0.4), radius: 30, x: 0, y: 15)
-
-                Image(systemName: "waveform.circle.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.white)
-            }
+            // App logo
+            Image("AppLogo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 120, height: 120)
+                .clipShape(RoundedRectangle(cornerRadius: 26))
+                .shadow(color: Color.sonicPrimary.opacity(0.4), radius: 30, x: 0, y: 15)
 
             VStack(spacing: 8) {
-                Text("SonicPlayer")
+                Text("Sonic Player")
                     .font(.system(size: 32, weight: .bold))
                     .foregroundStyle(LinearGradient.sonicGradient)
 
-                Text("Smart Audio Player for Learning")
+                Text("Offline-first Audio Player")
                     .font(.subheadline)
                     .foregroundColor(.sonicTextSecondary)
                     .multilineTextAlignment(.center)
 
-                Text("Version 1.0.0")
+                Text("Version \(appVersion)")
                     .font(.caption)
                     .foregroundColor(.sonicTextMuted)
                     .padding(.top, 4)
             }
+        }
+    }
+
+    private var appVersion: String {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+
+        switch (shortVersion, build) {
+        case let (shortVersion?, build?):
+            return "\(shortVersion) (\(build))"
+        case let (shortVersion?, nil):
+            return shortVersion
+        case let (nil, build?):
+            return build
+        case (nil, nil):
+            return "—"
         }
     }
 
@@ -78,7 +90,7 @@ struct AboutView: View {
             icon: "target",
             iconColor: .sonicPrimary
         ) {
-            Text("SonicPlayer is built with passion to improve the audio learning experience for students and learners worldwide. We believe that accessing educational content should be simple, efficient, and enjoyable.")
+            Text("Sonic Player is built to help you enjoy your personal audio library without ads, algorithms, or distractions. Import your files, organize by folders, search quickly, and listen anywhere — even offline.")
                 .font(.body)
                 .foregroundColor(.sonicTextSecondary)
                 .lineHeight(1.6)
@@ -93,15 +105,15 @@ struct AboutView: View {
         ) {
             VStack(spacing: 16) {
                 FeatureItem(
-                    icon: "speedometer",
-                    title: "Variable Speed Control",
-                    description: "Listen at your own pace with speeds from 0.5× to 2.0×"
+                    icon: "square.stack.3d.up.fill",
+                    title: "Library + Search",
+                    description: "Browse folders, sort, and search your audio collection"
                 )
 
                 FeatureItem(
                     icon: "wifi.slash",
                     title: "Offline First",
-                    description: "All your lectures available anytime, anywhere, without internet"
+                    description: "Your files stay on your device — no internet required"
                 )
 
                 FeatureItem(
@@ -114,6 +126,12 @@ struct AboutView: View {
                     icon: "arrow.left.arrow.right",
                     title: "Smart Skip Controls",
                     description: "Jump forward or backward with customizable intervals"
+                )
+
+                FeatureItem(
+                    icon: "mic.fill",
+                    title: "Recording Mode",
+                    description: "Record audio and edit recordings (trim or delete sections)"
                 )
             }
         }

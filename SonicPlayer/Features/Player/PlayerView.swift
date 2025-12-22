@@ -53,7 +53,7 @@ struct PlayerView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.sonicTextPrimary)
 
-                Text("Select a file from the Files tab to start playing")
+                Text("Select a file from the Library tab to start playing")
                     .font(.body)
                     .foregroundColor(.sonicTextSecondary)
                     .multilineTextAlignment(.center)
@@ -66,40 +66,152 @@ struct PlayerView: View {
 
     private var playerContent: some View {
         GeometryReader { geometry in
+            let isLandscape = geometry.size.width > geometry.size.height
+
             ZStack(alignment: .top) {
-                VStack(spacing: 20) {
-                    headerView
-
-                    // Combined section to maintain consistent height
-                    VStack(spacing: 20) {
-                        // Animated thumbnail
-                        animatedThumbnailView
-                            .frame(height: showQueue ? 100 : nil)
-                            .padding(.top, showQueue ? 20 : 0)
-
-                        if showQueue {
-                            // Playback mode buttons
-                            playbackModeButtons
-                                .transition(.opacity)
-                                .padding(.top, 8)
-                        }
-
-                        // Track info or queue (takes remaining space)
-                        if showQueue {
-                            queueListView
-                        } else {
-                            trackInfoView
-                        }
-                    }
-                    .frame(maxHeight: .infinity)
-
-                    // Player controls (fixed at bottom)
-                    fullPlayerControls
+                if isLandscape && !showQueue {
+                    // Landscape layout: artwork left, controls right
+                    landscapeLayout(geometry: geometry)
+                } else {
+                    // Portrait layout: vertical stack
+                    portraitLayout
                 }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 16)
             }
         }
+    }
+
+    private var portraitLayout: some View {
+        VStack(spacing: 20) {
+            headerView
+
+            // Combined section to maintain consistent height
+            VStack(spacing: 20) {
+                // Animated thumbnail
+                animatedThumbnailView
+                    .frame(height: showQueue ? 100 : nil)
+                    .padding(.top, showQueue ? 20 : 0)
+
+                if showQueue {
+                    // Playback mode buttons
+                    playbackModeButtons
+                        .transition(.opacity)
+                        .padding(.top, 8)
+                }
+
+                // Track info or queue (takes remaining space)
+                if showQueue {
+                    queueListView
+                } else {
+                    trackInfoView
+                }
+            }
+            .frame(maxHeight: .infinity)
+
+            // Player controls (fixed at bottom)
+            fullPlayerControls
+        }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 16)
+    }
+
+    private func landscapeLayout(geometry: GeometryProxy) -> some View {
+        HStack(spacing: 24) {
+            // Left side: Artwork and track info
+            VStack(spacing: 16) {
+                Spacer()
+
+                // Artwork
+                landscapeArtwork
+
+                // Track info
+                trackInfoView
+
+                Spacer()
+            }
+            .frame(width: geometry.size.width * 0.35)
+
+            // Right side: Controls
+            VStack(spacing: 16) {
+                headerView
+
+                Spacer()
+
+                // Progress slider with skips
+                progressSliderWithSkipsView
+
+                // Playback controls
+                controlsView
+
+                // Volume
+                VolumeView()
+                    .frame(height: 40)
+                    .padding(.horizontal)
+
+                // Bottom controls
+                bottomControlsView
+
+                Spacer()
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 16)
+    }
+
+    private var landscapeArtwork: some View {
+        ZStack {
+            if let artwork = store.artwork {
+                Image(uiImage: artwork)
+                    .resizable()
+                    .aspectRatio(1, contentMode: .fill)
+                    .frame(width: 180, height: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 24)
+                            .fill(Color.sonicPrimaryLight.opacity(0.15))
+                    }
+            } else {
+                // Gradient background
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(
+                        LinearGradient(
+                            colors: colors,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+
+            // Waveform
+            WaveformView(
+                isPlaying: store.isPlaying,
+                barCount: 12,
+                barWidth: 4,
+                baseHeight: 24,
+                amplitudeRange: 4...28
+            )
+            .foregroundColor(.white.opacity(0.8))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
+
+            // Border overlay
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(
+                    LinearGradient(
+                        colors: [.white.opacity(0.5), .white.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 2
+                )
+        }
+        .frame(width: 180, height: 180)
+        .shadow(
+            color: colors.first?.opacity(0.5) ?? Color.sonicPrimary.opacity(0.4),
+            radius: 20,
+            x: 0,
+            y: 10
+        )
     }
 
     private var animatedThumbnailView: some View {

@@ -28,8 +28,7 @@ enum FileSystemItem: Identifiable, Equatable, Hashable {
     var date: Date {
         switch self {
         case .folder(let folder): return folder.creationDate
-        case .file(let file): 
-            return (try? file.url.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date()
+        case .file(let file): return file.creationDate
         }
     }
 

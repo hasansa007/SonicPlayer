@@ -50,19 +50,19 @@ struct HelpView: View {
                 StepCard(
                     number: 1,
                     title: "Add Audio Files",
-                    description: "Transfer MP3, M4A, or WAV files to your device's Documents folder using iTunes, Finder, or other file transfer methods."
+                    description: "Go to the Library tab, tap the … menu, then choose Import to add MP3, M4A, or WAV files (or folders) from the Files app."
                 )
 
                 StepCard(
                     number: 2,
-                    title: "Browse Your Files",
-                    description: "Go to the Files tab to see all your audio files. Tap on any file to start playing it."
+                    title: "Browse or Search",
+                    description: "Use Library to browse folders, or the Search tab to quickly find what you want."
                 )
 
                 StepCard(
                     number: 3,
                     title: "Control Playback",
-                    description: "Use the Player tab to play, pause, skip, and adjust the playback speed. The player works even when your screen is locked!"
+                    description: "Tap a file to play, then use play/pause, skip, and speed controls. Playback continues in the background and from the Lock Screen."
                 )
             }
         }
@@ -77,17 +77,17 @@ struct HelpView: View {
             VStack(spacing: 12) {
                 FAQItem(
                     question: "How do I add audio files?",
-                    answer: "Connect your device to your computer and use iTunes or Finder to add files to the SonicPlayer Documents folder. Supported formats: MP3, M4A, WAV."
+                    answer: "In the Library tab, tap the … menu and choose Import. You can import files and folders from the Files app. Supported formats: MP3, M4A, WAV."
                 )
 
                 FAQItem(
-                    question: "Can I use SonicPlayer offline?",
-                    answer: "Yes! SonicPlayer is designed to work completely offline. All your audio files are stored locally on your device."
+                    question: "Can I use Sonic Player offline?",
+                    answer: "Yes! Sonic Player is designed to work completely offline. All your audio files are stored locally on your device."
                 )
 
                 FAQItem(
                     question: "How do I change the playback speed?",
-                    answer: "In the Player view, tap the speed button (1.0×) at the bottom to choose from 0.5× to 2.0× speed options."
+                    answer: "In the Player view, tap the speed control to choose from 0.5× to 2.0×."
                 )
 
                 FAQItem(
@@ -97,7 +97,12 @@ struct HelpView: View {
 
                 FAQItem(
                     question: "Does it work with headphones?",
-                    answer: "Absolutely! SonicPlayer supports headphone controls, Bluetooth devices, and lock screen controls for seamless playback."
+                    answer: "Absolutely! Sonic Player supports headphone controls, Bluetooth devices, and lock screen controls for seamless playback."
+                )
+
+                FAQItem(
+                    question: "How do I record and edit audio?",
+                    answer: "Enable Recording Mode in Settings to record audio. You can trim or delete sections of recordings in the editor."
                 )
             }
         }
@@ -114,8 +119,8 @@ struct HelpView: View {
                     issue: "Files not showing up",
                     solutions: [
                         "Make sure files are in MP3, M4A, or WAV format",
-                        "Check that files are in the Documents folder",
-                        "Try refreshing the Files tab using the refresh button",
+                        "Try importing again from Library → … → Import",
+                        "Try pulling to refresh in the Library view",
                         "Restart the app"
                     ]
                 )
@@ -134,7 +139,7 @@ struct HelpView: View {
                     issue: "Background playback not working",
                     solutions: [
                         "Check that Low Power Mode is not enabled",
-                        "Ensure Background App Refresh is enabled for SonicPlayer",
+                        "Ensure Background App Refresh is enabled for Sonic Player",
                         "Check your device's audio session settings"
                     ]
                 )

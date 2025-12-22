@@ -30,7 +30,7 @@ extension DependencyValues {
 }
 
 extension AudioPlayerClient: DependencyKey {
-    static let liveValue: AudioPlayerClient = {
+    static func makeLive() -> AudioPlayerClient {
         let player = AudioPlayerManager()
         return Self(
             prepare: { url in
@@ -40,19 +40,19 @@ extension AudioPlayerClient: DependencyKey {
                 try await player.play(url: url)
             },
             pause: {
-                player.pause()
+                await player.pause()
             },
             resume: {
-                player.resume()
+                await player.resume()
             },
             stop: {
-                player.stop()
+                await player.stop()
             },
             seek: { time in
                 await player.seek(to: time)
             },
             setRate: { rate in
-                player.setRate(rate)
+                await player.setRate(rate)
             },
             skipForward: { interval in
                 await player.skip(by: interval)
@@ -69,19 +69,21 @@ extension AudioPlayerClient: DependencyKey {
                 }
             },
             currentTime: {
-                player.currentTime
+                await player.currentTime
             },
             duration: {
                 await player.duration
             },
             isPlaying: {
-                player.isPlaying
+                await player.isPlaying
             },
             timeUpdates: {
-                player.timeUpdates()
+                await player.timeUpdates()
             }
         )
-    }()
+    }
+
+    static let liveValue: AudioPlayerClient = makeLive()
 
     static let testValue = Self()
 }
@@ -331,4 +333,3 @@ private final class AudioPlayerManager: NSObject, ObservableObject {
         }
     }
 }
-

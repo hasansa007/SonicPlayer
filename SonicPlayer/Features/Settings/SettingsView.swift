@@ -14,6 +14,9 @@ struct SettingsView: View {
                         // App branding
                         appHeaderView
 
+                        // App Mode
+                        appModeSection
+
                         // Playback settings
                         playbackSettingsSection
 
@@ -55,17 +58,48 @@ struct SettingsView: View {
                 .shadow(color: Color.sonicPrimary.opacity(0.4), radius: 20, x: 0, y: 10)
 
             VStack(spacing: 4) {
-                Text("SonicPlayer")
+                Text("Sonic Player")
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundStyle(LinearGradient.sonicGradient)
 
-                Text("v1.0.0")
+                Text("v\(appShortVersion)")
                     .font(.caption)
                     .foregroundColor(.sonicTextSecondary)
             }
         }
         .padding(.vertical, 20)
+    }
+
+    private var appShortVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+    }
+
+    private var appModeSection: some View {
+        SettingsSection(title: "App Mode", icon: "waveform.circle.fill") {
+            VStack(spacing: 12) {
+                SettingsRow(
+                    icon: store.isRecordingMode ? "mic.fill" : "play.fill",
+                    title: "Recording Mode",
+                    iconColor: store.isRecordingMode ? .red : .sonicPrimary
+                ) {
+                    Toggle("", isOn: Binding(
+                        get: { store.isRecordingMode },
+                        set: { _ in store.send(.toggleRecordingMode) }
+                    ))
+                    .labelsHidden()
+                    .tint(.sonicPrimary)
+                }
+
+                if store.isRecordingMode {
+                    Text("Recording mode enabled. The app will show recording interface instead of the player.")
+                        .font(.caption)
+                        .foregroundColor(.sonicTextSecondary)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 4)
+                }
+            }
+        }
     }
 
     private var playbackSettingsSection: some View {
@@ -183,7 +217,7 @@ struct SettingsView: View {
             VStack(spacing: 12) {
                 SettingsButton(
                     icon: "info.circle",
-                    title: "About SonicPlayer",
+                    title: "About Sonic Player",
                     iconColor: .blue
                 ) {
                     store.send(.showAboutTapped)

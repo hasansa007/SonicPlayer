@@ -39,6 +39,15 @@ extension UserDefaults {
             set(newValue.rawValue, forKey: "colorScheme")
         }
     }
+
+    var savedRecordingMode: Bool {
+        get {
+            return bool(forKey: "isRecordingMode")
+        }
+        set {
+            set(newValue, forKey: "isRecordingMode")
+        }
+    }
 }
 
 @Reducer
@@ -48,6 +57,7 @@ struct SettingsFeature {
         var defaultPlaybackSpeed: PlaybackSpeed
         var defaultSkipDuration: SkipDuration
         var colorScheme: AppColorScheme
+        var isRecordingMode: Bool
         var showAbout = false
         var showHelp = false
 
@@ -55,6 +65,7 @@ struct SettingsFeature {
             self.defaultPlaybackSpeed = UserDefaults.standard.savedPlaybackSpeed
             self.defaultSkipDuration = UserDefaults.standard.savedSkipDuration
             self.colorScheme = UserDefaults.standard.savedColorScheme
+            self.isRecordingMode = UserDefaults.standard.savedRecordingMode
         }
     }
 
@@ -62,6 +73,7 @@ struct SettingsFeature {
         case setDefaultPlaybackSpeed(PlaybackSpeed)
         case setDefaultSkipDuration(SkipDuration)
         case setColorScheme(AppColorScheme)
+        case toggleRecordingMode
         case showAboutTapped
         case showHelpTapped
         case requestFeatureTapped
@@ -85,6 +97,11 @@ struct SettingsFeature {
             case let .setColorScheme(scheme):
                 state.colorScheme = scheme
                 UserDefaults.standard.savedColorScheme = scheme
+                return .none
+
+            case .toggleRecordingMode:
+                state.isRecordingMode.toggle()
+                UserDefaults.standard.savedRecordingMode = state.isRecordingMode
                 return .none
 
             case .showAboutTapped:
