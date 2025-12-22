@@ -43,12 +43,14 @@ struct RecordingFeature {
         case recordingTapped(AudioFile)
         case deleteRecording(AudioFile)
         case editRecording(PresentationAction<EditRecordingFeature.Action>)
+        case editedRecordingReloaded(AudioFile?)
         case setShowPermissionAlert(Bool)
     }
 
     @Dependency(\.audioRecorder) var audioRecorder
     @Dependency(\.fileManager) var fileManager
     @Dependency(\.continuousClock) var clock
+    @Dependency(\.audioPlayer) var audioPlayer
 
     private enum CancelID { case recordingTimer }
 
@@ -221,14 +223,34 @@ struct RecordingFeature {
                 }
 
             case .editRecording(.presented(.deleted)):
-                // Reload recordings after deletion
-                state.editRecording = nil
-                return .send(.loadRecordings)
+                return .run { [url = state.editRecording?.recording.url] send in
+                    await send(.loadRecordings)
+                    guard let url else { return }
+                    let updated = try? await fileManager.getMetadata(url)
+                    await send(.editedRecordingReloaded(updated))
+                }
 
             case .editRecording(.presented(.trimApplied)):
-                // Reload recordings after trim
-                state.editRecording = nil
-                return .send(.loadRecordings)
+                return .run { [url = state.editRecording?.recording.url] send in
+                    await send(.loadRecordings)
+                    guard let url else { return }
+                    let updated = try? await fileManager.getMetadata(url)
+                    await send(.editedRecordingReloaded(updated))
+                }
+
+            case .editRecording(.dismiss):
+                return .run { _ in
+                    await audioPlayer.stop()
+                }
+
+            case let .editedRecordingReloaded(updated):
+                if let updated {
+                    state.editRecording = EditRecordingFeature.State(recording: updated)
+                } else {
+                    state.editRecording?.isPlaying = false
+                    state.editRecording?.currentTime = 0
+                }
+                return .none
 
             case .editRecording:
                 return .none
@@ -268,7 +290,6 @@ struct EditRecordingFeature {
 
     enum Action {
         case onAppear
-        case onDisappear
         case playPauseTapped
         case skipForward
         case skipBackward
@@ -302,15 +323,6 @@ struct EditRecordingFeature {
                 // Start playback automatically in preview mode
                 state.currentTime = 0
                 return .none
-                
-            case .onDisappear:
-                state.isPlaying = false
-                return .merge(
-                    .cancel(id: CancelID.playbackTimeUpdates),
-                    .run { _ in
-                        await audioPlayer.stop()
-                    }
-                )
 
             case .playPauseTapped:
                 if state.isPlaying {

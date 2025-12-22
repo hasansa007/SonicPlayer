@@ -114,16 +114,15 @@ struct RecordingView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
-                    .padding(.bottom, 160) // Space for record button
                 }
+                .frame(maxHeight: .infinity)
             }
 
             // Floating record button
             if !store.isRecording {
                 VStack {
-                    Spacer()
                     recordButton
-                        .padding(.bottom, 40)
+                        .padding(.vertical, 40)
                 }
             }
         }

@@ -74,9 +74,6 @@ struct EditRecordingView: View {
         .onAppear {
             store.send(.onAppear)
         }
-        .onDisappear {
-            store.send(.onDisappear)
-        }
     }
 
     private var topBar: some View {
