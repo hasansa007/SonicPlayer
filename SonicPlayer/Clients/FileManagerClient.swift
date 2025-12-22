@@ -20,7 +20,7 @@ extension FileManagerClient: DependencyKey {
     static let liveValue: FileManagerClient = {
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
-        func stableAudioID(for url: URL) -> UUID {
+        @Sendable func stableAudioID(for url: URL) -> UUID {
             let path = url.standardizedFileURL.path
             let digest = SHA256.hash(data: Data(path.utf8))
             let bytes = Array(digest.prefix(16)).map { UInt8($0) }
@@ -31,7 +31,7 @@ extension FileManagerClient: DependencyKey {
             // Get duration with fallback to AVAudioPlayer
             var duration: TimeInterval = 0
             do {
-                let asset = AVAsset(url: url)
+                let asset = AVURLAsset(url: url)
                 duration = try await asset.load(.duration).seconds
             } catch {
                 // Fallback: try AVAudioPlayer which is more forgiving for MP3s
