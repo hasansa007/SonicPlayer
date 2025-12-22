@@ -1,5 +1,6 @@
 import AVFoundation
 import ComposableArchitecture
+import CryptoKit
 import Foundation
 
 @DependencyClient
@@ -19,6 +20,13 @@ extension FileManagerClient: DependencyKey {
     static let liveValue: FileManagerClient = {
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
+        func stableAudioID(for url: URL) -> UUID {
+            let path = url.standardizedFileURL.path
+            let digest = SHA256.hash(data: Data(path.utf8))
+            let bytes = Array(digest.prefix(16)).map { UInt8($0) }
+            return UUID(uuid: (bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7], bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]))
+        }
+
         let getMetadata: @Sendable (URL) async throws -> AudioFile = { url in
             // Get duration with fallback to AVAudioPlayer
             var duration: TimeInterval = 0
@@ -32,25 +40,33 @@ extension FileManagerClient: DependencyKey {
                 }
             }
 
-            let resources = try url.resourceValues(forKeys: [.fileSizeKey])
+            let resources = try url.resourceValues(forKeys: [.fileSizeKey, .creationDateKey])
             let fileSize = Int64(resources.fileSize ?? 0)
+            let creationDate = resources.creationDate ?? Date()
 
             let format: AudioFormat
             switch url.pathExtension.lowercased() {
             case "mp3": format = .mp3
             case "m4a": format = .m4a
             case "wav": format = .wav
+            case "aac": format = .aac
+            case "flac": format = .flac
+            case "aiff": format = .aiff
+            case "m4b": format = .m4b
+            case "mp4": format = .mp4
             default: format = .mp3
             }
 
             let title = url.deletingPathExtension().lastPathComponent
 
             return AudioFile(
+                id: stableAudioID(for: url),
                 url: url,
                 title: title,
                 duration: duration,
                 fileSize: fileSize,
-                format: format
+                format: format,
+                creationDate: creationDate
             )
         }
 
@@ -64,7 +80,7 @@ extension FileManagerClient: DependencyKey {
                     throw NSError(domain: "FileManagerClient", code: 1, userInfo: [NSLocalizedDescriptionKey: "Access Denied: \(targetPath.path) is not in \(rootPath.path)"])
                 }
 
-                let audioExtensions = ["mp3", "m4a", "wav"]
+                let audioExtensions = ["mp3", "m4a", "wav", "aac", "flac", "aiff", "m4b", "mp4"]
                 
                 let contents = try FileManager.default.contentsOfDirectory(
                     at: targetPath,
@@ -242,7 +258,8 @@ extension FileManagerClient: DependencyKey {
                 title: "Test",
                 duration: 0,
                 fileSize: 0,
-                format: .mp3
+                format: .mp3,
+                creationDate: Date()
             )
         },
         documentsDirectory: { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }

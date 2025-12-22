@@ -19,6 +19,7 @@ struct FilesFeature {
         var isSelectionMode = false
         var selectedItems: Set<FileSystemItem> = []
         @Presents var alert: AlertState<Action.Alert>?
+        @Presents var editAudio: EditRecordingFeature.State?
 
         // Input State
         var isCreatingFolder = false
@@ -113,6 +114,7 @@ struct FilesFeature {
         case createFolderInPicker(String)
         case cancelMove
         case alert(PresentationAction<Alert>)
+        case editAudio(PresentationAction<EditRecordingFeature.Action>)
 
         enum Alert: Equatable {
             case confirmDelete
@@ -259,7 +261,13 @@ struct FilesFeature {
                     return .send(.deleteSelectedTapped)
                 }
                 return .none
-                
+
+            case let .fileRows(.element(id: id, action: .editTapped)):
+                if let file = state.fileRows[id: id]?.file {
+                    state.editAudio = EditRecordingFeature.State(recording: file)
+                }
+                return .none
+
             case let .fileRows(.element(id: id, action: .toggleSelection)):
                 if let file = state.fileRows[id: id]?.file {
                     return .send(.toggleSelection(.file(file)))
@@ -377,7 +385,78 @@ struct FilesFeature {
             case let .importFiles(urls):
                 let directory = state.currentDirectory
                 return .run { send in
-                    print("📥 Starting import of \(urls.count) file(s)")
+                    let audioExtensions: Set<String> = ["mp3", "m4a", "wav", "aac", "flac", "aiff", "m4b", "mp4"]
+                    let containsFolder = urls.contains { url in
+                        (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+                    }
+
+                    func createUniqueFolder(named name: String, in parent: URL) throws -> URL {
+                        var finalName = name
+                        var folderURL = parent.appendingPathComponent(finalName, isDirectory: true)
+                        var counter = 2
+
+                        while FileManager.default.fileExists(atPath: folderURL.path) {
+                            finalName = "\(name) \(counter)"
+                            folderURL = parent.appendingPathComponent(finalName, isDirectory: true)
+                            counter += 1
+                        }
+
+                        try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: false)
+                        return folderURL
+                    }
+
+                    func importFolder(_ folderURL: URL, into destinationDirectory: URL?) async throws -> (success: Int, failed: Int) {
+                        let needsAccess = folderURL.startAccessingSecurityScopedResource()
+                        defer {
+                            if needsAccess {
+                                folderURL.stopAccessingSecurityScopedResource()
+                            }
+                        }
+
+                        let parent = destinationDirectory ?? fileManager.documentsDirectory()
+                        let destinationRoot = try createUniqueFolder(named: folderURL.lastPathComponent, in: parent)
+
+                        var success = 0
+                        var failed = 0
+
+                        let keys: [URLResourceKey] = [.isDirectoryKey]
+                        let enumerator = FileManager.default.enumerator(
+                            at: folderURL,
+                            includingPropertiesForKeys: keys,
+                            options: [.skipsHiddenFiles]
+                        )
+
+                        while let next = enumerator?.nextObject() as? URL {
+                            let resourceValues = try? next.resourceValues(forKeys: [.isDirectoryKey])
+                            if resourceValues?.isDirectory == true {
+                                continue
+                            }
+
+                            let ext = next.pathExtension.lowercased()
+                            guard audioExtensions.contains(ext) else { continue }
+
+                            let relativePath = next.path
+                                .replacingOccurrences(of: folderURL.path + "/", with: "")
+                            let relativeDir = (relativePath as NSString).deletingLastPathComponent
+
+                            var targetDir = destinationRoot
+                            if !relativeDir.isEmpty && relativeDir != "." {
+                                targetDir = destinationRoot.appendingPathComponent(relativeDir, isDirectory: true)
+                                try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
+                            }
+
+                            do {
+                                try await fileManager.importFile(next, targetDir)
+                                success += 1
+                            } catch {
+                                failed += 1
+                            }
+                        }
+
+                        return (success, failed)
+                    }
+
+                    print("📥 Starting import of \(urls.count) item(s)")
                     print("   Current directory: \(directory?.path ?? "root")")
 
                     var successCount = 0
@@ -385,7 +464,7 @@ struct FilesFeature {
 
                     // If importing to root, always create a new folder for the files
                     var targetDirectory = directory
-                    if directory == nil {
+                    if directory == nil, !containsFolder {
                         do {
                             targetDirectory = try await fileManager.createFolderForImport()
                             print("📁 Created import folder: \(targetDirectory?.path ?? "nil")")
@@ -396,10 +475,22 @@ struct FilesFeature {
                     }
 
                     for (index, url) in urls.enumerated() {
-                        print("📄 Importing file \(index + 1)/\(urls.count): \(url.lastPathComponent)")
+                        let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+                        print("📄 Importing \(isDirectory ? "folder" : "file") \(index + 1)/\(urls.count): \(url.lastPathComponent)")
                         do {
-                            try await fileManager.importFile(url, targetDirectory)
-                            successCount += 1
+                            if isDirectory {
+                                let (success, failed) = try await importFolder(url, into: targetDirectory)
+                                successCount += success
+                                failCount += failed
+                            } else {
+                                let ext = url.pathExtension.lowercased()
+                                guard audioExtensions.contains(ext) else {
+                                    print("⏭️ Skipping non-audio file: \(url.lastPathComponent)")
+                                    continue
+                                }
+                                try await fileManager.importFile(url, targetDirectory)
+                                successCount += 1
+                            }
                         } catch {
                             print("❌ Failed to import \(url.lastPathComponent): \(error.localizedDescription)")
                             failCount += 1
@@ -446,6 +537,9 @@ struct FilesFeature {
                 }
 
             case .alert:
+                return .none
+
+            case .editAudio:
                 return .none
 
             case let .moveItemTapped(item):
@@ -538,6 +632,9 @@ struct FilesFeature {
             }
         }
         .ifLet(\.$alert, action: \.alert)
+        .ifLet(\.$editAudio, action: \.editAudio) {
+            EditRecordingFeature()
+        }
         .forEach(\.folderCards, action: \.folderCards) {
             FolderCardFeature()
         }

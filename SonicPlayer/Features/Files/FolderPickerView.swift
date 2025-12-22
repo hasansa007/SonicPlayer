@@ -58,7 +58,7 @@ struct FolderPickerView: View {
                     newFolderName = ""
                 }
             } message: {
-                Text("Create a new folder in \(store.currentDirectory?.lastPathComponent ?? "SonicPlayer")")
+                Text("Create a new folder in \(store.currentDirectory?.lastPathComponent ?? "Sonic Player")")
             }
         }
     }

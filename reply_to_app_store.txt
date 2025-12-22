@@ -1,0 +1,27 @@
+Hello Apple Review Team,
+
+Thank you for your feedback regarding Guideline 2.5.4.
+
+SonicPlayer is a dedicated audio player application designed to let users listen to their personal music collection, podcasts, and audiobooks. Persistent background audio is a core feature of the app, allowing users to continue listening to their content while multitasking in other apps or when their device is locked.
+
+The "audio" value in the `UIBackgroundModes` key is essential for this functionality. Without it, playback would stop immediately when the user leaves the app, which would severely degrade the user experience for an audio player.
+
+We have implemented this feature using `AVAudioSession` with the `.playback` category.
+
+**To verify the background audio feature:**
+1. Launch SonicPlayer.
+2. **Import an Audio File (in-app):**
+    *   Navigate to the **Library** tab.
+    *   Tap the **ellipsis (...) circle icon** in the top-right corner of the navigation bar.
+    *   Select **"Import Files"** from the menu.
+    *   Choose an audio file (MP3, M4A, or WAV) from your device's files (e.g., from iCloud Drive, On My iPad/iPhone, etc.) to import it into SonicPlayer.
+3. Once the file is imported, tap on it in the **Library** tab to start playback.
+4. While the audio is playing, press the Home button (or swipe up) to send the app to the background.
+5. **Observation:** The audio continues to play.
+6. Lock the device screen.
+7. **Observation:** The audio continues to play, and playback controls are available on the Lock Screen.
+
+We respectfully request you to re-evaluate the app with these updated steps.
+
+Thank you,
+The SonicPlayer Team

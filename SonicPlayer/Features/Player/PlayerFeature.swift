@@ -205,8 +205,8 @@ struct PlayerFeature {
                     // 5. Update state with loaded data
                     await send(.sessionLoaded(currentFile, queueFiles, currentIndex))
 
-                    // 6. Start restore attempt
-                    await send(.retryRestoreSession(currentFile, sessionTime, 1.0, 0))
+                    // 6. Start restore attempt with saved playback speed
+                    await send(.retryRestoreSession(currentFile, sessionTime, state.playbackSpeed.rawValue, 0))
                 }
 
             case let .sessionLoaded(track, queue, index):
@@ -270,10 +270,17 @@ struct PlayerFeature {
                 state.queue = []
                 state.currentIndex = 0
                 state.currentPlaylistSource = nil
+                state.isPlaying = false
                 state.currentTime = 0
                 state.duration = 0
+                state.isLoadingTrack = false
                 state.isExpanded = false // Dismiss PlayerView
-                return .none
+                return .merge(
+                    .cancel(id: CancelID.timeObserver),
+                    .run { _ in
+                        await audioPlayer.stop()
+                    }
+                )
 
             case .playPauseButtonTapped:
                 if state.isPlaying {
@@ -385,11 +392,13 @@ struct PlayerFeature {
 
             case let .setPlaybackSpeed(speed):
                 state.playbackSpeed = speed
+                UserDefaults.standard.savedPlaybackSpeed = speed
                 let rate = speed.rawValue
                 return Effect.run { send in await audioPlayer.setRate(rate) }
 
             case let .setSkipDuration(duration):
                 state.skipDuration = duration
+                UserDefaults.standard.savedSkipDuration = duration
                 return .none
 
             case let .timeUpdate(time):
