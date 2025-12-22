@@ -65,7 +65,12 @@ struct FilesView: View {
             }
         }
         .sheet(isPresented: $showingDocumentPicker) {
-            DocumentPicker { urls in
+            DocumentPicker(
+                // Use `.item` so folders are selectable in the Files picker.
+                contentTypes: [.item, .folder],
+                asCopy: false,
+                allowsMultipleSelection: true
+            ) { urls in
                 store.send(.importFiles(urls))
             }
         }
@@ -190,11 +195,11 @@ struct FilesView: View {
     
     private var optionsMenu: some View {
         Menu {
-            // Import Files
+            // Import
             Button {
                 showingDocumentPicker = true
             } label: {
-                Label("Import Files", systemImage: "square.and.arrow.down")
+                Label("Import", systemImage: "square.and.arrow.down")
             }
 
             // Create New Folder
@@ -238,20 +243,14 @@ struct FilesView: View {
 import UniformTypeIdentifiers
 
 struct DocumentPicker: UIViewControllerRepresentable {
+    let contentTypes: [UTType]
+    let asCopy: Bool
+    let allowsMultipleSelection: Bool
     let onPick: ([URL]) -> Void
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        // Support multiple audio formats and folders
-        let types: [UTType] = [
-            .mp3,
-            .mpeg4Audio,  // m4a
-            .wav,
-            .audio,  // Fallback for other audio types
-            .folder  // Allow folder selection
-        ].compactMap { $0 }
-
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)
-        picker.allowsMultipleSelection = true
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: contentTypes, asCopy: asCopy)
+        picker.allowsMultipleSelection = allowsMultipleSelection
         picker.delegate = context.coordinator
         return picker
     }

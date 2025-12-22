@@ -60,11 +60,27 @@ struct AboutView: View {
                     .foregroundColor(.sonicTextSecondary)
                     .multilineTextAlignment(.center)
 
-                Text("Version 1.0.0")
+                Text("Version \(appVersion)")
                     .font(.caption)
                     .foregroundColor(.sonicTextMuted)
                     .padding(.top, 4)
             }
+        }
+    }
+
+    private var appVersion: String {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+
+        switch (shortVersion, build) {
+        case let (shortVersion?, build?):
+            return "\(shortVersion) (\(build))"
+        case let (shortVersion?, nil):
+            return shortVersion
+        case let (nil, build?):
+            return build
+        case (nil, nil):
+            return "—"
         }
     }
 

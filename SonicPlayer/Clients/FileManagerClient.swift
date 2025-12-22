@@ -1,5 +1,6 @@
 import AVFoundation
 import ComposableArchitecture
+import CryptoKit
 import Foundation
 
 @DependencyClient
@@ -18,6 +19,13 @@ struct FileManagerClient {
 extension FileManagerClient: DependencyKey {
     static let liveValue: FileManagerClient = {
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+
+        func stableAudioID(for url: URL) -> UUID {
+            let path = url.standardizedFileURL.path
+            let digest = SHA256.hash(data: Data(path.utf8))
+            let bytes = Array(digest.prefix(16)).map { UInt8($0) }
+            return UUID(uuid: (bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7], bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]))
+        }
 
         let getMetadata: @Sendable (URL) async throws -> AudioFile = { url in
             // Get duration with fallback to AVAudioPlayer
@@ -52,6 +60,7 @@ extension FileManagerClient: DependencyKey {
             let title = url.deletingPathExtension().lastPathComponent
 
             return AudioFile(
+                id: stableAudioID(for: url),
                 url: url,
                 title: title,
                 duration: duration,
