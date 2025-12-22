@@ -20,7 +20,7 @@ extension AudioRecorderClient: DependencyKey {
         return Self(
             checkPermissions: {
                 if #available(iOS 17.0, *) {
-                    return await AVAudioApplication.shared.recordPermission == .granted
+                    return AVAudioApplication.shared.recordPermission == .granted
                 } else {
                     return AVAudioSession.sharedInstance().recordPermission == .granted
                 }
@@ -81,7 +81,7 @@ extension DependencyValues {
 private actor RecorderActor {
     private var audioRecorder: AVAudioRecorder?
 
-    func startRecording(url: URL) throws {
+    func startRecording(url: URL) async throws {
         // Configure audio session
         let audioSession = AVAudioSession.sharedInstance()
         try audioSession.setCategory(.record, mode: .default)
@@ -107,7 +107,7 @@ private actor RecorderActor {
         self.audioRecorder = recorder
     }
 
-    func stopRecording() throws -> URL? {
+    func stopRecording() async throws -> URL? {
         guard let recorder = audioRecorder else {
             return nil
         }
@@ -123,17 +123,17 @@ private actor RecorderActor {
         return url
     }
 
-    func currentTime() -> TimeInterval {
+    func currentTime() async -> TimeInterval {
         audioRecorder?.currentTime ?? 0
     }
 
-    func peakPower() -> Float {
+    func peakPower() async -> Float {
         guard let recorder = audioRecorder else { return 0 }
         recorder.updateMeters()
         return recorder.peakPower(forChannel: 0)
     }
 
-    func isRecording() -> Bool {
+    func isRecording() async -> Bool {
         audioRecorder?.isRecording ?? false
     }
 }

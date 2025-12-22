@@ -12,7 +12,7 @@ extension AudioTrimmerClient: DependencyKey {
     static let liveValue: AudioTrimmerClient = {
         return Self(
             trimAudio: { sourceURL, startTime, endTime in
-                let asset = AVAsset(url: sourceURL)
+                let asset = AVURLAsset(url: sourceURL)
 
                 // Validate times
                 let assetDuration = try await asset.load(.duration).seconds
@@ -36,22 +36,15 @@ extension AudioTrimmerClient: DependencyKey {
                 // Remove existing file if present
                 try? FileManager.default.removeItem(at: outputURL)
 
-                // Configure export session
-                exportSession.outputURL = outputURL
-                exportSession.outputFileType = .m4a
-
                 // Set time range
                 let startCMTime = CMTime(seconds: startTime, preferredTimescale: 600)
                 let endCMTime = CMTime(seconds: endTime, preferredTimescale: 600)
                 let timeRange = CMTimeRange(start: startCMTime, end: endCMTime)
                 exportSession.timeRange = timeRange
 
-                // Export
-                await exportSession.export()
+                do {
+                    try await exportSession.export(to: outputURL, as: .m4a)
 
-                // Check status
-                switch exportSession.status {
-                case .completed:
                     // Delete original file
                     try? FileManager.default.removeItem(at: sourceURL)
 
@@ -60,23 +53,15 @@ extension AudioTrimmerClient: DependencyKey {
                     try FileManager.default.moveItem(at: outputURL, to: finalURL)
 
                     return finalURL
-
-                case .failed:
-                    if let error = exportSession.error {
-                        throw AudioTrimmerError.exportFailed(error)
-                    }
-                    throw AudioTrimmerError.exportFailed(NSError(domain: "AudioTrimmer", code: -1))
-
-                case .cancelled:
+                } catch is CancellationError {
                     throw AudioTrimmerError.exportCancelled
-
-                default:
-                    throw AudioTrimmerError.unknownError
+                } catch {
+                    throw AudioTrimmerError.exportFailed(error)
                 }
             }
             ,
             deleteAudioRange: { sourceURL, startTime, endTime in
-                let asset = AVAsset(url: sourceURL)
+                let asset = AVURLAsset(url: sourceURL)
 
                 let assetDurationSeconds = try await asset.load(.duration).seconds
                 guard assetDurationSeconds > 0 else {
@@ -136,29 +121,17 @@ extension AudioTrimmerClient: DependencyKey {
 
                 try? FileManager.default.removeItem(at: outputURL)
 
-                exportSession.outputURL = outputURL
-                exportSession.outputFileType = .m4a
+                do {
+                    try await exportSession.export(to: outputURL, as: .m4a)
 
-                await exportSession.export()
-
-                switch exportSession.status {
-                case .completed:
                     try? FileManager.default.removeItem(at: sourceURL)
                     let finalURL = sourceURL
                     try FileManager.default.moveItem(at: outputURL, to: finalURL)
                     return finalURL
-
-                case .failed:
-                    if let error = exportSession.error {
-                        throw AudioTrimmerError.exportFailed(error)
-                    }
-                    throw AudioTrimmerError.exportFailed(NSError(domain: "AudioTrimmer", code: -1))
-
-                case .cancelled:
+                } catch is CancellationError {
                     throw AudioTrimmerError.exportCancelled
-
-                default:
-                    throw AudioTrimmerError.unknownError
+                } catch {
+                    throw AudioTrimmerError.exportFailed(error)
                 }
             }
         )

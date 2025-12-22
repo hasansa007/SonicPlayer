@@ -5,7 +5,7 @@ struct AudioMetadataService {
 
     /// Extract album artwork from an audio file
     static func extractArtwork(from url: URL) async -> UIImage? {
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
 
         // Try to get artwork from metadata
         guard let formats = try? await asset.load(.availableMetadataFormats) else { return nil }
@@ -29,7 +29,7 @@ struct AudioMetadataService {
 
     /// Extract metadata including title, artist, album
     static func extractMetadata(from url: URL) async -> AudioMetadata {
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
         var metadata = AudioMetadata()
 
         guard let formats = try? await asset.load(.availableMetadataFormats) else { return metadata }
