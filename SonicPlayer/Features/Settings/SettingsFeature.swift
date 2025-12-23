@@ -40,14 +40,6 @@ extension UserDefaults {
         }
     }
 
-    var savedRecordingMode: Bool {
-        get {
-            return bool(forKey: "isRecordingMode")
-        }
-        set {
-            set(newValue, forKey: "isRecordingMode")
-        }
-    }
 }
 
 @Reducer
@@ -65,7 +57,7 @@ struct SettingsFeature {
             self.defaultPlaybackSpeed = UserDefaults.standard.savedPlaybackSpeed
             self.defaultSkipDuration = UserDefaults.standard.savedSkipDuration
             self.colorScheme = UserDefaults.standard.savedColorScheme
-            self.isRecordingMode = UserDefaults.standard.savedRecordingMode
+            self.isRecordingMode = false
         }
     }
 
@@ -101,7 +93,6 @@ struct SettingsFeature {
 
             case .toggleRecordingMode:
                 state.isRecordingMode.toggle()
-                UserDefaults.standard.savedRecordingMode = state.isRecordingMode
                 return .none
 
             case .showAboutTapped:

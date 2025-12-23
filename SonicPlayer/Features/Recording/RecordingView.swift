@@ -3,16 +3,15 @@ import SwiftUI
 
 struct RecordingView: View {
     @Bindable var store: StoreOf<RecordingFeature>
+    let isRecordingMode: Bool
+    let canSwitchMode: Bool
+    let onToggleMode: () -> Void
 
     var body: some View {
-        ZStack {
-            Color.sonicBackground.ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                // Header
-                headerView
-                    .padding(.top, 20)
-
+        NavigationStack {
+            ZStack {
+                Color.sonicBackground.ignoresSafeArea()
+                
                 if store.isRecording {
                     // Recording interface
                     recordingInterface
@@ -21,37 +20,43 @@ struct RecordingView: View {
                     recordingsList
                 }
             }
-        }
-        .alert("Microphone Permission Required", isPresented: $store.showPermissionAlert.sending(\.setShowPermissionAlert)) {
-            Button("Allow Microphone") {
-                store.send(.requestPermissions)
+            .alert("Microphone Permission Required", isPresented: $store.showPermissionAlert.sending(\.setShowPermissionAlert)) {
+                Button("Allow Microphone") {
+                    store.send(.requestPermissions)
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Sonic Player needs access to your microphone to record audio.")
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Sonic Player needs access to your microphone to record audio.")
-        }
-        .sheet(item: $store.scope(state: \.editRecording, action: \.editRecording)) { editStore in
-            EditRecordingView(store: editStore)
-        }
-        .onAppear {
-            store.send(.onAppear)
+            .sheet(item: $store.scope(state: \.editRecording, action: \.editRecording)) { editStore in
+                EditRecordingView(store: editStore)
+            }
+            .onAppear {
+                store.send(.onAppear)
+            }
+            .navigationTitle("Recordings")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    modeButton
+                }
+            }
+            .background(Color.sonicBackground.ignoresSafeArea())
         }
     }
 
-    private var headerView: some View {
-        VStack(spacing: 8) {
-            Text("Recordings")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+    private var modeButton: some View {
+        Button {
+            onToggleMode()
+        } label: {
+            Image(systemName: isRecordingMode ? "play.fill" : "mic.fill")
+                .font(.subheadline.weight(.semibold))
                 .foregroundColor(.sonicTextPrimary)
-
-            if !store.isRecording && !store.recordings.isEmpty {
-                Text("\(store.recordings.count) recording\(store.recordings.count == 1 ? "" : "s")")
-                    .font(.subheadline)
-                    .foregroundColor(.sonicTextSecondary)
-            }
+                .padding(8)
+                .background(.ultraThinMaterial, in: Circle())
         }
-        .frame(maxWidth: .infinity)
+        .accessibilityLabel(isRecordingMode ? "Playing Mode" : "Recording Mode")
+        .disabled(!canSwitchMode)
     }
 
     private var recordingInterface: some View {

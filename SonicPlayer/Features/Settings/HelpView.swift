@@ -9,9 +9,6 @@ struct HelpView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Quick start guide
-                    quickStartSection
-
                     // FAQ section
                     faqSection
 
@@ -36,34 +33,6 @@ struct HelpView: View {
                             .foregroundColor(.sonicTextMuted)
                     }
                 }
-            }
-        }
-    }
-
-    private var quickStartSection: some View {
-        HelpSection(
-            title: "Quick Start",
-            icon: "rocket.fill",
-            iconColor: .sonicPrimary
-        ) {
-            VStack(spacing: 16) {
-                StepCard(
-                    number: 1,
-                    title: "Add Audio Files",
-                    description: "Go to the Library tab, tap the … menu, then choose Import to add MP3, M4A, or WAV files (or folders) from the Files app."
-                )
-
-                StepCard(
-                    number: 2,
-                    title: "Browse or Search",
-                    description: "Use Library to browse folders, or the Search tab to quickly find what you want."
-                )
-
-                StepCard(
-                    number: 3,
-                    title: "Control Playback",
-                    description: "Tap a file to play, then use play/pause, skip, and speed controls. Playback continues in the background and from the Lock Screen."
-                )
             }
         }
     }
@@ -102,7 +71,7 @@ struct HelpView: View {
 
                 FAQItem(
                     question: "How do I record and edit audio?",
-                    answer: "Enable Recording Mode in Settings to record audio. You can trim or delete sections of recordings in the editor."
+                    answer: "Use the mode button in the header to switch to Recording Mode. You can trim or delete sections of recordings in the editor."
                 )
             }
         }

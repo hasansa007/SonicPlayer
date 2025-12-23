@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import SwiftUI
+import UIKit
 
 // Assuming FolderCardView.swift and FileItemRow.swift are separate files in the same module
 // If they are in different modules, explicit import statements for those modules would be needed.
@@ -7,9 +8,10 @@ import SwiftUI
 struct FilesView: View {
     @Bindable var store: StoreOf<FilesFeature>
     @State private var showingDocumentPicker = false
+    @State private var shareItem: ShareItem?
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .bottom) {
             Color.sonicBackground.ignoresSafeArea()
 
             if shouldShowLoader {
@@ -83,6 +85,9 @@ struct FilesView: View {
         .sheet(item: $store.scope(state: \.editAudio, action: \.editAudio)) { editStore in
             EditRecordingView(store: editStore)
         }
+        .sheet(item: $shareItem) { item in
+            ActivityView(items: [item.url])
+        }
         .onAppear {
             store.send(.onAppear)
         }
@@ -128,6 +133,11 @@ struct FilesView: View {
                                 FolderCardView(store: cardStore)
                                     .contextMenu {
                                         Button {
+                                            shareItem = ShareItem(url: cardStore.folder.url)
+                                        } label: {
+                                            Label("Share", systemImage: "square.and.arrow.up")
+                                        }
+                                        Button {
                                             cardStore.send(.moveTapped)
                                         } label: {
                                             Label("Move", systemImage: "folder")
@@ -156,6 +166,11 @@ struct FilesView: View {
                             ForEach(store.scope(state: \.filteredFileRows, action: \.fileRows)) { rowStore in
                                 FileItemRow(store: rowStore, isSelectionMode: false)
                                 .contextMenu {
+                                    Button {
+                                        shareItem = ShareItem(url: rowStore.file.url)
+                                    } label: {
+                                        Label("Share", systemImage: "square.and.arrow.up")
+                                    }
                                     Button {
                                         rowStore.send(.moveTapped)
                                     } label: {
@@ -209,28 +224,8 @@ struct FilesView: View {
                 Label("New Folder", systemImage: "folder.badge.plus")
             }
 
-            Divider()
-
-            // Share (SharePlay) - Disabled
-            Button {
-                // SharePlay not yet implemented
-            } label: {
-                Label("Share", systemImage: "shareplay")
-            }
-            .disabled(true)
-
-            Divider()
-
-            // Sort By
-            Menu("Sort By") {
-                Picker("Sort By", selection: $store.sortOption.sending(\.setSortOption)) {
-                    Text("Name").tag(FilesFeature.SortOption.name)
-                    Text("Date").tag(FilesFeature.SortOption.date)
-                    Text("Size").tag(FilesFeature.SortOption.size)
-                }
-            }
         } label: {
-            Image(systemName: "ellipsis.circle")
+            Image(systemName: "plus.circle.fill")
                 .font(.title3)
                 .foregroundColor(.sonicPrimaryDark)
         }
@@ -276,4 +271,19 @@ struct DocumentPicker: UIViewControllerRepresentable {
             // User cancelled, nothing to do
         }
     }
+}
+
+struct ShareItem: Identifiable {
+    let url: URL
+    var id: URL { url }
+}
+
+struct ActivityView: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

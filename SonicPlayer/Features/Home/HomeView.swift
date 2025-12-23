@@ -3,6 +3,9 @@ import SwiftUI
 
 struct HomeView: View {
     @Bindable var store: StoreOf<HomeFeature>
+    let isRecordingMode: Bool
+    let canSwitchMode: Bool
+    let onToggleMode: () -> Void
     
     var body: some View {
         NavigationStack {
@@ -153,11 +156,31 @@ struct HomeView: View {
                 .padding(.bottom, 80) // Add bottom padding for Mini Player
             }
             .navigationTitle("Home")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    modeButton
+                }
+            }
             .background(Color.sonicBackground.ignoresSafeArea())
             .onAppear {
                 store.send(.onAppear)
             }
         }
+    }
+
+    private var modeButton: some View {
+        Button {
+            onToggleMode()
+        } label: {
+            Image(systemName: isRecordingMode ? "play.fill" : "mic.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.sonicTextPrimary)
+                .padding(8)
+                .background(.ultraThinMaterial, in: Circle())
+        }
+        .accessibilityLabel(isRecordingMode ? "Playing Mode" : "Recording Mode")
+        .disabled(!canSwitchMode)
     }
 }
 

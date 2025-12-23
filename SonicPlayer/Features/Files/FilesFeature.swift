@@ -31,19 +31,11 @@ struct FilesFeature {
         var availableFolders: [Folder] = []
         var isShowingFolderPicker = false
         
-        var sortOption: SortOption = .name
         var documentsDirectoryURL: URL?
+        var lastOpenedFileURL: URL?
 
         var filteredItems: [FileSystemItem] {
-            let sortedItems: [FileSystemItem]
-            switch sortOption {
-            case .name:
-                sortedItems = items.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-            case .date:
-                sortedItems = items.sorted { $0.date > $1.date }
-            case .size:
-                sortedItems = items.sorted { $0.size > $1.size }
-            }
+            let sortedItems: [FileSystemItem] = items
             
             if searchText.isEmpty {
                 return sortedItems
@@ -69,12 +61,6 @@ struct FilesFeature {
             return fileRows.filter { filteredIDs.contains($0.id) }
         }
     }
-    
-    enum SortOption: String, CaseIterable, Equatable {
-        case name
-        case date
-        case size
-    }
 
     enum Action {
         case onAppear
@@ -89,7 +75,6 @@ struct FilesFeature {
         case folderTapped(Folder)
         case fileTapped(AudioFile)
         case setSearchText(String)
-        case setSortOption(SortOption)
 
         // Selection & Mode
         case toggleSelectionMode
@@ -238,6 +223,7 @@ struct FilesFeature {
                     if state.isSelectionMode {
                         return .send(.toggleSelection(.file(file)))
                     } else {
+                        state.lastOpenedFileURL = file.url
                         return .send(.fileTapped(file))
                     }
                 }
@@ -287,10 +273,6 @@ struct FilesFeature {
 
             case let .setSearchText(text):
                 state.searchText = text
-                return .none
-                
-            case let .setSortOption(option):
-                state.sortOption = option
                 return .none
                 
             case .toggleSelectionMode:

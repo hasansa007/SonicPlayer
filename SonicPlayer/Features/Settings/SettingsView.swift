@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SettingsView: View {
     let store: StoreOf<SettingsFeature>
+    @AppStorage("hasSeenQuickstart") private var hasSeenQuickstart = false
 
     var body: some View {
         NavigationStack {
@@ -13,9 +14,6 @@ struct SettingsView: View {
                     VStack(spacing: 20) {
                         // App branding
                         appHeaderView
-
-                        // App Mode
-                        appModeSection
 
                         // Playback settings
                         playbackSettingsSection
@@ -73,33 +71,6 @@ struct SettingsView: View {
 
     private var appShortVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
-    }
-
-    private var appModeSection: some View {
-        SettingsSection(title: "App Mode", icon: "waveform.circle.fill") {
-            VStack(spacing: 12) {
-                SettingsRow(
-                    icon: store.isRecordingMode ? "mic.fill" : "play.fill",
-                    title: "Recording Mode",
-                    iconColor: store.isRecordingMode ? .red : .sonicPrimary
-                ) {
-                    Toggle("", isOn: Binding(
-                        get: { store.isRecordingMode },
-                        set: { _ in store.send(.toggleRecordingMode) }
-                    ))
-                    .labelsHidden()
-                    .tint(.sonicPrimary)
-                }
-
-                if store.isRecordingMode {
-                    Text("Recording mode enabled. The app will show recording interface instead of the player.")
-                        .font(.caption)
-                        .foregroundColor(.sonicTextSecondary)
-                        .padding(.horizontal, 12)
-                        .padding(.top, 4)
-                }
-            }
-        }
     }
 
     private var playbackSettingsSection: some View {
@@ -215,6 +186,16 @@ struct SettingsView: View {
     private var infoSection: some View {
         SettingsSection(title: "Information", icon: "info.circle.fill") {
             VStack(spacing: 12) {
+                SettingsButton(
+                    icon: "sparkles",
+                    title: "Replay Quickstart",
+                    iconColor: .sonicPrimary
+                ) {
+                    hasSeenQuickstart = false
+                }
+
+                Divider()
+
                 SettingsButton(
                     icon: "info.circle",
                     title: "About Sonic Player",

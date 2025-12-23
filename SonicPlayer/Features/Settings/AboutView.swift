@@ -130,7 +130,7 @@ struct AboutView: View {
 
                 FeatureItem(
                     icon: "mic.fill",
-                    title: "Recording Mode",
+                    title: "Recording",
                     description: "Record audio and edit recordings (trim or delete sections)"
                 )
             }
