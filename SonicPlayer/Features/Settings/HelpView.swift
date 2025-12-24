@@ -46,7 +46,7 @@ struct HelpView: View {
             VStack(spacing: 12) {
                 FAQItem(
                     question: "How do I add audio files?",
-                    answer: "In the Library tab, tap the … menu and choose Import. You can import files and folders from the Files app. Supported formats: MP3, M4A, WAV."
+                    answer: "In the Library tab, tap the + button and choose Import. You can import files and folders from the Files app. Supported formats: MP3, M4A, WAV."
                 )
 
                 FAQItem(
