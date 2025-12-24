@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		86A1B0012F1B3B9D00A1BEEF /* Quickstart.json in Resources */ = {isa = PBXBuildFile; fileRef = 86A1B0002F1B3B9D00A1BEEF /* Quickstart.json */; };
 		861C5CFF2EFB36E60052DEAF /* QuickstartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 861C5CFE2EFB36E60052DEAF /* QuickstartView.swift */; };
 		8629C23B2EEA25340052A74B /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2392EEA25340052A74B /* HomeView.swift */; };
 		8629C23C2EEA25340052A74B /* HomeFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2382EEA25340052A74B /* HomeFeature.swift */; };
@@ -22,7 +21,7 @@
 		86662FEC2EF7EAC1000577F1 /* AudioRecorderClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86662FEA2EF7EAC1000577F1 /* AudioRecorderClient.swift */; };
 		86662FED2EF7EAC1000577F1 /* AudioTrimmerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86662FEB2EF7EAC1000577F1 /* AudioTrimmerClient.swift */; };
 		8690789B2EEC9F8D005620F9 /* ArtworkClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8690789A2EEC9F8D005620F9 /* ArtworkClient.swift */; };
-		869078BE2EECC1D7005620F9 /* FileItemRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078B62EECC1D7005620F9 /* FileItemRow.swift */; };
+		869078BE2EECC1D7005620F9 /* FileItemRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078B62EECC1D7005620F9 /* FileItemRowView.swift */; };
 		869078BF2EECC1D7005620F9 /* FolderPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078BD2EECC1D7005620F9 /* FolderPickerView.swift */; };
 		869078C02EECC1D7005620F9 /* FilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078B92EECC1D7005620F9 /* FilesView.swift */; };
 		869078C12EECC1D7005620F9 /* FolderPickerFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078BC2EECC1D7005620F9 /* FolderPickerFeature.swift */; };
@@ -30,6 +29,10 @@
 		869078C32EECC1D7005620F9 /* FolderCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078BB2EECC1D7005620F9 /* FolderCardView.swift */; };
 		869078C42EECC1D7005620F9 /* FileRowFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078B72EECC1D7005620F9 /* FileRowFeature.swift */; };
 		869078C52EECC1D7005620F9 /* FolderCardFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078BA2EECC1D7005620F9 /* FolderCardFeature.swift */; };
+		8692B7E12EFBA00400DFAF7C /* FolderCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8692B7E02EFBA00400DFAF7C /* FolderCard.swift */; };
+		86A1B0012F1B3B9D00A1BEEF /* Quickstart.json in Resources */ = {isa = PBXBuildFile; fileRef = 86A1B0002F1B3B9D00A1BEEF /* Quickstart.json */; };
+		86A1B2042F1B3F0000A1BEEF /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A1B2032F1B3F0000A1BEEF /* ShareSheet.swift */; };
+		86A1B3002F1B4A0100A1BEEF /* FileItemRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A1B3012F1B4A0100A1BEEF /* FileItemRow.swift */; };
 		A1000001000000000000001 /* SonicPlayerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000001 /* SonicPlayerApp.swift */; };
 		A1000003000000000000001 /* AppFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000004000000000000001 /* AppFeature.swift */; };
 		A1000005000000000000001 /* AppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000006000000000000001 /* AppView.swift */; };
@@ -51,7 +54,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		86A1B0002F1B3B9D00A1BEEF /* Quickstart.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Quickstart.json; sourceTree = "<group>"; };
 		861C5CFE2EFB36E60052DEAF /* QuickstartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickstartView.swift; sourceTree = "<group>"; };
 		8629C2382EEA25340052A74B /* HomeFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeFeature.swift; sourceTree = "<group>"; };
 		8629C2392EEA25340052A74B /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -66,7 +68,7 @@
 		86662FEA2EF7EAC1000577F1 /* AudioRecorderClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorderClient.swift; sourceTree = "<group>"; };
 		86662FEB2EF7EAC1000577F1 /* AudioTrimmerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioTrimmerClient.swift; sourceTree = "<group>"; };
 		8690789A2EEC9F8D005620F9 /* ArtworkClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkClient.swift; sourceTree = "<group>"; };
-		869078B62EECC1D7005620F9 /* FileItemRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileItemRow.swift; sourceTree = "<group>"; };
+		869078B62EECC1D7005620F9 /* FileItemRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileItemRowView.swift; sourceTree = "<group>"; };
 		869078B72EECC1D7005620F9 /* FileRowFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileRowFeature.swift; sourceTree = "<group>"; };
 		869078B82EECC1D7005620F9 /* FilesFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesFeature.swift; sourceTree = "<group>"; };
 		869078B92EECC1D7005620F9 /* FilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesView.swift; sourceTree = "<group>"; };
@@ -74,6 +76,10 @@
 		869078BB2EECC1D7005620F9 /* FolderCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderCardView.swift; sourceTree = "<group>"; };
 		869078BC2EECC1D7005620F9 /* FolderPickerFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderPickerFeature.swift; sourceTree = "<group>"; };
 		869078BD2EECC1D7005620F9 /* FolderPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderPickerView.swift; sourceTree = "<group>"; };
+		8692B7E02EFBA00400DFAF7C /* FolderCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderCard.swift; sourceTree = "<group>"; };
+		86A1B0002F1B3B9D00A1BEEF /* Quickstart.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Quickstart.json; sourceTree = "<group>"; };
+		86A1B2032F1B3F0000A1BEEF /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
+		86A1B3012F1B4A0100A1BEEF /* FileItemRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileItemRow.swift; sourceTree = "<group>"; };
 		A1000002000000000000001 /* SonicPlayerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonicPlayerApp.swift; sourceTree = "<group>"; };
 		A1000004000000000000001 /* AppFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFeature.swift; sourceTree = "<group>"; };
 		A1000006000000000000001 /* AppView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppView.swift; sourceTree = "<group>"; };
@@ -206,6 +212,7 @@
 		A1000047000000000000001 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				86A1B2032F1B3F0000A1BEEF /* ShareSheet.swift */,
 				8629C2AE2EEBBE9B0052A74B /* WaveformView.swift */,
 				8629C2AA2EEBB9710052A74B /* Theme.swift */,
 				8629C2A42EEB94DF0052A74B /* ArtworkCache.swift */,
@@ -238,7 +245,9 @@
 		A1000050000000000000001 /* Files */ = {
 			isa = PBXGroup;
 			children = (
-				869078B62EECC1D7005620F9 /* FileItemRow.swift */,
+				8692B7E02EFBA00400DFAF7C /* FolderCard.swift */,
+				869078B62EECC1D7005620F9 /* FileItemRowView.swift */,
+				86A1B3012F1B4A0100A1BEEF /* FileItemRow.swift */,
 				869078B72EECC1D7005620F9 /* FileRowFeature.swift */,
 				869078B82EECC1D7005620F9 /* FilesFeature.swift */,
 				869078B92EECC1D7005620F9 /* FilesView.swift */,
@@ -344,7 +353,9 @@
 				A1000007000000000000001 /* PlayerFeature.swift in Sources */,
 				A1000009000000000000001 /* PlayerView.swift in Sources */,
 				A1000010000000000000002 /* MiniPlayerView.swift in Sources */,
-				869078BE2EECC1D7005620F9 /* FileItemRow.swift in Sources */,
+				869078BE2EECC1D7005620F9 /* FileItemRowView.swift in Sources */,
+				86A1B3002F1B4A0100A1BEEF /* FileItemRow.swift in Sources */,
+				8692B7E12EFBA00400DFAF7C /* FolderCard.swift in Sources */,
 				869078BF2EECC1D7005620F9 /* FolderPickerView.swift in Sources */,
 				869078C02EECC1D7005620F9 /* FilesView.swift in Sources */,
 				869078C12EECC1D7005620F9 /* FolderPickerFeature.swift in Sources */,
@@ -361,6 +372,7 @@
 				8629C2A72EEB94DF0052A74B /* ArtworkCache.swift in Sources */,
 				8629C2A82EEB94DF0052A74B /* ColorExtractor.swift in Sources */,
 				8629C2A92EEB94DF0052A74B /* AudioMetadataService.swift in Sources */,
+				86A1B2042F1B3F0000A1BEEF /* ShareSheet.swift in Sources */,
 				A1000025000000000000001 /* FileManagerClient.swift in Sources */,
 				8629C2AF2EEBBE9B0052A74B /* WaveformView.swift in Sources */,
 				86662FE42EF7E7D7000577F1 /* RecordingFeature.swift in Sources */,
@@ -508,7 +520,7 @@
 				CODE_SIGN_ENTITLEMENTS = SonicPlayer/SonicPlayer.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = A3JC2SBNCR;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -541,7 +553,7 @@
 				CODE_SIGN_ENTITLEMENTS = SonicPlayer/SonicPlayer.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = A3JC2SBNCR;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;

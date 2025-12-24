@@ -3,21 +3,21 @@ import SwiftUI
 
 struct RecordingView: View {
     @Bindable var store: StoreOf<RecordingFeature>
-    let isRecordingMode: Bool
-    let canSwitchMode: Bool
-    let onToggleMode: () -> Void
+    @State private var shareItem: ShareItem?
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.sonicBackground.ignoresSafeArea()
-                
-                if store.isRecording {
-                    // Recording interface
-                    recordingInterface
-                } else {
-                    // Recordings list
-                    recordingsList
+            GeometryReader { proxy in
+                let isLandscape = proxy.size.width > proxy.size.height
+
+                ZStack {
+                    Color.sonicBackground.ignoresSafeArea()
+
+                    if store.isRecording {
+                        recordingInterface(isLandscape: isLandscape)
+                    } else {
+                        recordingsList(isLandscape: isLandscape)
+                    }
                 }
             }
             .alert("Microphone Permission Required", isPresented: $store.showPermissionAlert.sending(\.setShowPermissionAlert)) {
@@ -31,102 +31,182 @@ struct RecordingView: View {
             .sheet(item: $store.scope(state: \.editRecording, action: \.editRecording)) { editStore in
                 EditRecordingView(store: editStore)
             }
+            .sheet(item: $shareItem) { item in
+                ActivityView(items: [item.url])
+            }
             .onAppear {
                 store.send(.onAppear)
             }
             .navigationTitle("Recordings")
             .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    modeButton
-                }
-            }
             .background(Color.sonicBackground.ignoresSafeArea())
         }
     }
 
-    private var modeButton: some View {
-        Button {
-            onToggleMode()
-        } label: {
-            Image(systemName: isRecordingMode ? "play.fill" : "mic.fill")
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.sonicTextPrimary)
-                .padding(8)
-                .background(.ultraThinMaterial, in: Circle())
-        }
-        .accessibilityLabel(isRecordingMode ? "Playing Mode" : "Recording Mode")
-        .disabled(!canSwitchMode)
-    }
-
-    private var recordingInterface: some View {
-        VStack(spacing: 40) {
-            Spacer()
-
-            // Recording time
-            Text(formatTime(store.recordingTime))
-                .font(.system(size: 56, weight: .light, design: .rounded))
-                .foregroundColor(.sonicTextPrimary)
-                .monospacedDigit()
-
-            // Waveform visualization
-            RecordingWaveformView(peakLevel: store.peakLevel)
-                .frame(height: 100)
-                .padding(.horizontal, 40)
-
-            Spacer()
-
-            // Stop button
-            Button {
-                store.send(.stopRecordingTapped)
-            } label: {
+    private func recordingInterface(isLandscape: Bool) -> some View {
+        Group {
+            if isLandscape {
                 ZStack {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 80, height: 80)
-                        .shadow(color: Color.red.opacity(0.4), radius: 20, x: 0, y: 10)
+                    HStack(spacing: 40) {
+                        VStack(spacing: 24) {
+                        Text(formatTime(store.recordingTime))
+                            .font(.system(size: 56, weight: .light, design: .rounded))
+                            .foregroundColor(.sonicTextPrimary)
+                            .monospacedDigit()
 
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.white)
-                        .frame(width: 28, height: 28)
+                        RecordingWaveformView(peakLevel: store.peakLevel)
+                            .frame(height: 140)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 10)
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, 40)
+
+                    HStack {
+                        Spacer()
+                        stopButton
+                    }
+                    .padding(.trailing, 28)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ZStack {
+                    VStack(spacing: 40) {
+                        Spacer()
+
+                        Text(formatTime(store.recordingTime))
+                            .font(.system(size: 60, weight: .light, design: .rounded))
+                            .foregroundColor(.sonicTextPrimary)
+                            .monospacedDigit()
+
+                        RecordingWaveformView(peakLevel: store.peakLevel)
+                            .frame(height: 120)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 20)
+
+                        Spacer()
+                    }
+
+                    portraitActionButton(stopButton)
                 }
             }
-            .padding(.bottom, 60)
         }
     }
 
-    private var recordingsList: some View {
-        VStack(spacing: 0) {
-            if store.isLoadingRecordings {
-                ProgressView()
-                    .scaleEffect(1.5)
-                    .tint(.sonicPrimary)
-                    .frame(maxHeight: .infinity)
-            } else if store.recordings.isEmpty {
-                emptyStateView
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(store.recordings, id: \.id) { recording in
-                            RecordingRow(recording: recording) {
-                                store.send(.recordingTapped(recording))
-                            } onDelete: {
-                                store.send(.deleteRecording(recording))
+    private func recordingsList(isLandscape: Bool) -> some View {
+        ZStack {
+            VStack(spacing: 0) {
+                if store.isLoadingRecordings {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .tint(.sonicPrimary)
+                        .frame(maxHeight: .infinity)
+                } else if store.recordings.isEmpty {
+                    emptyStateView
+                } else {
+                    ScrollView {
+                        if isLandscape {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), spacing: 16)], spacing: 16) {
+                                ForEach(store.recordings, id: \.id) { recording in
+                                    RecordingItemRowView(recording: recording) {
+                                        store.send(.recordingTapped(recording))
+                                    } onDelete: {
+                                        store.send(.deleteRecording(recording))
+                                    }
+                                    .contextMenu {
+                                        Button {
+                                            store.send(.recordingTapped(recording))
+                                        } label: {
+                                            Label("Edit", systemImage: "pencil")
+                                        }
+                                        Button {
+                                            shareItem = ShareItem(url: recording.url)
+                                        } label: {
+                                            Label("Share", systemImage: "square.and.arrow.up")
+                                        }
+                                        Button(role: .destructive) {
+                                            store.send(.deleteRecording(recording))
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
+                                    }
+                                }
                             }
+                            .padding(.horizontal, 20)
+                            .padding(.top, 20)
+                        } else {
+                            LazyVStack(spacing: 12) {
+                                ForEach(store.recordings, id: \.id) { recording in
+                                    RecordingItemRowView(recording: recording) {
+                                        store.send(.recordingTapped(recording))
+                                    } onDelete: {
+                                        store.send(.deleteRecording(recording))
+                                    }
+                                    .contextMenu {
+                                        Button {
+                                            store.send(.recordingTapped(recording))
+                                        } label: {
+                                            Label("Edit", systemImage: "pencil")
+                                        }
+                                        Button {
+                                            shareItem = ShareItem(url: recording.url)
+                                        } label: {
+                                            Label("Share", systemImage: "square.and.arrow.up")
+                                        }
+                                        Button(role: .destructive) {
+                                            store.send(.deleteRecording(recording))
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.top, 20)
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
+                    .frame(maxHeight: .infinity)
                 }
-                .frame(maxHeight: .infinity)
+
             }
 
-            // Floating record button
-            if !store.isRecording {
-                VStack {
+            if !store.isRecording && isLandscape {
+                HStack {
+                    Spacer()
                     recordButton
-                        .padding(.vertical, 40)
                 }
+                .padding(.trailing, 28)
+            }
+
+            if !store.isRecording && !isLandscape {
+                portraitActionButton(recordButton)
+            }
+        }
+    }
+
+    private func portraitActionButton(_ button: some View) -> some View {
+        VStack {
+            Spacer()
+            button
+                .padding(.vertical, 40)
+        }
+    }
+
+    private var stopButton: some View {
+        Button {
+            store.send(.stopRecordingTapped)
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 80, height: 80)
+                    .shadow(color: Color.red.opacity(0.4), radius: 20, x: 0, y: 10)
+                    .shadow(color: Color.black.opacity(0.12), radius: 12, x: 0, y: 6)
+
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.white)
+                    .frame(width: 28, height: 28)
             }
         }
     }
@@ -170,6 +250,7 @@ struct RecordingView: View {
                     )
                     .frame(width: 80, height: 80)
                     .shadow(color: Color.red.opacity(0.4), radius: 20, x: 0, y: 10)
+                    .shadow(color: Color.black.opacity(0.12), radius: 12, x: 0, y: 6)
 
                 Circle()
                     .fill(Color.white)
@@ -189,67 +270,6 @@ struct RecordingView: View {
         } else {
             return String(format: "%02d:%02d.%02d", minutes, seconds, centiseconds)
         }
-    }
-}
-
-// MARK: - Recording Row
-
-struct RecordingRow: View {
-    let recording: AudioFile
-    let onTap: () -> Void
-    let onDelete: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 16) {
-                // Icon
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(LinearGradient.sonicGradient.opacity(0.15))
-                        .frame(width: 56, height: 56)
-
-                    Image(systemName: "waveform")
-                        .font(.title2)
-                        .foregroundStyle(LinearGradient.sonicGradient)
-                }
-
-                // Info
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(recording.title)
-                        .font(.headline)
-                        .foregroundColor(.sonicTextPrimary)
-                        .lineLimit(2)
-
-                    HStack(spacing: 12) {
-                        Label(recording.durationFormatted, systemImage: "clock")
-                        Label(formatDate(recording.creationDate), systemImage: "calendar")
-                    }
-                    .font(.caption)
-                    .foregroundColor(.sonicTextSecondary)
-                }
-
-                Spacer()
-
-                // Delete button
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                        .font(.title3)
-                        .foregroundColor(.red)
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(16)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
     }
 }
 
@@ -287,5 +307,29 @@ struct RecordingWaveformView: View {
         // Shift bars left and add new value
         bars.removeFirst()
         bars.append(height)
+    }
+}
+
+struct RecordingItemRowView: View {
+    let recording: AudioFile
+    let onTap: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        FileItemRow(
+            title: recording.title,
+            subtitle: "\(recording.durationFormatted) • \(formatDate(recording.creationDate))",
+            artwork: nil,
+            colors: Color.sonicTealColors,
+            fallbackSystemImage: "waveform", showsChevron: true,
+            onTap: onTap
+        )
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 }

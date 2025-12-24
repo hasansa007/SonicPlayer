@@ -1,8 +1,7 @@
 import ComposableArchitecture
 import SwiftUI
-import UIKit
 
-// Assuming FolderCardView.swift and FileItemRow.swift are separate files in the same module
+// Assuming FolderCardView.swift and FileItemRowView.swift are separate files in the same module
 // If they are in different modules, explicit import statements for those modules would be needed.
 
 struct FilesView: View {
@@ -164,7 +163,7 @@ struct FilesView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         LazyVStack(spacing: 8) {
                             ForEach(store.scope(state: \.filteredFileRows, action: \.fileRows)) { rowStore in
-                                FileItemRow(store: rowStore, isSelectionMode: false)
+                                FileItemRowView(store: rowStore, isSelectionMode: false)
                                 .contextMenu {
                                     Button {
                                         shareItem = ShareItem(url: rowStore.file.url)
@@ -271,19 +270,4 @@ struct DocumentPicker: UIViewControllerRepresentable {
             // User cancelled, nothing to do
         }
     }
-}
-
-struct ShareItem: Identifiable {
-    let url: URL
-    var id: URL { url }
-}
-
-struct ActivityView: UIViewControllerRepresentable {
-    let items: [Any]
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

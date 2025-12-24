@@ -357,7 +357,7 @@ struct QuickstartDemoView: View {
             VStack(spacing: 10) {
                 HStack(spacing: 8) {
                     demoPill(text: "Library", icon: "square.stack.3d.up.fill", fill: colors)
-                    demoPill(text: "Recording", icon: "mic.fill", fill: colors.reversed())
+                    demoPill(text: "Recordings", icon: "mic.fill", fill: colors.reversed())
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 

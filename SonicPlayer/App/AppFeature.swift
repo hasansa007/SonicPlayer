@@ -19,8 +19,13 @@ struct AppFeature {
         var recording = RecordingFeature.State()
 
         // App Mode
+        enum AppMode: Hashable {
+            case browsing
+            case recording
+        }
+        
         var isRecordingMode: Bool {
-            settings.isRecordingMode
+            selectedTab == .recording || recording.isRecording
         }
 
         static func == (lhs: State, rhs: State) -> Bool {
@@ -57,7 +62,7 @@ struct AppFeature {
     enum Tab: Hashable {
         case home
         case files
-        case sharing
+        case recording
         case settings
     }
 
@@ -85,7 +90,15 @@ struct AppFeature {
         Reduce { state, action in
             switch action {
             case let .selectTab(tab):
-                state.selectedTab = state.isTabAvailable(tab) ? tab : .home
+                let wasRecordingMode = state.isRecordingMode
+                state.selectedTab = state.isTabAvailable(tab) ? tab : state.fallbackTab()
+                state.ensureValidTabForCurrentMode()
+                if tab == .recording && !wasRecordingMode && state.isRecordingMode {
+                    return .send(.player(.suspendSession))
+                }
+                if tab == .home && wasRecordingMode && !state.isRecordingMode {
+                    return .send(.player(.restoreSession))
+                }
                 return .none
                 
             // Home Actions
@@ -145,10 +158,11 @@ struct AppFeature {
             case let .settings(.setDefaultPlaybackSpeed(speed)):
                 return .send(.player(.setPlaybackSpeed(speed)))
 
-            case .settings(.toggleRecordingMode):
-                // When switching modes, always stop and clear the player (PlayerView + MiniPlayer).
+            case .recording(.recordingStarted),
+                 .recording(.recordingStopped),
+                 .recording(.recordingFailed):
                 state.ensureValidTabForCurrentMode()
-                return .send(.player(.clearSession))
+                return .none
 
             case .player(.trackLoaded), .player(.sessionLoaded):
                 state.home.lastPlayedTrack = state.player.currentTrack
@@ -200,13 +214,16 @@ struct AppFeature {
 
 private extension AppFeature.State {
     func isTabAvailable(_ tab: AppFeature.Tab) -> Bool {
-        guard isRecordingMode else { return true }
-        return tab != .files && tab != .sharing
+        if !isRecordingMode { return true }
+        if recording.isRecording {
+            return tab == .recording || tab == .settings
+        }
+        return tab != .files
     }
 
     mutating func ensureValidTabForCurrentMode() {
         if !isTabAvailable(selectedTab) {
-            selectedTab = .home
+            selectedTab = fallbackTab()
         }
         if isRecordingMode {
             filesPath.removeAll()
@@ -215,11 +232,18 @@ private extension AppFeature.State {
 
     mutating func navigateToFolderInLibrary(_ folderURL: URL) {
         guard isTabAvailable(.files) else {
-            selectedTab = .home
+            selectedTab = fallbackTab()
             return
         }
         selectedTab = .files
         filesPath.removeAll()
         filesPath.append(FilesFeature.State(currentDirectory: folderURL))
+    }
+
+    func fallbackTab() -> AppFeature.Tab {
+        if isRecordingMode && recording.isRecording {
+            return .recording
+        }
+        return .home
     }
 }

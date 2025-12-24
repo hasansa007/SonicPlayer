@@ -2,13 +2,13 @@
   "pages": [
     {
       "title": "Home",
-      "message": "Jump to Library or Recording and tap any item to start playback instantly.",
+      "message": "Jump to Library or Recordings and tap any item to start playback instantly.",
       "systemImage": "house.fill",
       "colors": ["teal"],
       "demo": "home",
       "actions": [
         { "title": "Go to Library", "systemImage": "square.stack.3d.up.fill" },
-        { "title": "Go to Recording", "systemImage": "mic.fill" },
+        { "title": "Open Recordings", "systemImage": "mic.fill" },
         { "title": "Tap item to play", "systemImage": "play.fill" }
       ]
     },
@@ -25,7 +25,7 @@
     },
     {
       "title": "Recording",
-      "message": "Switch to Recording Mode and capture audio. Start, pause, and stop, then trim takes.",
+      "message": "Use the Recordings tab to capture audio. Start, pause, and stop, then trim takes.",
       "systemImage": "mic.fill",
       "colors": ["orange"],
       "demo": "recording",

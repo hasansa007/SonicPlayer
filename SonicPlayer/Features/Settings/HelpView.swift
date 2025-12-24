@@ -71,7 +71,7 @@ struct HelpView: View {
 
                 FAQItem(
                     question: "How do I record and edit audio?",
-                    answer: "Use the mode button in the header to switch to Recording Mode. You can trim or delete sections of recordings in the editor."
+                    answer: "Open the Recordings tab to record audio. You can trim or delete sections of recordings in the editor."
                 )
             }
         }

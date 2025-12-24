@@ -49,7 +49,6 @@ struct SettingsFeature {
         var defaultPlaybackSpeed: PlaybackSpeed
         var defaultSkipDuration: SkipDuration
         var colorScheme: AppColorScheme
-        var isRecordingMode: Bool
         var showAbout = false
         var showHelp = false
 
@@ -57,7 +56,6 @@ struct SettingsFeature {
             self.defaultPlaybackSpeed = UserDefaults.standard.savedPlaybackSpeed
             self.defaultSkipDuration = UserDefaults.standard.savedSkipDuration
             self.colorScheme = UserDefaults.standard.savedColorScheme
-            self.isRecordingMode = false
         }
     }
 
@@ -65,7 +63,6 @@ struct SettingsFeature {
         case setDefaultPlaybackSpeed(PlaybackSpeed)
         case setDefaultSkipDuration(SkipDuration)
         case setColorScheme(AppColorScheme)
-        case toggleRecordingMode
         case showAboutTapped
         case showHelpTapped
         case requestFeatureTapped
@@ -89,10 +86,6 @@ struct SettingsFeature {
             case let .setColorScheme(scheme):
                 state.colorScheme = scheme
                 UserDefaults.standard.savedColorScheme = scheme
-                return .none
-
-            case .toggleRecordingMode:
-                state.isRecordingMode.toggle()
                 return .none
 
             case .showAboutTapped:

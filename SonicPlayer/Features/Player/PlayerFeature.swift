@@ -155,6 +155,7 @@ struct PlayerFeature {
         case retryRestoreSession(AudioFile, TimeInterval, Float, Int) // track, time, rate, attemptNumber
         case sessionRestored
         case clearSession
+        case suspendSession
         
         case loadArtwork
         case artworkLoaded(UIImage?, [Color])
@@ -275,6 +276,37 @@ struct PlayerFeature {
                 state.duration = 0
                 state.isLoadingTrack = false
                 state.isExpanded = false // Dismiss PlayerView
+                return .merge(
+                    .cancel(id: CancelID.timeObserver),
+                    .run { _ in
+                        await audioPlayer.stop()
+                    }
+                )
+
+            case .suspendSession:
+                if let currentTrack = state.currentTrack {
+                    let queueItems = state.queue.map { QueueItem(fileURL: $0.url.path) }
+                    state.$session.withLock { session in
+                        session = PlaybackSession(
+                            fileURL: currentTrack.url.path,
+                            currentTime: state.currentTime,
+                            queue: queueItems,
+                            playlistSource: state.currentPlaylistSource
+                        )
+                    }
+                }
+
+                state.currentTrack = nil
+                state.artwork = nil
+                state.colors = []
+                state.queue = []
+                state.currentIndex = 0
+                state.currentPlaylistSource = nil
+                state.isPlaying = false
+                state.currentTime = 0
+                state.duration = 0
+                state.isLoadingTrack = false
+                state.isExpanded = false
                 return .merge(
                     .cancel(id: CancelID.timeObserver),
                     .run { _ in

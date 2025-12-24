@@ -83,14 +83,14 @@ actor ArtworkCacheActor {
     }
 
     /// Clear all cached data
-    func clearCache() {
+    func clearCache() async {
         imageCache.removeAll()
         colorCache.removeAll()
         loadingURLs.removeAll()
     }
 
     /// Get cache statistics (for debugging)
-    func getCacheStats() -> (imageCount: Int, colorCount: Int) {
+    func getCacheStats() async -> (imageCount: Int, colorCount: Int) {
         (imageCache.count, colorCache.count)
     }
 }
