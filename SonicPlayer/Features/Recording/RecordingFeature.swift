@@ -238,6 +238,12 @@ struct RecordingFeature {
                     await send(.editedRecordingReloaded(updated))
                 }
 
+            case let .editRecording(.presented(.renameApplied(updated))):
+                return .run { send in
+                    await send(.loadRecordings)
+                    await send(.editedRecordingReloaded(updated))
+                }
+
             case .editRecording(.dismiss):
                 return .run { _ in
                     await audioPlayer.stop()
@@ -306,6 +312,9 @@ struct EditRecordingFeature {
         case cancelTrim
         case deleted
         case trimApplied
+        case renameTapped(String)
+        case renameApplied(AudioFile)
+        case renameFailed(String)
         case updatePlaybackTime
         case playbackTimeUpdated(TimeInterval)
         case playbackEnded
@@ -313,6 +322,7 @@ struct EditRecordingFeature {
 
     @Dependency(\.audioTrimmer) var audioTrimmer
     @Dependency(\.audioPlayer) var audioPlayer
+    @Dependency(\.fileManager) var fileManager
 
     private enum CancelID { case playbackTimeUpdates }
 
@@ -481,6 +491,32 @@ struct EditRecordingFeature {
                 return .none
 
             case .deleted, .trimApplied:
+                return .none
+
+            case let .renameTapped(newName):
+                let url = state.recording.url
+                let fileExtension = url.pathExtension
+                let finalName = newName.contains(".") ? newName : "\(newName).\(fileExtension)"
+                let newURL = url.deletingLastPathComponent().appendingPathComponent(finalName)
+                return .run { send in
+                    do {
+                        try await fileManager.renameItem(url, finalName)
+                        if let updated = try? await fileManager.getMetadata(newURL) {
+                            await send(.renameApplied(updated))
+                        } else {
+                            await send(.renameFailed("Rename failed."))
+                        }
+                    } catch {
+                        await send(.renameFailed(error.localizedDescription))
+                    }
+                }
+
+            case let .renameApplied(updated):
+                state.recording = updated
+                return .none
+
+            case let .renameFailed(message):
+                state.trimError = message
                 return .none
             }
         }

@@ -36,30 +36,18 @@ struct PlayerView: View {
         VStack(spacing: 24) {
             headerView
 
-            Spacer()
-
-            Image(systemName: "music.note")
-                .font(.system(size: 80))
-                .foregroundStyle(.linearGradient(
+            EmptyStateView(
+                icon: "music.note",
+                title: "No Track Selected",
+                message: "Select a file from the Library tab to start playing",
+                iconStyle: AnyShapeStyle(.linearGradient(
                     colors: [Color.sonicPrimaryDark, Color.sonicPrimary],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
-                ))
-                .shadow(color: Color.sonicPrimary.opacity(0.3), radius: 20, x: 0, y: 10)
-
-            VStack(spacing: 12) {
-                Text("No Track Selected")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.sonicTextPrimary)
-
-                Text("Select a file from the Library tab to start playing")
-                    .font(.body)
-                    .foregroundColor(.sonicTextSecondary)
-                    .multilineTextAlignment(.center)
-            }
-
-            Spacer()
+                )),
+                iconSize: 80,
+                spacing: 16
+            )
         }
         .padding()
     }

@@ -60,6 +60,11 @@ struct HelpView: View {
                 )
 
                 FAQItem(
+                    question: "How do I change the language?",
+                    answer: "Open Settings and select Language to choose your preferred language."
+                )
+
+                FAQItem(
                     question: "Can I skip forward or backward?",
                     answer: "Yes! Use the skip buttons on either side of the play button. You can customize the skip duration (15s, 30s, or 60s) in Settings."
                 )
@@ -88,7 +93,7 @@ struct HelpView: View {
                     issue: "Files not showing up",
                     solutions: [
                         "Make sure files are in MP3, M4A, or WAV format",
-                        "Try importing again from Library → … → Import",
+                        "Try importing again from Library → + → Import",
                         "Try pulling to refresh in the Library view",
                         "Restart the app"
                     ]

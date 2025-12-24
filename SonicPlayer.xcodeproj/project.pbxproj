@@ -30,8 +30,10 @@
 		869078C42EECC1D7005620F9 /* FileRowFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078B72EECC1D7005620F9 /* FileRowFeature.swift */; };
 		869078C52EECC1D7005620F9 /* FolderCardFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078BA2EECC1D7005620F9 /* FolderCardFeature.swift */; };
 		8692B7E12EFBA00400DFAF7C /* FolderCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8692B7E02EFBA00400DFAF7C /* FolderCard.swift */; };
+		8692B7E32EFC094200DFAF7C /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 8692B7E22EFC094200DFAF7C /* Localizable.xcstrings */; };
 		86A1B0012F1B3B9D00A1BEEF /* Quickstart.json in Resources */ = {isa = PBXBuildFile; fileRef = 86A1B0002F1B3B9D00A1BEEF /* Quickstart.json */; };
 		86A1B2042F1B3F0000A1BEEF /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A1B2032F1B3F0000A1BEEF /* ShareSheet.swift */; };
+		86A1B7012F1C500000A1BEEF /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A1B7002F1C500000A1BEEF /* EmptyStateView.swift */; };
 		86A1B3002F1B4A0100A1BEEF /* FileItemRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A1B3012F1B4A0100A1BEEF /* FileItemRow.swift */; };
 		A1000001000000000000001 /* SonicPlayerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000001 /* SonicPlayerApp.swift */; };
 		A1000003000000000000001 /* AppFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000004000000000000001 /* AppFeature.swift */; };
@@ -62,7 +64,7 @@
 		8629C2A62EEB94DF0052A74B /* ColorExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorExtractor.swift; sourceTree = "<group>"; };
 		8629C2AA2EEBB9710052A74B /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		8629C2AE2EEBBE9B0052A74B /* WaveformView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaveformView.swift; sourceTree = "<group>"; };
-		86662FE02EF7E7D7000577F1 /* EditRecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditRecordingView.swift; sourceTree = "<group>"; };
+		86662FE02EF7E7D7000577F1 /* EditRecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditRecordingView.swift; sourceTree = "<group>"; xcLanguageSpecificationIdentifier = xcode.lang.plist; };
 		86662FE12EF7E7D7000577F1 /* RecordingFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingFeature.swift; sourceTree = "<group>"; };
 		86662FE22EF7E7D7000577F1 /* RecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingView.swift; sourceTree = "<group>"; };
 		86662FEA2EF7EAC1000577F1 /* AudioRecorderClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorderClient.swift; sourceTree = "<group>"; };
@@ -77,8 +79,10 @@
 		869078BC2EECC1D7005620F9 /* FolderPickerFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderPickerFeature.swift; sourceTree = "<group>"; };
 		869078BD2EECC1D7005620F9 /* FolderPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderPickerView.swift; sourceTree = "<group>"; };
 		8692B7E02EFBA00400DFAF7C /* FolderCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderCard.swift; sourceTree = "<group>"; };
+		8692B7E22EFC094200DFAF7C /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		86A1B0002F1B3B9D00A1BEEF /* Quickstart.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Quickstart.json; sourceTree = "<group>"; };
 		86A1B2032F1B3F0000A1BEEF /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
+		86A1B7002F1C500000A1BEEF /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		86A1B3012F1B4A0100A1BEEF /* FileItemRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileItemRow.swift; sourceTree = "<group>"; };
 		A1000002000000000000001 /* SonicPlayerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonicPlayerApp.swift; sourceTree = "<group>"; };
 		A1000004000000000000001 /* AppFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFeature.swift; sourceTree = "<group>"; };
@@ -213,6 +217,7 @@
 			isa = PBXGroup;
 			children = (
 				86A1B2032F1B3F0000A1BEEF /* ShareSheet.swift */,
+				86A1B7002F1C500000A1BEEF /* EmptyStateView.swift */,
 				8629C2AE2EEBBE9B0052A74B /* WaveformView.swift */,
 				8629C2AA2EEBB9710052A74B /* Theme.swift */,
 				8629C2A42EEB94DF0052A74B /* ArtworkCache.swift */,
@@ -226,6 +231,7 @@
 		A1000048000000000000001 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				8692B7E22EFC094200DFAF7C /* Localizable.xcstrings */,
 				A1000034000000000000001 /* Assets.xcassets */,
 				86A1B0002F1B3B9D00A1BEEF /* Quickstart.json */,
 			);
@@ -315,6 +321,14 @@
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hans",
+				hi,
+				es,
+				fr,
+				ar,
+				bn,
+				pt,
+				ru,
 			);
 			mainGroup = A1000040000000000000001;
 			packageReferences = (
@@ -336,6 +350,7 @@
 			files = (
 				A1000033000000000000001 /* Assets.xcassets in Resources */,
 				86A1B0012F1B3B9D00A1BEEF /* Quickstart.json in Resources */,
+				8692B7E32EFC094200DFAF7C /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -373,6 +388,7 @@
 				8629C2A82EEB94DF0052A74B /* ColorExtractor.swift in Sources */,
 				8629C2A92EEB94DF0052A74B /* AudioMetadataService.swift in Sources */,
 				86A1B2042F1B3F0000A1BEEF /* ShareSheet.swift in Sources */,
+				86A1B7012F1C500000A1BEEF /* EmptyStateView.swift in Sources */,
 				A1000025000000000000001 /* FileManagerClient.swift in Sources */,
 				8629C2AF2EEBBE9B0052A74B /* WaveformView.swift in Sources */,
 				86662FE42EF7E7D7000577F1 /* RecordingFeature.swift in Sources */,
@@ -391,6 +407,7 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
 
 /* Begin XCBuildConfiguration section */
 		A1000059000000000000001 /* Debug */ = {
@@ -452,6 +469,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
 			name = Debug;
@@ -508,6 +526,7 @@
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
@@ -520,7 +539,7 @@
 				CODE_SIGN_ENTITLEMENTS = SonicPlayer/SonicPlayer.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_TEAM = A3JC2SBNCR;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -553,7 +572,7 @@
 				CODE_SIGN_ENTITLEMENTS = SonicPlayer/SonicPlayer.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_TEAM = A3JC2SBNCR;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;

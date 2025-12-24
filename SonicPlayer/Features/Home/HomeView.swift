@@ -140,7 +140,7 @@ struct HomeView: View {
                                 
                                 Spacer()
                                 
-                                Image(systemName: "chevron.right")
+                                Image(systemName: "chevron.forward")
                                     .foregroundColor(.secondary)
                             }
                             .padding()
@@ -327,4 +327,3 @@ struct UpNextCard: View {
         }
     }
 }
-

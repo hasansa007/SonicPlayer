@@ -212,27 +212,14 @@ struct RecordingView: View {
     }
 
     private var emptyStateView: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            Image(systemName: "waveform.circle")
-                .font(.system(size: 80))
-                .foregroundStyle(LinearGradient.sonicGradient)
-
-            VStack(spacing: 8) {
-                Text("No Recordings Yet")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.sonicTextPrimary)
-
-                Text("Tap the button below to start recording")
-                    .font(.subheadline)
-                    .foregroundColor(.sonicTextSecondary)
-            }
-
-            Spacer()
-            Spacer()
-        }
+        EmptyStateView(
+            icon: "waveform.circle",
+            title: "No Recordings Yet",
+            message: "Tap the button below to start recording",
+            iconStyle: AnyShapeStyle(LinearGradient.sonicGradient),
+            iconSize: 80,
+            spacing: 24
+        )
     }
 
     private var recordButton: some View {

@@ -204,13 +204,13 @@ struct QuickstartPage: View {
                 .frame(height: demoHeight)
 
 
-            Text(model.title)
+            Text(LocalizedStringKey(model.title))
                 .font(.title2)
                 .fontWeight(.bold)
                 .foregroundColor(.sonicTextPrimary)
                 .multilineTextAlignment(.center)
 
-            Text(model.message)
+            Text(LocalizedStringKey(model.message))
                 .font(.body)
                 .foregroundColor(.sonicTextSecondary)
                 .multilineTextAlignment(.center)
@@ -267,7 +267,7 @@ struct QuickstartDemoView: View {
         case .recording:
             return "Waveform + trim tools"
         case .settings:
-            return "Playback + theme"
+            return "Playback + language"
         }
     }
 
@@ -301,7 +301,7 @@ struct QuickstartDemoView: View {
         VStack(spacing: 12) {
             VStack(spacing: 10) {
                 HStack {
-                    Text(title)
+                    Text(LocalizedStringKey(title))
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundColor(.sonicTextPrimary)
@@ -335,7 +335,7 @@ struct QuickstartDemoView: View {
                 Image(systemName: tabIcon)
                     .font(.caption2)
                     .foregroundColor(.sonicTextSecondary)
-                Text(subtitle)
+                Text(LocalizedStringKey(subtitle))
                     .font(.caption)
                     .foregroundColor(.sonicTextSecondary)
             }
@@ -484,7 +484,7 @@ struct QuickstartDemoView: View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.caption2)
-            Text(text)
+            Text(LocalizedStringKey(text))
                 .font(.caption)
                 .fontWeight(.semibold)
         }
@@ -512,7 +512,7 @@ struct QuickstartActionsView: View {
                     Image(systemName: action.systemImage)
                         .font(.caption)
                         .foregroundStyle(LinearGradient.sonic(colors: colors))
-                    Text(action.title)
+                    Text(LocalizedStringKey(action.title))
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundColor(.sonicTextPrimary)

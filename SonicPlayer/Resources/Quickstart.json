@@ -37,14 +37,14 @@
     },
     {
       "title": "Settings",
-      "message": "Tune playback speed, skip duration, and appearance. Replay this quickstart any time.",
+      "message": "Tune playback speed, skip duration, theme, and language. Replay this quickstart any time.",
       "systemImage": "gearshape.fill",
       "colors": ["green"],
       "demo": "settings",
       "actions": [
+        { "title": "Language", "systemImage": "globe" },
         { "title": "Playback speed", "systemImage": "speedometer" },
-        { "title": "Skip duration", "systemImage": "arrow.left.arrow.right" },
-        { "title": "Theme", "systemImage": "paintbrush.fill" }
+        { "title": "Skip duration", "systemImage": "arrow.left.arrow.right" }
       ]
     }
   ]

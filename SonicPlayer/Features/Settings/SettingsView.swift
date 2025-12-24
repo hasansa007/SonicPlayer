@@ -4,6 +4,8 @@ import SwiftUI
 struct SettingsView: View {
     let store: StoreOf<SettingsFeature>
     @AppStorage("hasSeenQuickstart") private var hasSeenQuickstart = false
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.systemID
+    private let supportedLanguages = AppLanguage.supportedLanguages
 
     var body: some View {
         NavigationStack {
@@ -149,36 +151,77 @@ struct SettingsView: View {
 
     private var appearanceSection: some View {
         SettingsSection(title: "Appearance", icon: "paintbrush.fill") {
-            SettingsRow(
-                icon: store.colorScheme.icon,
-                title: "Theme",
-                iconColor: .orange
-            ) {
-                Menu {
-                    ForEach(AppColorScheme.allCases) { scheme in
-                        Button {
-                            store.send(.setColorScheme(scheme))
-                        } label: {
-                            HStack {
-                                Image(systemName: scheme.icon)
-                                Text(scheme.rawValue)
-                                if scheme == store.colorScheme {
-                                    Image(systemName: "checkmark")
+            VStack(spacing: 12) {
+                SettingsRow(
+                    icon: store.colorScheme.icon,
+                    title: "Theme",
+                    iconColor: .orange
+                ) {
+                    Menu {
+                        ForEach(AppColorScheme.allCases) { scheme in
+                            Button {
+                                store.send(.setColorScheme(scheme))
+                            } label: {
+                                HStack {
+                                    Image(systemName: scheme.icon)
+                                    Text(scheme.rawValue)
+                                    if scheme == store.colorScheme {
+                                        Image(systemName: "checkmark")
+                                    }
                                 }
                             }
                         }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(store.colorScheme.rawValue)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.sonicPrimary)
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.caption2)
-                            .foregroundColor(.sonicTextMuted)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(store.colorScheme.rawValue)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.sonicPrimary)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2)
+                                .foregroundColor(.sonicTextMuted)
+                        }
                     }
                 }
+
+                Divider()
+
+                SettingsRow(
+                    icon: "globe",
+                    title: "Language",
+                    iconColor: .sonicPrimary
+                ) {
+                    Menu {
+                        ForEach(supportedLanguages) { language in
+                            Button {
+                                setLanguage(language)
+                            } label: {
+                                HStack {
+                                    Text(language.displayName)
+                                    if language.id == appLanguage {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(selectedLanguage.displayName)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.sonicPrimary)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2)
+                                .foregroundColor(.sonicTextMuted)
+                        }
+                    }
+                }
+
+                Text("Language updates immediately.")
+                    .font(.caption)
+                    .foregroundColor(.sonicTextMuted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 44)
             }
         }
     }
@@ -215,6 +258,45 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private var selectedLanguage: AppLanguage {
+        supportedLanguages.first { $0.id == appLanguage } ?? .system
+    }
+
+    private func setLanguage(_ language: AppLanguage) {
+        appLanguage = language.id
+        if let code = language.code {
+            UserDefaults.standard.set([code], forKey: "AppleLanguages")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+        }
+    }
+}
+
+struct AppLanguage: Identifiable, Equatable {
+    static let systemID = "system"
+    static let system = AppLanguage(code: nil)
+    static let supportedLanguages: [AppLanguage] = [
+        .system,
+        AppLanguage(code: "en"),
+        AppLanguage(code: "zh-Hans"),
+        AppLanguage(code: "hi"),
+        AppLanguage(code: "es"),
+        AppLanguage(code: "fr"),
+        AppLanguage(code: "ar"),
+        AppLanguage(code: "bn"),
+        AppLanguage(code: "pt"),
+        AppLanguage(code: "ru"),
+    ]
+
+    let code: String?
+    var id: String { code ?? Self.systemID }
+
+    var displayName: String {
+        guard let code else { return NSLocalizedString("System", comment: "System language option") }
+        let locale = Locale(identifier: code)
+        return locale.localizedString(forLanguageCode: code) ?? code
     }
 }
 
@@ -296,7 +378,7 @@ struct SettingsButton: View {
 
                 Spacer()
 
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(.sonicTextMuted)

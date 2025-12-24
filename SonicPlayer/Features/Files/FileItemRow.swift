@@ -22,7 +22,7 @@ struct FileItemRow<LeadingAccessory: View, TrailingAccessory: View>: View {
             Spacer()
 
             if showsChevron {
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.caption)
                     .foregroundColor(Color(UIColor.tertiaryLabel))
             }

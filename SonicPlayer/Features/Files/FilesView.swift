@@ -10,7 +10,7 @@ struct FilesView: View {
     @State private var shareItem: ShareItem?
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        ZStack {
             Color.sonicBackground.ignoresSafeArea()
 
             if shouldShowLoader {
@@ -104,16 +104,13 @@ struct FilesView: View {
     }
 
     private var emptyStateView: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "folder.badge.questionmark")
-                .font(.system(size: 64))
-                .foregroundStyle(LinearGradient.sonicGradientPurple)
-
-            Text("Folder is Empty")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundColor(.sonicTextPrimary)
-        }
+        EmptyStateView(
+            icon: "folder.badge.questionmark",
+            title: "Folder is Empty",
+            iconStyle: AnyShapeStyle(LinearGradient.sonicGradientPurple),
+            iconSize: 64,
+            spacing: 24
+        )
     }
     
     // Helper to determine if we should show the full screen loader
