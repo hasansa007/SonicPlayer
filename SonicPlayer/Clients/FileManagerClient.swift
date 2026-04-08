@@ -80,7 +80,7 @@ extension FileManagerClient: DependencyKey {
                     throw NSError(domain: "FileManagerClient", code: 1, userInfo: [NSLocalizedDescriptionKey: "Access Denied: \(targetPath.path) is not in \(rootPath.path)"])
                 }
 
-                let audioExtensions = ["mp3", "m4a", "wav", "aac", "flac", "aiff", "m4b", "mp4"]
+                let audioExtensions = ["mp3", "m4a", "wav", "aac", "flac", "aiff", "m4b", "mp4", "opus", "ogg"]
                 
                 let contents = try FileManager.default.contentsOfDirectory(
                     at: targetPath,

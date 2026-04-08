@@ -3,53 +3,49 @@ import SwiftUI
 
 struct SettingsView: View {
     let store: StoreOf<SettingsFeature>
-    @AppStorage("hasSeenQuickstart") private var hasSeenQuickstart = false
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.systemID
     private let supportedLanguages = AppLanguage.supportedLanguages
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.sonicBackground.ignoresSafeArea()
+        ZStack {
+            Color.sonicBackground.ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: 20) {
-                        // App branding
-                        appHeaderView
+            ScrollView {
+                VStack(spacing: 20) {
+                    // App branding
+                    appHeaderView
 
-                        // Playback settings
-                        playbackSettingsSection
+                    // Playback settings
+                    playbackSettingsSection
 
-                        // Appearance settings
-                        appearanceSection
+                    // Appearance settings
+                    appearanceSection
 
-                        // About & Help
-                        infoSection
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 80) // Add bottom padding for Mini Player
+                    // About & Help
+                    infoSection
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 80)
             }
-            .navigationTitle("Settings")
-            .sheet(isPresented: Binding(
-                get: { store.showAbout },
-                set: { _ in store.send(.dismissAbout) }
-            )) {
-                AboutView(store: store)
-            }
-            .sheet(isPresented: Binding(
-                get: { store.showHelp },
-                set: { _ in store.send(.dismissHelp) }
-            )) {
-                HelpView(store: store)
-            }
+        }
+        .navigationTitle("Settings")
+        .navigationDestination(isPresented: Binding(
+            get: { store.showAbout },
+            set: { _ in store.send(.dismissAbout) }
+        )) {
+            AboutView(store: store)
+        }
+        .navigationDestination(isPresented: Binding(
+            get: { store.showHelp },
+            set: { _ in store.send(.dismissHelp) }
+        )) {
+            HelpView(store: store)
         }
     }
 
     private var appHeaderView: some View {
         VStack(spacing: 16) {
-            // Logo
             Image("AppLogo")
                 .resizable()
                 .scaledToFit()
@@ -78,7 +74,6 @@ struct SettingsView: View {
     private var playbackSettingsSection: some View {
         SettingsSection(title: "Playback", icon: "play.circle.fill") {
             VStack(spacing: 12) {
-                // Default playback speed
                 SettingsRow(
                     icon: "speedometer",
                     title: "Default Speed",
@@ -113,7 +108,6 @@ struct SettingsView: View {
 
                 Divider()
 
-                // Default skip duration
                 SettingsRow(
                     icon: "arrow.left.arrow.right",
                     title: "Skip Duration",
@@ -229,16 +223,6 @@ struct SettingsView: View {
     private var infoSection: some View {
         SettingsSection(title: "Information", icon: "info.circle.fill") {
             VStack(spacing: 12) {
-                SettingsButton(
-                    icon: "sparkles",
-                    title: "Replay Quickstart",
-                    iconColor: .sonicPrimary
-                ) {
-                    hasSeenQuickstart = false
-                }
-
-                Divider()
-
                 SettingsButton(
                     icon: "info.circle",
                     title: "About Sonic Player",

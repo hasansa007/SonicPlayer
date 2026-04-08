@@ -6,38 +6,23 @@ struct AboutView: View {
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 32) {
-                    // Hero section
-                    heroSection
+        ScrollView {
+            VStack(spacing: 32) {
+                // Hero section
+                heroSection
 
-                    // Mission section
-                    missionSection
+                // Mission section
+                missionSection
 
-                    // Features section
-                    featuresSection
-
-                    // Tech stack section
-                    techStackSection
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 24)
+                // Features section
+                featuresSection
             }
-            .background(Color.sonicBackground.ignoresSafeArea())
-            .navigationTitle("About")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.sonicTextMuted)
-                    }
-                }
-            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 24)
         }
+        .background(Color.sonicBackground.ignoresSafeArea())
+        .navigationTitle("About")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private var heroSection: some View {

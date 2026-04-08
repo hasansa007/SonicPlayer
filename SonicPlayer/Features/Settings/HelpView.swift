@@ -6,35 +6,23 @@ struct HelpView: View {
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // FAQ section
-                    faqSection
+        ScrollView {
+            VStack(spacing: 24) {
+                // FAQ section
+                faqSection
 
-                    // Troubleshooting
-                    troubleshootingSection
+                // Troubleshooting
+                troubleshootingSection
 
-                    // Contact support
-                    supportSection
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 24)
+                // Contact support
+                supportSection
             }
-            .background(Color.sonicBackground.ignoresSafeArea())
-            .navigationTitle("Help & Support")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.sonicTextMuted)
-                    }
-                }
-            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 24)
         }
+        .background(Color.sonicBackground.ignoresSafeArea())
+        .navigationTitle("Help & Support")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private var faqSection: some View {

@@ -19,6 +19,10 @@
 				<string>public.aac-audio</string>
 				<string>org.xiph.flac</string>
 				<string>public.aiff-audio</string>
+				<string>com.apple.m4a-audio</string>
+				<string>com.apple.protected-mpeg-4-audio</string>
+				<string>org.xiph.ogg</string>
+				<string>org.xiph.opus</string>
 				<string>public.audio</string>
 			</array>
 		</dict>
@@ -34,9 +38,9 @@
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.1.3</string>
+	<string>2.0.0</string>
 	<key>CFBundleVersion</key>
-	<string>13</string>
+	<string>15</string>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>

@@ -99,6 +99,7 @@ struct FilesFeature {
         case createFolderInPicker(String)
         case cancelMove
         case alert(PresentationAction<Alert>)
+        case playAllTapped
         case editAudio(PresentationAction<EditRecordingFeature.Action>)
 
         enum Alert: Equatable {
@@ -263,6 +264,10 @@ struct FilesFeature {
             case .folderCards, .fileRows:
                 return .none
 
+            case .playAllTapped:
+                // Handled by parent — plays all files in current folder
+                return .none
+
             case .folderTapped:
                 // Handled by parent
                 return .none
@@ -367,7 +372,7 @@ struct FilesFeature {
             case let .importFiles(urls):
                 let directory = state.currentDirectory
                 return .run { send in
-                    let audioExtensions: Set<String> = ["mp3", "m4a", "wav", "aac", "flac", "aiff", "m4b", "mp4"]
+                    let audioExtensions: Set<String> = ["mp3", "m4a", "wav", "aac", "flac", "aiff", "m4b", "mp4", "opus", "ogg"]
                     let containsFolder = urls.contains { url in
                         (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
                     }
@@ -496,7 +501,7 @@ struct FilesFeature {
 
             case .deleteSelectedTapped:
                 state.alert = AlertState {
-                    TextState("Delete \(state.selectedItems.count) items?")
+                    TextState("Delete \(state.selectedItems.count) \(state.selectedItems.count == 1 ? "item" : "items")?")
                 } actions: {
                     ButtonState(role: .destructive, action: .confirmDelete) {
                         TextState("Delete")

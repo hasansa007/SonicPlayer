@@ -55,6 +55,8 @@ enum AudioFormat: String, Codable, Hashable {
     case aiff = "aiff"
     case m4b = "m4b"
     case mp4 = "mp4"
+    case opus = "opus"
+    case ogg = "ogg"
 
     var displayName: String {
         switch self {
@@ -66,6 +68,8 @@ enum AudioFormat: String, Codable, Hashable {
         case .aiff: return "AIFF"
         case .m4b: return "M4B"
         case .mp4: return "MP4"
+        case .opus: return "OPUS"
+        case .ogg: return "OGG"
         }
     }
 }

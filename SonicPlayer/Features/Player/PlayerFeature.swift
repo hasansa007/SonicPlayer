@@ -149,7 +149,7 @@ struct PlayerFeature {
         case stopTimeObserver
         case toggleExpansion
         case setExpanded(Bool)
-        case scenePhaseChanged // Action to handle scene changes for persistence
+        case scenePhaseChanged(ScenePhase) // Action to handle scene changes for persistence
         case restoreSession
         case sessionLoaded(AudioFile, [AudioFile], Int) // currentTrack, queue, currentIndex
         case retryRestoreSession(AudioFile, TimeInterval, Float, Int) // track, time, rate, attemptNumber
@@ -324,9 +324,13 @@ struct PlayerFeature {
                 } else {
                     if state.currentTrack != nil {
                         state.isPlaying = true
+                        let rate = state.playbackSpeed.rawValue
 
                         return Effect.merge(
-                            Effect.run { send in await audioPlayer.resume() },
+                            Effect.run { send in
+                                await audioPlayer.resume()
+                                await audioPlayer.setRate(rate)
+                            },
                             Effect.send(.startTimeObserver)
                         )
                     }
@@ -351,7 +355,6 @@ struct PlayerFeature {
                     }
                 }
                 state.currentTime = 0
-                state.isExpanded = true
 
                 return Effect.merge(
                     Effect.cancel(id: CancelID.timeObserver),
@@ -441,8 +444,13 @@ struct PlayerFeature {
                     if state.hasNextTrack {
                         return .send(.nextTrack)
                     } else {
-                        // End of queue - dismiss player
-                        return .send(.clearSession)
+                        // End of queue - stop playback, stay on current track
+                        state.isPlaying = false
+                        state.currentTime = state.duration
+                        return .merge(
+                            .run { _ in await audioPlayer.pause() },
+                            .cancel(id: CancelID.timeObserver)
+                        )
                     }
                 }
 
@@ -491,8 +499,17 @@ struct PlayerFeature {
                 state.isExpanded = expanded
                 return .none
                 
-            case .scenePhaseChanged:
-                // Save session when app backgrounds
+            case let .scenePhaseChanged(phase):
+                // Reapply playback speed when returning to foreground
+                if phase == .active, state.isPlaying, state.currentTrack != nil {
+                    let rate = state.playbackSpeed.rawValue
+                    return .run { _ in
+                        await audioPlayer.setRate(rate)
+                    }
+                }
+
+                // Save session when app backgrounds (not active)
+                guard phase != .active else { return .none }
                 guard let currentTrack = state.currentTrack else {
                     state.$session.withLock { session in
                         session = PlaybackSession()

@@ -39,7 +39,6 @@ extension UserDefaults {
             set(newValue.rawValue, forKey: "colorScheme")
         }
     }
-
 }
 
 @Reducer
@@ -95,10 +94,8 @@ struct SettingsFeature {
             case .showHelpTapped:
                 state.showHelp = true
                 return .none
-                
+
             case .requestFeatureTapped:
-                // Placeholder for feature request logic (e.g., mailto)
-                // TODO: Replace 'support@sonicplayer.app' with your actual support email
                 if let url = URL(string: "mailto:hasansa007@gmail.com?subject=Feature%20Request") {
                     UIApplication.shared.open(url)
                 }

@@ -5,93 +5,94 @@ struct MiniPlayerView: View {
     let store: StoreOf<PlayerFeature>
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Album art thumbnail with waveform
-            ZStack {
-                if let artwork = store.artwork {
-                    Image(uiImage: artwork)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 40, height: 40)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.sonicPrimaryLight.opacity(0.15))
+        VStack(spacing: 0) {
+            // Progress bar
+            GeometryReader { geo in
+                Rectangle()
+                    .fill(Color.sonicPrimary)
+                    .frame(width: geo.size.width * store.progress, height: 2)
+                    .animation(.linear(duration: 0.3), value: store.progress)
+            }
+            .frame(height: 2)
+
+            HStack(spacing: 12) {
+                // Tap area: artwork + title → expand player
+                Button {
+                    store.send(.setExpanded(true))
+                } label: {
+                    HStack(spacing: 10) {
+                        // Thumbnail
+                        ZStack {
+                            if let artwork = store.artwork {
+                                Image(uiImage: artwork)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 40, height: 40)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            } else {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(LinearGradient.sonicGradient)
+                                    .frame(width: 40, height: 40)
+                            }
+
+                            if store.isPlaying {
+                                MiniWaveformView(isPlaying: store.isPlaying)
+                                    .frame(width: 24, height: 16)
+                                    .foregroundColor(.white)
+                            } else if store.artwork == nil {
+                                Image(systemName: "music.note")
+                                    .font(.caption)
+                                    .foregroundColor(.white)
+                            }
                         }
-                } else {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(
-                            LinearGradient.sonic(
-                                colors: Color.sonicTealColors
-                            )
-                        )
-                        .frame(width: 40, height: 40)
+
+                        // Title
+                        Text(store.currentTrack?.title ?? "Not Playing")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                // Play/Pause
+                Button {
+                    store.send(.playPauseButtonTapped)
+                } label: {
+                    Image(systemName: store.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.title3)
+                        .foregroundColor(.sonicPrimary)
+                        .frame(width: 44, height: 44)
                 }
 
-                if store.isPlaying {
-                    MiniWaveformView(isPlaying: store.isPlaying)
-                        .frame(width: 24, height: 16)
-                        .foregroundColor(.white)
-                } else if store.currentTrack == nil || store.artwork == nil {
-                     // Only show note icon if no artwork
-                    Image(systemName: "music.note")
+                // Skip Forward
+                Button {
+                    store.send(.skipForward)
+                } label: {
+                    Image(systemName: "forward.fill")
+                        .font(.title3)
+                        .foregroundColor(.sonicPrimary)
+                }
+
+                // Close
+                Button {
+                    store.send(.clearSession)
+                } label: {
+                    Image(systemName: "xmark")
                         .font(.caption)
-                        .foregroundColor(.white)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.sonicTextMuted)
+                        .frame(width: 28, height: 28)
                 }
             }
-            .shadow(radius: 2)
-
-            // Track Title (scrolling) - constrained to available space
-            ScrollingText(text: store.currentTrack?.title ?? "Not Playing")
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundColor(.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: 20)
-                .clipped()
-
-            // Play/Pause Button
-            Button {
-                store.send(.playPauseButtonTapped)
-            } label: {
-                Image(systemName: store.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.title3)
-                    .sonicGradientForeground(colors: store.artwork != nil ? store.colors : Color.sonicTealColors)
-            }
-
-            // Skip Button
-            Button {
-                store.send(.skipForward)
-            } label: {
-                Image(systemName: "forward.fill")
-                    .font(.title3)
-                    .sonicGradientForeground(colors: store.artwork != nil ? store.colors : Color.sonicTealColors)
-            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .background {
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    Capsule()
-                        .fill(
-                            LinearGradient.sonic(
-                                colors: (store.artwork != nil ? store.colors : Color.sonicTealColors).map { $0.opacity(0.15) }
-                            )
-                        )
-                }
-                .overlay {
-                    Capsule()
-                        .stroke(.white.opacity(0.25), lineWidth: 1.5)
-                }
-        }
-        .shadow(color: (store.colors.first ?? Color.sonicPrimary).opacity(0.15), radius: 20, x: 0, y: 10)
-        .shadow(color: (store.colors.last ?? Color.sonicPrimary).opacity(0.15), radius: 15, x: 0, y: 5)
-        .padding(.horizontal, 24)
-        .onTapGesture {
-            store.send(.setExpanded(true))
-        }
+        .background(.ultraThinMaterial)
+        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: -2)
     }
 }
 
@@ -123,14 +124,10 @@ struct MiniWaveformView: View {
     }
 
     func startAnimation() {
-        for i in 0..<3 {
-            phases[i] = CGFloat.random(in: 4...10)
-        }
+        for i in 0..<3 { phases[i] = CGFloat.random(in: 4...10) }
     }
 
     func stopAnimation() {
-        for i in 0..<3 {
-            phases[i] = 0
-        }
+        for i in 0..<3 { phases[i] = 0 }
     }
 }

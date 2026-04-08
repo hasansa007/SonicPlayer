@@ -8,6 +8,8 @@ struct FilesView: View {
     @Bindable var store: StoreOf<FilesFeature>
     @State private var showingDocumentPicker = false
     @State private var shareItem: ShareItem?
+    @State private var isSelecting = false
+    @State private var selectedFileIds: Set<UUID> = []
 
     var body: some View {
         ZStack {
@@ -35,7 +37,7 @@ struct FilesView: View {
             prompt: "Search files..."
         )
         .alert($store.scope(state: \.alert, action: \.alert))
-        .alert("New Folder", isPresented: Binding(
+        .alert("New Collection", isPresented: Binding(
             get: { store.isCreatingFolder },
             set: { if !$0 { store.send(.cancelNameInput) } }
         )) {
@@ -106,8 +108,8 @@ struct FilesView: View {
     private var emptyStateView: some View {
         EmptyStateView(
             icon: "folder.badge.questionmark",
-            title: "Folder is Empty",
-            iconStyle: AnyShapeStyle(LinearGradient.sonicGradientPurple),
+            title: "Collection is Empty",
+            iconStyle: AnyShapeStyle(LinearGradient.sonicGradient),
             iconSize: 64,
             spacing: 24
         )
@@ -155,32 +157,84 @@ struct FilesView: View {
                     }
                 }
                 
+                // Play All button (when folder has files)
+                if !store.filteredFileRows.isEmpty && store.currentDirectory != nil {
+                    Button {
+                        store.send(.playAllTapped)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "play.fill")
+                                .font(.caption)
+                            Text("Play All")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(.sonicPrimary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.sonicPrimary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                    }
+                    .padding(.horizontal)
+                }
+
                 // Files Section
                 if !store.filteredFileRows.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         LazyVStack(spacing: 8) {
                             ForEach(store.scope(state: \.filteredFileRows, action: \.fileRows)) { rowStore in
-                                FileItemRowView(store: rowStore, isSelectionMode: false)
+                                HStack(spacing: 8) {
+                                    if isSelecting {
+                                        Button {
+                                            withAnimation(.easeInOut(duration: 0.15)) {
+                                                if selectedFileIds.contains(rowStore.id) {
+                                                    selectedFileIds.remove(rowStore.id)
+                                                } else {
+                                                    selectedFileIds.insert(rowStore.id)
+                                                }
+                                            }
+                                        } label: {
+                                            Image(systemName: selectedFileIds.contains(rowStore.id) ? "checkmark.circle.fill" : "circle")
+                                                .font(.title3)
+                                                .foregroundColor(selectedFileIds.contains(rowStore.id) ? .sonicPrimary : .sonicTextMuted)
+                                        }
+                                    }
+
+                                    FileItemRowView(store: rowStore, isSelectionMode: isSelecting)
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    if isSelecting {
+                                        withAnimation(.easeInOut(duration: 0.15)) {
+                                            if selectedFileIds.contains(rowStore.id) {
+                                                selectedFileIds.remove(rowStore.id)
+                                            } else {
+                                                selectedFileIds.insert(rowStore.id)
+                                            }
+                                        }
+                                    }
+                                }
                                 .contextMenu {
-                                    Button {
-                                        shareItem = ShareItem(url: rowStore.file.url)
-                                    } label: {
-                                        Label("Share", systemImage: "square.and.arrow.up")
-                                    }
-                                    Button {
-                                        rowStore.send(.moveTapped)
-                                    } label: {
-                                        Label("Move", systemImage: "folder")
-                                    }
-                                    Button {
-                                        rowStore.send(.renameTapped)
-                                    } label: {
-                                        Label("Rename", systemImage: "pencil")
-                                    }
-                                    Button(role: .destructive) {
-                                        rowStore.send(.deleteTapped)
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
+                                    if !isSelecting {
+                                        Button {
+                                            shareItem = ShareItem(url: rowStore.file.url)
+                                        } label: {
+                                            Label("Share", systemImage: "square.and.arrow.up")
+                                        }
+                                        Button {
+                                            rowStore.send(.moveTapped)
+                                        } label: {
+                                            Label("Move", systemImage: "folder")
+                                        }
+                                        Button {
+                                            rowStore.send(.renameTapped)
+                                        } label: {
+                                            Label("Rename", systemImage: "pencil")
+                                        }
+                                        Button(role: .destructive) {
+                                            rowStore.send(.deleteTapped)
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
                                     }
                                 }
                             }
@@ -200,30 +254,93 @@ struct FilesView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
-            optionsMenu
+            if isSelecting {
+                HStack(spacing: 16) {
+                    if !selectedFileIds.isEmpty {
+                        Menu {
+                            Button {
+                                selectFilesInStore()
+                                store.send(.moveSelectedTapped)
+                                clearSelection()
+                            } label: {
+                                Label("Move", systemImage: "folder")
+                            }
+
+                            if selectedFileIds.count == 1 {
+                                Button {
+                                    if let id = selectedFileIds.first {
+                                        store.send(.fileRows(.element(id: id, action: .renameTapped)))
+                                    }
+                                    clearSelection()
+                                } label: {
+                                    Label("Rename", systemImage: "pencil")
+                                }
+                            }
+
+                            Button(role: .destructive) {
+                                selectFilesInStore()
+                                store.send(.deleteSelectedTapped)
+                                clearSelection()
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .foregroundColor(.sonicPrimary)
+                        }
+                    }
+
+                    Button("Done") {
+                        clearSelection()
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundColor(.sonicPrimary)
+                }
+            } else {
+                HStack(spacing: 16) {
+                    if !store.filteredFileRows.isEmpty {
+                        Button("Select") {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isSelecting = true
+                            }
+                        }
+                        .foregroundColor(.sonicPrimary)
+                    }
+
+                    Menu {
+                        Button {
+                            showingDocumentPicker = true
+                        } label: {
+                            Label("Import", systemImage: "square.and.arrow.down")
+                        }
+                        Button {
+                            store.send(.createFolderTapped)
+                        } label: {
+                            Label("New Collection", systemImage: "folder.badge.plus")
+                        }
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(.sonicPrimary)
+                    }
+                }
+            }
         }
     }
-    
-    private var optionsMenu: some View {
-        Menu {
-            // Import
-            Button {
-                showingDocumentPicker = true
-            } label: {
-                Label("Import", systemImage: "square.and.arrow.down")
-            }
 
-            // Create New Folder
-            Button {
-                store.send(.createFolderTapped)
-            } label: {
-                Label("New Folder", systemImage: "folder.badge.plus")
+    private func selectFilesInStore() {
+        store.send(.clearSelection)
+        for id in selectedFileIds {
+            if let row = store.fileRows[id: id] {
+                store.send(.toggleSelection(.file(row.file)))
             }
+        }
+    }
 
-        } label: {
-            Image(systemName: "plus.circle.fill")
-                .font(.title3)
-                .foregroundColor(.sonicPrimaryDark)
+    private func clearSelection() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isSelecting = false
+            selectedFileIds.removeAll()
         }
     }
 

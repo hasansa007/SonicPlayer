@@ -108,27 +108,4 @@ extension LinearGradient {
         endPoint: .bottomTrailing
     )
 
-    static let sonicGradientPurple = LinearGradient(
-        colors: Color.sonicPurpleColors,
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
-
-    static let sonicGradientOrange = LinearGradient(
-        colors: Color.sonicOrangeColors,
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
-
-    static let sonicGradientGreen = LinearGradient(
-        colors: Color.sonicGreenColors,
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
-
-    static let sonicGradientBlue = LinearGradient(
-        colors: Color.sonicBlueColors,
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
 }

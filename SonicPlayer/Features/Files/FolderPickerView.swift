@@ -81,7 +81,7 @@ struct FolderPickerRow: View {
                     // Root folder with gradient
                     ZStack {
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(LinearGradient.sonicGradientPurple)
+                            .fill(LinearGradient.sonicGradient)
 
                         Image(systemName: "house.fill")
                             .font(.title2)

@@ -5,14 +5,18 @@ import Foundation
 struct RecordingFeature {
     @ObservableState
     struct State: Equatable {
-        var recordings: [AudioFile] = []
+        // Recording state
         var isRecording: Bool = false
         var recordingTime: TimeInterval = 0
         var currentRecordingURL: URL?
         var peakLevel: Float = 0
         var hasPermission: Bool = false
         var showPermissionAlert: Bool = false
-        var isLoadingRecordings: Bool = false
+
+        // Save flow state
+        var isSaveFlowPresented: Bool = false
+        var saveFileName: String = ""
+        var saveDestination: URL? = nil // nil = Library root (Documents)
 
         // Edit state
         @Presents var editRecording: EditRecordingFeature.State?
@@ -31,6 +35,8 @@ struct RecordingFeature {
         case permissionsChecked(Bool)
         case requestPermissions
         case permissionsRequested(Bool)
+
+        // Recording
         case startRecordingTapped
         case stopRecordingTapped
         case recordingStarted(URL)
@@ -38,12 +44,20 @@ struct RecordingFeature {
         case recordingFailed(Error)
         case updateRecordingTime
         case timeUpdated(TimeInterval, Float)
-        case loadRecordings
-        case recordingsLoaded([AudioFile])
-        case recordingTapped(AudioFile)
-        case deleteRecording(AudioFile)
+
+        // Save flow
+        case setSaveFileName(String)
+        case setSaveDestination(URL?)
+        case saveRecording
+        case saveAndEditRecording
+        case discardRecording
+        case recordingSaved(AudioFile?)
+        case dismissSaveFlow
+
+        // Edit
         case editRecording(PresentationAction<EditRecordingFeature.Action>)
-        case editedRecordingReloaded(AudioFile?)
+
+        // Permission alert
         case setShowPermissionAlert(Bool)
     }
 
@@ -58,10 +72,7 @@ struct RecordingFeature {
         Reduce { state, action in
             switch action {
             case .onAppear:
-                return .merge(
-                    .send(.checkPermissions),
-                    .send(.loadRecordings)
-                )
+                return .send(.checkPermissions)
 
             case .checkPermissions:
                 return .run { send in
@@ -139,13 +150,18 @@ struct RecordingFeature {
                 }
                 .concatenate(with: .cancel(id: CancelID.recordingTimer))
 
-            case .recordingStopped:
-                state.currentRecordingURL = nil
+            case let .recordingStopped(url):
                 state.recordingTime = 0
                 state.peakLevel = 0
 
-                // Reload recordings to show the new one
-                return .send(.loadRecordings)
+                // Save immediately and open edit view
+                guard let url else { return .none }
+                state.currentRecordingURL = url
+
+                return .run { send in
+                    let metadata = try? await fileManager.getMetadata(url)
+                    await send(.recordingSaved(metadata))
+                }
 
             case let .recordingFailed(error):
                 state.isRecording = false
@@ -170,93 +186,89 @@ struct RecordingFeature {
                 state.peakLevel = peak
                 return .none
 
-            case .loadRecordings:
-                guard let recordingsFolder = state.recordingsFolder else {
-                    return .none
-                }
+            // MARK: - Save Flow
 
-                state.isLoadingRecordings = true
+            case let .setSaveFileName(name):
+                state.saveFileName = name
+                return .none
+
+            case let .setSaveDestination(url):
+                state.saveDestination = url
+                return .none
+
+            case .saveRecording:
+                guard let sourceURL = state.currentRecordingURL else { return .none }
+
+                let destination = state.saveDestination ?? fileManager.documentsDirectory()
+                let fileName = state.saveFileName.isEmpty ? sourceURL.lastPathComponent : "\(state.saveFileName).m4a"
+                let targetURL = destination.appendingPathComponent(fileName)
+
+                state.isSaveFlowPresented = false
 
                 return .run { send in
-                    // Ensure recordings folder exists
-                    try? FileManager.default.createDirectory(at: recordingsFolder, withIntermediateDirectories: true)
-
                     do {
-                        let contents = try FileManager.default.contentsOfDirectory(
-                            at: recordingsFolder,
-                            includingPropertiesForKeys: [.creationDateKey],
-                            options: [.skipsHiddenFiles]
-                        )
-
-                        let audioExtensions = ["m4a", "mp3", "wav"]
-                        var recordings: [AudioFile] = []
-
-                        for url in contents where audioExtensions.contains(url.pathExtension.lowercased()) {
-                            if let audioFile = try? await fileManager.getMetadata(url) {
-                                recordings.append(audioFile)
-                            }
+                        // If source and target differ, move the file
+                        if sourceURL != targetURL {
+                            try FileManager.default.moveItem(at: sourceURL, to: targetURL)
                         }
-
-                        // Sort by date, newest first
-                        recordings.sort { $0.creationDate > $1.creationDate }
-
-                        await send(.recordingsLoaded(recordings))
+                        let metadata = try? await fileManager.getMetadata(targetURL)
+                        await send(.recordingSaved(metadata))
                     } catch {
-                        print("Failed to load recordings: \(error.localizedDescription)")
-                        await send(.recordingsLoaded([]))
+                        print("Failed to save recording: \(error.localizedDescription)")
+                        await send(.recordingSaved(nil))
                     }
                 }
 
-            case let .recordingsLoaded(recordings):
-                state.isLoadingRecordings = false
-                state.recordings = recordings
+            case .saveAndEditRecording:
+                guard let sourceURL = state.currentRecordingURL else { return .none }
+
+                let destination = state.saveDestination ?? fileManager.documentsDirectory()
+                let fileName = state.saveFileName.isEmpty ? sourceURL.lastPathComponent : "\(state.saveFileName).m4a"
+                let targetURL = destination.appendingPathComponent(fileName)
+
+                state.isSaveFlowPresented = false
+
+                return .run { send in
+                    do {
+                        if sourceURL != targetURL {
+                            try FileManager.default.moveItem(at: sourceURL, to: targetURL)
+                        }
+                        if let metadata = try? await fileManager.getMetadata(targetURL) {
+                            await send(.recordingSaved(metadata))
+                        }
+                    } catch {
+                        print("Failed to save recording: \(error.localizedDescription)")
+                    }
+                }
+
+            case let .recordingSaved(audioFile):
+                state.currentRecordingURL = nil
+                state.saveFileName = ""
+                state.saveDestination = nil
+                // If save & edit, open editor
+                if let audioFile {
+                    state.editRecording = EditRecordingFeature.State(recording: audioFile)
+                }
                 return .none
 
-            case let .recordingTapped(recording):
-                state.editRecording = EditRecordingFeature.State(recording: recording)
+            case .discardRecording:
+                if let url = state.currentRecordingURL {
+                    try? FileManager.default.removeItem(at: url)
+                }
+                state.currentRecordingURL = nil
+                state.saveFileName = ""
+                state.saveDestination = nil
+                state.isSaveFlowPresented = false
                 return .none
 
-            case let .deleteRecording(recording):
-                return .run { send in
-                    try? FileManager.default.removeItem(at: recording.url)
-                    await send(.loadRecordings)
-                }
-
-            case .editRecording(.presented(.deleted)):
-                return .run { [url = state.editRecording?.recording.url] send in
-                    await send(.loadRecordings)
-                    guard let url else { return }
-                    let updated = try? await fileManager.getMetadata(url)
-                    await send(.editedRecordingReloaded(updated))
-                }
-
-            case .editRecording(.presented(.trimApplied)):
-                return .run { [url = state.editRecording?.recording.url] send in
-                    await send(.loadRecordings)
-                    guard let url else { return }
-                    let updated = try? await fileManager.getMetadata(url)
-                    await send(.editedRecordingReloaded(updated))
-                }
-
-            case let .editRecording(.presented(.renameApplied(updated))):
-                return .run { send in
-                    await send(.loadRecordings)
-                    await send(.editedRecordingReloaded(updated))
-                }
+            case .dismissSaveFlow:
+                state.isSaveFlowPresented = false
+                return .none
 
             case .editRecording(.dismiss):
                 return .run { _ in
                     await audioPlayer.stop()
                 }
-
-            case let .editedRecordingReloaded(updated):
-                if let updated {
-                    state.editRecording = EditRecordingFeature.State(recording: updated)
-                } else {
-                    state.editRecording?.isPlaying = false
-                    state.editRecording?.currentTime = 0
-                }
-                return .none
 
             case .editRecording:
                 return .none
@@ -272,7 +284,7 @@ struct RecordingFeature {
     }
 }
 
-// MARK: - Edit Recording Feature
+// MARK: - Edit Recording Feature (unchanged from original)
 
 @Reducer
 struct EditRecordingFeature {
@@ -330,7 +342,6 @@ struct EditRecordingFeature {
         Reduce { state, action in
             switch action {
             case .onAppear:
-                // Start playback automatically in preview mode
                 state.currentTime = 0
                 return .none
 
@@ -458,7 +469,6 @@ struct EditRecordingFeature {
                 }
 
             case .trimStarted:
-                // Visual feedback that trimming started
                 return .none
 
             case .trimCompleted:
@@ -469,7 +479,6 @@ struct EditRecordingFeature {
             case let .trimFailed(error):
                 state.isTrimming_InProgress = false
                 state.trimError = error.localizedDescription
-                print("Trim failed: \(error.localizedDescription)")
                 return .none
 
             case .deleteRangeCompleted:
@@ -480,7 +489,6 @@ struct EditRecordingFeature {
             case let .deleteRangeFailed(error):
                 state.isTrimming_InProgress = false
                 state.trimError = error.localizedDescription
-                print("Delete range failed: \(error.localizedDescription)")
                 return .none
 
             case .cancelTrim:

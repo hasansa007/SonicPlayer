@@ -14,7 +14,7 @@ struct FileItemRowView: View {
             colors: store.colors,
             fallbackSystemImage: "waveform",
             showsChevron: false,
-            onTap: { store.send(.tapped) }
+            onTap: { if !isSelectionMode { store.send(.tapped) } }
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
