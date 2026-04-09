@@ -13,12 +13,12 @@ struct RecordingView: View {
                 if store.isRecording {
                     recordingInterface
                 } else if store.isSaveFlowPresented {
-                    saveFlowInterface
+                    saveEditInterface
                 } else {
                     preRecordingInterface
                 }
             }
-            .navigationTitle(store.isRecording ? "Recording" : "New Recording")
+            .navigationTitle(store.isRecording ? "Recording" : (store.isSaveFlowPresented ? "Edit Recording" : "New Recording"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -35,11 +35,47 @@ struct RecordingView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if store.isSaveFlowPresented {
-                        Button("Save") {
-                            store.send(.saveRecording)
+                        if let inlineEdit = store.inlineEdit, inlineEdit.isTrimming {
+                            HStack(spacing: 12) {
+                                Button {
+                                    store.send(.inlineEdit(.applyTrim))
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "scissors")
+                                            .font(.caption)
+                                        Text("Trim")
+                                            .font(.subheadline).fontWeight(.semibold)
+                                    }
+                                    .foregroundColor(.sonicPrimary)
+                                }
+
+                                Button {
+                                    store.send(.inlineEdit(.cancelTrim))
+                                } label: {
+                                    Text("Cancel")
+                                        .font(.subheadline)
+                                        .foregroundColor(.sonicTextSecondary)
+                                }
+
+                                Button {
+                                    store.send(.inlineEdit(.deleteRangeTapped))
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "trash")
+                                            .font(.caption)
+                                        Text("Delete")
+                                            .font(.subheadline)
+                                    }
+                                    .foregroundColor(.red)
+                                }
+                            }
+                        } else {
+                            Button("Save") {
+                                store.send(.saveRecording)
+                            }
+                            .fontWeight(.semibold)
+                            .foregroundColor(.sonicPrimary)
                         }
-                        .fontWeight(.semibold)
-                        .foregroundColor(.sonicPrimary)
                     }
                 }
             }
@@ -52,8 +88,13 @@ struct RecordingView: View {
         } message: {
             Text("Sonic Player needs access to your microphone to record audio.")
         }
-        .sheet(item: $store.scope(state: \.editRecording, action: \.editRecording)) { editStore in
-            EditRecordingView(store: editStore)
+        .alert("Action Failed", isPresented: Binding(
+            get: { store.inlineEdit?.trimError != nil },
+            set: { if !$0 { store.send(.inlineEdit(.cancelTrim)) } }
+        )) {
+            Button("OK", role: .cancel) { store.send(.inlineEdit(.cancelTrim)) }
+        } message: {
+            if let error = store.inlineEdit?.trimError { Text(error) }
         }
         .onAppear {
             store.send(.onAppear)
@@ -70,7 +111,7 @@ struct RecordingView: View {
                 .font(.system(size: 48))
                 .foregroundColor(.sonicTextMuted)
 
-            Text("Tap to start recording")
+            Text("Ready to record?")
                 .font(.subheadline)
                 .foregroundColor(.sonicTextSecondary)
 
@@ -86,12 +127,13 @@ struct RecordingView: View {
                                 endPoint: .bottom
                             )
                         )
-                        .frame(width: 80, height: 80)
-                        .shadow(color: Color.red.opacity(0.3), radius: 16, x: 0, y: 8)
+                        .frame(width: 64, height: 64)
+                        .shadow(color: Color.red.opacity(0.5), radius: 20, x: 0, y: 8)
+                        .shadow(color: Color.red.opacity(0.3), radius: 40, x: 0, y: 12)
 
                     Circle()
                         .fill(Color.white)
-                        .frame(width: 28, height: 28)
+                        .frame(width: 22, height: 22)
                 }
             }
 
@@ -102,108 +144,298 @@ struct RecordingView: View {
     // MARK: - Recording Interface
 
     private var recordingInterface: some View {
-        VStack(spacing: 40) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 40) {
+                Spacer().frame(height: 20)
 
-            Text(formatTime(store.recordingTime))
-                .font(.system(size: 60, weight: .light, design: .rounded))
-                .foregroundColor(.sonicTextPrimary)
-                .monospacedDigit()
+                Text(formatTime(store.recordingTime))
+                    .font(.system(size: 60, weight: .light, design: .rounded))
+                    .foregroundColor(.sonicTextPrimary)
+                    .monospacedDigit()
 
-            RecordingWaveformView(peakLevel: store.peakLevel)
-                .frame(height: 120)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 20)
+                RecordingWaveformView(peakLevel: store.peakLevel)
+                    .frame(height: 120)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 20)
 
-            // Stop button
-            Button {
-                store.send(.stopRecordingTapped)
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 72, height: 72)
-                        .shadow(color: Color.red.opacity(0.3), radius: 16, x: 0, y: 8)
+                // Stop button
+                Button {
+                    store.send(.stopRecordingTapped)
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 72, height: 72)
+                            .shadow(color: Color.red.opacity(0.3), radius: 16, x: 0, y: 8)
 
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.white)
-                        .frame(width: 28, height: 28)
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.white)
+                            .frame(width: 28, height: 28)
+                    }
                 }
+                .padding(.bottom, 40)
             }
-
-            Spacer()
+            .frame(maxWidth: .infinity)
         }
     }
 
-    // MARK: - Save Flow
+    // MARK: - Combined Save + Edit Interface
 
-    @State private var previewPlaying = false
+    private var saveEditInterface: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+            if let inlineEdit = store.inlineEdit {
+                // Waveform area
+                inlineWaveformArea(inlineEdit)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
 
-    private var saveFlowInterface: some View {
-        VStack(spacing: 24) {
-            Spacer()
+                // Time display
+                Text(formatEditTime(inlineEdit.currentTime))
+                    .font(.system(size: 36, weight: .light, design: .rounded))
+                    .foregroundColor(.sonicTextPrimary)
+                    .monospacedDigit()
+                    .padding(.top, 16)
 
-            // Waveform preview with play button
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.sonicBorder.opacity(0.2))
-                    .frame(height: 80)
-                    .overlay {
-                        HStack(spacing: 2) {
-                            ForEach(0..<30, id: \.self) { _ in
-                                RoundedRectangle(cornerRadius: 1)
-                                    .fill(Color.sonicPrimary.opacity(0.4))
-                                    .frame(width: 3, height: CGFloat.random(in: 8...40))
-                            }
-                        }
-                    }
+                // Playback controls
+                inlinePlaybackControls
+                    .padding(.top, 12)
 
-                // Play button overlay
-                Button {
-                    previewPlaying.toggle()
-                } label: {
-                    Image(systemName: previewPlaying ? "pause.circle.fill" : "play.circle.fill")
-                        .font(.system(size: 44))
-                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.3), radius: 4)
-                }
-            }
-            .padding(.horizontal, 24)
+                Spacer()
 
-            // Name field
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Name")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.sonicTextSecondary)
-
-                TextField("Recording name", text: Binding(
-                    get: { store.saveFileName },
-                    set: { store.send(.setSaveFileName($0)) }
-                ))
-                .textFieldStyle(.roundedBorder)
-            }
-            .padding(.horizontal, 24)
-
-            // Play & Edit button
-            Button {
-                store.send(.saveAndEditRecording)
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "scissors")
-                        .font(.subheadline)
-                    Text("Edit Recording")
-                        .font(.body)
+                // Name field
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Name")
+                        .font(.caption)
                         .fontWeight(.medium)
-                }
-                .foregroundColor(.sonicPrimary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.sonicSurface, in: RoundedRectangle(cornerRadius: 12))
-            }
-            .padding(.horizontal, 24)
+                        .foregroundColor(.sonicTextSecondary)
 
-            Spacer()
+                    TextField("Recording name", text: Binding(
+                        get: { store.saveFileName },
+                        set: { store.send(.setSaveFileName($0)) }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                }
+                .padding(.horizontal, 24)
+
+                // Trim button (if not already in trim mode)
+                if !inlineEdit.isTrimming {
+                    Button {
+                        store.send(.inlineEdit(.trimTapped))
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "scissors")
+                                .font(.subheadline)
+                            Text("Select & Trim")
+                                .font(.body)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(.sonicPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.sonicPrimary.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 12)
+                }
+
+                Spacer().frame(height: 24)
+            } else {
+                // Loading state while metadata loads
+                VStack(spacing: 16) {
+                    Spacer()
+                    ProgressView()
+                        .tint(.sonicPrimary)
+                    Text("Loading...")
+                        .font(.subheadline)
+                        .foregroundColor(.sonicTextSecondary)
+                    Spacer()
+                }
+            }
+
+            }
+        }
+        .overlay {
+            // Trimming overlay
+            if store.inlineEdit?.isTrimming_InProgress == true {
+                ZStack {
+                    Color.black.opacity(0.7).ignoresSafeArea()
+                    VStack(spacing: 20) {
+                        ProgressView().scaleEffect(1.5).tint(.sonicPrimary)
+                        Text("Trimming audio...").font(.headline).foregroundColor(.sonicTextPrimary)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Inline Waveform
+
+    private func inlineWaveformArea(_ editState: EditRecordingFeature.State) -> some View {
+        VStack(spacing: 8) {
+            ZStack {
+                if editState.isTrimming {
+                    inlineTrimWaveform(editState)
+                } else {
+                    inlinePlaybackWaveform(editState)
+                }
+            }
+            .frame(height: 120)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            // Timeline
+            HStack {
+                Text(formatEditTime(editState.isTrimming ? editState.trimStart : 0))
+                    .font(.caption2).monospacedDigit()
+                    .foregroundColor(.sonicTextSecondary)
+                Spacer()
+                if editState.isTrimming {
+                    Text("Duration: \(formatEditTime(editState.trimEnd - editState.trimStart))")
+                        .font(.caption2)
+                        .foregroundColor(.sonicPrimary)
+                }
+                Spacer()
+                Text(formatEditTime(editState.isTrimming ? editState.trimEnd : editState.recording.duration))
+                    .font(.caption2).monospacedDigit()
+                    .foregroundColor(.sonicTextSecondary)
+            }
+        }
+    }
+
+    private func inlinePlaybackWaveform(_ editState: EditRecordingFeature.State) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.sonicPrimary.opacity(0.06))
+
+            HStack(spacing: 2) {
+                ForEach(0..<40, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(Color.sonicPrimary.opacity(0.35))
+                        .frame(width: 3, height: CGFloat.random(in: 10...60))
+                }
+            }
+
+            GeometryReader { geo in
+                let progress = editState.recording.duration > 0 ? editState.currentTime / editState.recording.duration : 0
+                Rectangle()
+                    .fill(Color.sonicPrimary)
+                    .frame(width: 2)
+                    .offset(x: geo.size.width * CGFloat(progress))
+            }
+
+            GeometryReader { geo in
+                Color.clear.contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                let progress = min(max(0, value.location.x / geo.size.width), 1)
+                                let time = progress * editState.recording.duration
+                                store.send(.inlineEdit(.playbackTimeUpdated(time)))
+                            }
+                    )
+            }
+        }
+    }
+
+    private func inlineTrimWaveform(_ editState: EditRecordingFeature.State) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.sonicPrimary.opacity(0.06))
+
+            GeometryReader { geo in
+                let totalWidth = geo.size.width
+                let startX = CGFloat(editState.trimStart / editState.recording.duration) * totalWidth
+                let endX = CGFloat(editState.trimEnd / editState.recording.duration) * totalWidth
+
+                Rectangle()
+                    .fill(Color.black.opacity(0.4))
+                    .frame(width: startX)
+
+                Rectangle()
+                    .fill(Color.black.opacity(0.4))
+                    .frame(width: totalWidth - endX)
+                    .offset(x: endX)
+
+                Rectangle()
+                    .fill(Color.sonicPrimary.opacity(0.15))
+                    .frame(width: max(0, endX - startX))
+                    .offset(x: startX)
+
+                HStack(spacing: 2) {
+                    ForEach(0..<40, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Color.sonicPrimary.opacity(0.35))
+                            .frame(width: 3, height: CGFloat.random(in: 10...60))
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                // Left handle
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.sonicPrimary)
+                    .frame(width: 4, height: 120)
+                    .offset(x: startX - 2)
+                    .gesture(
+                        DragGesture()
+                            .onChanged { value in
+                                let newStart = (value.location.x / totalWidth) * editState.recording.duration
+                                store.send(.inlineEdit(.trimStartChanged(max(0, min(newStart, editState.trimEnd - 1)))))
+                            }
+                    )
+
+                // Right handle
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.sonicPrimary)
+                    .frame(width: 4, height: 120)
+                    .offset(x: endX - 2)
+                    .gesture(
+                        DragGesture()
+                            .onChanged { value in
+                                let newEnd = (value.location.x / totalWidth) * editState.recording.duration
+                                store.send(.inlineEdit(.trimEndChanged(max(editState.trimStart + 1, min(newEnd, editState.recording.duration)))))
+                            }
+                    )
+
+                // Playback position
+                Rectangle()
+                    .fill(Color.sonicTextPrimary)
+                    .frame(width: 2)
+                    .offset(x: CGFloat(editState.currentTime / editState.recording.duration) * totalWidth)
+            }
+        }
+    }
+
+    // MARK: - Inline Playback Controls
+
+    private var inlinePlaybackControls: some View {
+        HStack(spacing: 48) {
+            Button { store.send(.inlineEdit(.skipBackward)) } label: {
+                Image(systemName: "gobackward.15")
+                    .font(.title2)
+                    .foregroundColor(.sonicTextSecondary)
+                    .frame(width: 52, height: 52)
+            }
+
+            Button { store.send(.inlineEdit(.playPauseTapped)) } label: {
+                ZStack {
+                    Circle()
+                        .fill(Color.sonicPrimary)
+                        .frame(width: 64, height: 64)
+                        .shadow(color: Color.sonicPrimary.opacity(0.3), radius: 8, x: 0, y: 4)
+
+                    Image(systemName: store.inlineEdit?.isPlaying == true ? "pause.fill" : "play.fill")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                        .offset(x: store.inlineEdit?.isPlaying == true ? 0 : 2)
+                }
+            }
+
+            Button { store.send(.inlineEdit(.skipForward)) } label: {
+                Image(systemName: "goforward.15")
+                    .font(.title2)
+                    .foregroundColor(.sonicTextSecondary)
+                    .frame(width: 52, height: 52)
+            }
         }
     }
 
@@ -215,6 +447,12 @@ struct RecordingView: View {
         let seconds = Int(time) % 60
         let centiseconds = Int((time.truncatingRemainder(dividingBy: 1)) * 100)
         return String(format: "%02d:%02d:%02d.%02d", hours, minutes, seconds, centiseconds)
+    }
+
+    private func formatEditTime(_ time: TimeInterval) -> String {
+        let minutes = Int(time) / 60
+        let seconds = Int(time) % 60
+        return String(format: "%d:%02d", minutes, seconds)
     }
 }
 

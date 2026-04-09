@@ -58,6 +58,15 @@ struct MiniPlayerView: View {
                 }
                 .buttonStyle(.plain)
 
+                // Previous
+                Button {
+                    store.send(.previousTrack)
+                } label: {
+                    Image(systemName: "backward.fill")
+                        .font(.body)
+                        .foregroundColor(.sonicPrimary)
+                }
+
                 // Play/Pause
                 Button {
                     store.send(.playPauseButtonTapped)
@@ -68,12 +77,12 @@ struct MiniPlayerView: View {
                         .frame(width: 44, height: 44)
                 }
 
-                // Skip Forward
+                // Next
                 Button {
-                    store.send(.skipForward)
+                    store.send(.nextTrack)
                 } label: {
                     Image(systemName: "forward.fill")
-                        .font(.title3)
+                        .font(.body)
                         .foregroundColor(.sonicPrimary)
                 }
 

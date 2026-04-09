@@ -6,8 +6,8 @@ import Foundation
 @DependencyClient
 struct FileManagerClient {
     var listItems: @Sendable (URL?) async throws -> [FileSystemItem]
-    var createFolder: @Sendable (String, URL?) async throws -> Void
-    var createFolderForImport: @Sendable () async throws -> URL
+    var createCollection: @Sendable (String, URL?) async throws -> Void
+    var createCollectionForImport: @Sendable () async throws -> URL
     var deleteItem: @Sendable (URL) async throws -> Void
     var moveItem: @Sendable (URL, URL) async throws -> Void
     var renameItem: @Sendable (URL, String) async throws -> Void
@@ -96,12 +96,25 @@ extension FileManagerClient: DependencyKey {
                             let creationDate = resourceValues?.creationDate ?? Date()
                             
                             if isDirectory {
-                                // Calculate stats for the folder (shallow)
+                                // Count audio files recursively (includes nested folders)
+                                func countAudioFiles(in directory: URL) -> Int {
+                                    let items = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles])) ?? []
+                                    var count = 0
+                                    for item in items {
+                                        let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+                                        if isDir {
+                                            count += countAudioFiles(in: item)
+                                        } else if audioExtensions.contains(item.pathExtension.lowercased()) {
+                                            count += 1
+                                        }
+                                    }
+                                    return count
+                                }
+                                let audioCount = countAudioFiles(in: url)
                                 let subContents = (try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles])) ?? []
-                                let audioCount = subContents.filter { audioExtensions.contains($0.pathExtension.lowercased()) }.count
                                 let subfolderCount = subContents.filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false }.count
                                 
-                                return .folder(Folder(
+                                return .folder(CollectionItem(
                                     id: url,
                                     url: url,
                                     name: url.lastPathComponent,
@@ -136,34 +149,34 @@ extension FileManagerClient: DependencyKey {
                     }
                 }
             },
-            createFolder: { name, parentURL in
+            createCollection: { name, parentURL in
                 let targetPath = parentURL ?? documentsDirectory
 
                 var finalName = name
-                var newFolderURL = targetPath.appendingPathComponent(finalName)
+                var newCollectionURL = targetPath.appendingPathComponent(finalName)
                 var counter = 2
 
-                while FileManager.default.fileExists(atPath: newFolderURL.path) {
+                while FileManager.default.fileExists(atPath: newCollectionURL.path) {
                     finalName = "\(name) \(counter)"
-                    newFolderURL = targetPath.appendingPathComponent(finalName)
+                    newCollectionURL = targetPath.appendingPathComponent(finalName)
                     counter += 1
                 }
 
-                try FileManager.default.createDirectory(at: newFolderURL, withIntermediateDirectories: false)
+                try FileManager.default.createDirectory(at: newCollectionURL, withIntermediateDirectories: false)
             },
-            createFolderForImport: {
-                var newFolderName = "New Folder"
+            createCollectionForImport: {
+                var newCollectionName = "New Collection"
                 var counter = 1
-                var proposedFolderURL = documentsDirectory.appendingPathComponent(newFolderName)
+                var proposedCollectionURL = documentsDirectory.appendingPathComponent(newCollectionName)
 
-                while FileManager.default.fileExists(atPath: proposedFolderURL.path) {
+                while FileManager.default.fileExists(atPath: proposedCollectionURL.path) {
                     counter += 1
-                    newFolderName = "New Folder \(counter)"
-                    proposedFolderURL = documentsDirectory.appendingPathComponent(newFolderName)
+                    newCollectionName = "New Collection \(counter)"
+                    proposedCollectionURL = documentsDirectory.appendingPathComponent(newCollectionName)
                 }
 
-                try FileManager.default.createDirectory(at: proposedFolderURL, withIntermediateDirectories: false)
-                return proposedFolderURL
+                try FileManager.default.createDirectory(at: proposedCollectionURL, withIntermediateDirectories: false)
+                return proposedCollectionURL
             },
             deleteItem: { url in
                 try FileManager.default.removeItem(at: url)
@@ -246,8 +259,8 @@ extension FileManagerClient: DependencyKey {
 
     static let testValue = Self(
         listItems: { _ in [] },
-        createFolder: { _, _ in },
-        createFolderForImport: { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] },
+        createCollection: { _, _ in },
+        createCollectionForImport: { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] },
         deleteItem: { _ in },
         moveItem: { _, _ in },
         renameItem: { _, _ in },

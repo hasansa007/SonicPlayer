@@ -58,6 +58,9 @@ struct PlayerFeature {
         var queue: [AudioFile] = []
         var currentIndex: Int = 0
         var currentPlaylistSource: PlaylistSource?
+        var repeatMode: RepeatMode = .off
+        var isShuffleEnabled: Bool = false
+        var originalQueue: [AudioFile] = []
 
         var isPlaying = false
         var currentTime: TimeInterval = 0
@@ -94,6 +97,8 @@ struct PlayerFeature {
             // Load persisted settings
             self.playbackSpeed = UserDefaults.standard.savedPlaybackSpeed
             self.skipDuration = UserDefaults.standard.savedSkipDuration
+            self.repeatMode = UserDefaults.standard.savedRepeatMode
+            self.isShuffleEnabled = UserDefaults.standard.savedShuffleEnabled
             // Will restore from session on .restoreSession action
             self.isExpanded = false
         }
@@ -125,7 +130,10 @@ struct PlayerFeature {
             lhs.currentTime == rhs.currentTime &&
             lhs.duration == rhs.duration &&
             lhs.isLoadingTrack == rhs.isLoadingTrack &&
-            lhs.isExpanded == rhs.isExpanded
+            lhs.isExpanded == rhs.isExpanded &&
+            lhs.repeatMode == rhs.repeatMode &&
+            lhs.isShuffleEnabled == rhs.isShuffleEnabled &&
+            lhs.originalQueue == rhs.originalQueue
             // Exclude artwork from comparison
         }
     }
@@ -157,6 +165,8 @@ struct PlayerFeature {
         case clearSession
         case suspendSession
         
+        case toggleRepeatMode
+        case toggleShuffle
         case loadArtwork
         case artworkLoaded(UIImage?, [Color])
     }
@@ -344,8 +354,18 @@ struct PlayerFeature {
                 // Update runtime state
                 state.currentTrack = track
                 if let newQueue = queue {
-                    state.queue = newQueue
-                    state.currentIndex = newQueue.firstIndex(of: track) ?? 0
+                    if state.isShuffleEnabled {
+                        state.originalQueue = newQueue
+                        var shuffled = newQueue
+                        shuffled.removeAll { $0 == track }
+                        shuffled.shuffle()
+                        shuffled.insert(track, at: 0)
+                        state.queue = shuffled
+                        state.currentIndex = 0
+                    } else {
+                        state.queue = newQueue
+                        state.currentIndex = newQueue.firstIndex(of: track) ?? 0
+                    }
                     // When loading a new queue, always update the playlist source
                     state.currentPlaylistSource = playlistSource
                 } else {
@@ -406,10 +426,14 @@ struct PlayerFeature {
                 return Effect.run { send in await audioPlayer.skipBackward(interval) }
                 
             case .nextTrack:
-                guard state.hasNextTrack else { return .none }
-                state.currentIndex += 1
-                let next = state.queue[state.currentIndex]
-                return Effect.send(.loadTrack(next, nil, nil))
+                if state.hasNextTrack {
+                    state.currentIndex += 1
+                    let next = state.queue[state.currentIndex]
+                    return Effect.send(.loadTrack(next, nil, nil))
+                } else if state.repeatMode == .all && !state.queue.isEmpty {
+                    return .send(.jumpToTrack(0))
+                }
+                return .none
 
             case .previousTrack:
                 if state.currentTime > 3 {
@@ -441,8 +465,20 @@ struct PlayerFeature {
 
                 // Check if track finished
                 if state.isPlaying && state.duration > 0 && (state.duration - time) < 1.0 {
-                    if state.hasNextTrack {
+                    if state.repeatMode == .one {
+                        // Repeat current track — seek to start and resume
+                        state.currentTime = 0
+                        let rate = state.playbackSpeed.rawValue
+                        return .run { send in
+                            await audioPlayer.seek(0)
+                            await audioPlayer.resume()
+                            await audioPlayer.setRate(rate)
+                        }
+                    } else if state.hasNextTrack {
                         return .send(.nextTrack)
+                    } else if state.repeatMode == .all && !state.queue.isEmpty {
+                        // Wrap to first track
+                        return .send(.jumpToTrack(0))
                     } else {
                         // End of queue - stop playback, stay on current track
                         state.isPlaying = false
@@ -540,6 +576,42 @@ struct PlayerFeature {
                 }
                 return .none
                 
+            case .toggleRepeatMode:
+                switch state.repeatMode {
+                case .off: state.repeatMode = .all
+                case .all: state.repeatMode = .one
+                case .one: state.repeatMode = .off
+                }
+                UserDefaults.standard.savedRepeatMode = state.repeatMode
+                return .none
+
+            case .toggleShuffle:
+                state.isShuffleEnabled.toggle()
+                UserDefaults.standard.savedShuffleEnabled = state.isShuffleEnabled
+                if state.isShuffleEnabled {
+                    // Save original queue and shuffle
+                    state.originalQueue = state.queue
+                    if let currentTrack = state.currentTrack {
+                        var shuffled = state.queue
+                        shuffled.removeAll { $0 == currentTrack }
+                        shuffled.shuffle()
+                        shuffled.insert(currentTrack, at: 0)
+                        state.queue = shuffled
+                        state.currentIndex = 0
+                    }
+                } else {
+                    // Restore original queue order
+                    if !state.originalQueue.isEmpty {
+                        let currentTrack = state.currentTrack
+                        state.queue = state.originalQueue
+                        if let currentTrack = currentTrack {
+                            state.currentIndex = state.originalQueue.firstIndex(of: currentTrack) ?? 0
+                        }
+                        state.originalQueue = []
+                    }
+                }
+                return .none
+
             case .loadArtwork:
                 guard let track = state.currentTrack else {
                     state.artwork = nil

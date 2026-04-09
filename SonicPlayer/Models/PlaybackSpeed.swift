@@ -30,3 +30,31 @@ enum SkipDuration: TimeInterval, CaseIterable, Identifiable, Codable {
         "\(Int(rawValue))s"
     }
 }
+
+enum RepeatMode: String, CaseIterable, Codable {
+    case off, one, all
+
+    var icon: String {
+        switch self {
+        case .off: return "repeat"
+        case .one: return "repeat.1"
+        case .all: return "repeat"
+        }
+    }
+}
+
+extension UserDefaults {
+    var savedRepeatMode: RepeatMode {
+        get {
+            if let rawValue = string(forKey: "repeatMode") {
+                return RepeatMode(rawValue: rawValue) ?? .off
+            }
+            return .off
+        }
+        set { set(newValue.rawValue, forKey: "repeatMode") }
+    }
+    var savedShuffleEnabled: Bool {
+        get { bool(forKey: "shuffleEnabled") }
+        set { set(newValue, forKey: "shuffleEnabled") }
+    }
+}

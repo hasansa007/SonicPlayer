@@ -3,11 +3,11 @@ import SwiftUI
 import UIKit
 
 @Reducer
-struct FolderCardFeature {
+struct CollectionItemCardFeature {
     @ObservableState
     struct State: Identifiable, Equatable {
         var id: URL { folder.id }
-        let folder: Folder
+        let folder: CollectionItem
         var artwork: UIImage?
         var colors: [Color] = []
         var isSelected: Bool = false

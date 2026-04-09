@@ -16,10 +16,6 @@ struct FileItemRowView: View {
             showsChevron: false,
             onTap: { if !isSelectionMode { store.send(.tapped) } }
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(store.isSelected ? Color.sonicPurple : Color.clear, lineWidth: 2)
-        )
         .onAppear {
             store.send(.onAppear)
         }
@@ -27,7 +23,7 @@ struct FileItemRowView: View {
     
     private var selectionIndicator: some View {
         Image(systemName: store.isSelected ? "checkmark.circle.fill" : "circle")
-            .foregroundColor(store.isSelected ? .sonicPurple : .gray)
+            .foregroundColor(.gray)
             .font(.title3)
     }
 

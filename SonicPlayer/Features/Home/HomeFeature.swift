@@ -10,8 +10,7 @@ struct HomeFeature {
         var isPlaying: Bool = false
         var playbackProgress: Double = 0
         var recentFiles: [AudioFile] = []
-        var isShowingAllRecentFiles: Bool = false
-        var isShowingAllFolders: Bool = false
+        var isShowingAllCollections: Bool = false
     }
 
     enum Action {
@@ -21,11 +20,9 @@ struct HomeFeature {
         case playTrack(AudioFile)
         case togglePlayPause
         case importTapped
-        case newFolderTapped
-        case viewAllRecentFilesTapped
-        case dismissAllRecentFiles
-        case viewAllFoldersTapped
-        case dismissAllFolders
+        case newCollectionTapped
+        case viewAllCollectionsTapped
+        case dismissAllCollections
     }
 
     @Dependency(\.fileManager) var fileManager
@@ -43,23 +40,15 @@ struct HomeFeature {
                 state.recentFiles = files
                 return .none
 
-            case .viewAllRecentFilesTapped:
-                state.isShowingAllRecentFiles = true
+            case .viewAllCollectionsTapped:
+                state.isShowingAllCollections = true
                 return .none
 
-            case .dismissAllRecentFiles:
-                state.isShowingAllRecentFiles = false
+            case .dismissAllCollections:
+                state.isShowingAllCollections = false
                 return .none
 
-            case .viewAllFoldersTapped:
-                state.isShowingAllFolders = true
-                return .none
-
-            case .dismissAllFolders:
-                state.isShowingAllFolders = false
-                return .none
-
-            case .fileTapped, .playTrack, .togglePlayPause, .importTapped, .newFolderTapped:
+            case .fileTapped, .playTrack, .togglePlayPause, .importTapped, .newCollectionTapped:
                 return .none
             }
         }

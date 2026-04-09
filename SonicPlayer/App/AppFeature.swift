@@ -10,25 +10,33 @@ struct AppFeature {
         var home = HomeFeature.State()
 
         // File browser (home)
-        var filesPath = StackState<FilesFeature.State>()
-        var filesRoot = FilesFeature.State(currentDirectory: nil)
+        var filesPath = StackState<CollectionsFeature.State>()
+        var filesRoot = CollectionsFeature.State(currentDirectory: nil)
 
-        // File browser (All Collections sheet)
-        var allFoldersPath = StackState<FilesFeature.State>()
 
         var settings = SettingsFeature.State()
         var recording = RecordingFeature.State()
+
+        // Onboarding
+        var onboarding: OnboardingFeature.State?
 
         // Sheets
         var isRecordingSheetPresented: Bool = false
         var isSettingsSheetPresented: Bool = false
         var isImportSheetPresented: Bool = false
 
+        init() {
+            let hasSeenOnboarding = UserDefaults.standard.bool(forKey: "hasSeenOnboarding")
+            if !hasSeenOnboarding {
+                self.onboarding = OnboardingFeature.State()
+            }
+        }
+
         static func == (lhs: State, rhs: State) -> Bool {
             lhs.player == rhs.player &&
             lhs.home == rhs.home &&
             lhs.filesPath == rhs.filesPath &&
-            lhs.allFoldersPath == rhs.allFoldersPath &&
+            lhs.onboarding == rhs.onboarding &&
             lhs.recording == rhs.recording &&
             lhs.isRecordingSheetPresented == rhs.isRecordingSheetPresented &&
             lhs.isSettingsSheetPresented == rhs.isSettingsSheetPresented &&
@@ -41,12 +49,12 @@ struct AppFeature {
         case home(HomeFeature.Action)
 
         // File browser
-        case filesPath(StackAction<FilesFeature.State, FilesFeature.Action>)
-        case filesRoot(FilesFeature.Action)
-        case allFoldersPath(StackAction<FilesFeature.State, FilesFeature.Action>)
+        case filesPath(StackAction<CollectionsFeature.State, CollectionsFeature.Action>)
+        case filesRoot(CollectionsFeature.Action)
 
         case settings(SettingsFeature.Action)
         case recording(RecordingFeature.Action)
+        case onboarding(OnboardingFeature.Action)
 
         // Sheets
         case recordButtonTapped
@@ -56,6 +64,10 @@ struct AppFeature {
         case importFiles([URL])
         case dismissImportSheet
         case openedFromFiles(URL)
+
+        // Quick Actions
+        case quickActionRecord
+        case quickActionImport
 
         // Lifecycle
         case scenePhaseChanged(ScenePhase)
@@ -73,7 +85,7 @@ struct AppFeature {
         }
 
         Scope(state: \.filesRoot, action: \.filesRoot) {
-            FilesFeature()
+            CollectionsFeature()
         }
 
         Scope(state: \.settings, action: \.settings) {
@@ -86,6 +98,20 @@ struct AppFeature {
 
         Reduce { state, action in
             switch action {
+
+            // MARK: - Onboarding
+
+            case .onboarding(.getStartedTapped):
+                UserDefaults.standard.set(true, forKey: "hasSeenOnboarding")
+                state.onboarding = nil
+                return .none
+
+            case let .onboarding(onboardingAction):
+                guard var onboardingState = state.onboarding else { return .none }
+                let onboardingReducer = OnboardingFeature()
+                _ = onboardingReducer.reduce(into: &onboardingState, action: onboardingAction)
+                state.onboarding = onboardingState
+                return .none
 
             // MARK: - Home Actions
 
@@ -103,26 +129,21 @@ struct AppFeature {
                 let queue = state.home.recentFiles
                 return .send(.player(.loadTrack(file, queue, .singleFile)))
 
-            case .home(.dismissAllFolders):
-                state.allFoldersPath.removeAll()
-                state.home.isShowingAllFolders = false
+            case .home(.dismissAllCollections):
+                state.home.isShowingAllCollections = false
                 return .none
 
             case .home(.importTapped):
                 state.isImportSheetPresented = true
                 return .none
 
-            case .home(.newFolderTapped):
-                return .send(.filesRoot(.createFolderTapped))
+            case .home(.newCollectionTapped):
+                return .send(.filesRoot(.createCollectionTapped))
 
             // MARK: - File Browser
 
-            case let .filesRoot(.folderTapped(folder)):
-                if state.home.isShowingAllFolders {
-                    state.allFoldersPath.append(FilesFeature.State(currentDirectory: folder.url))
-                } else {
-                    state.filesPath.append(FilesFeature.State(currentDirectory: folder.url))
-                }
+            case let .filesRoot(.collectionTapped(folder)):
+                state.filesPath.append(CollectionsFeature.State(currentDirectory: folder.url))
                 return .none
 
             case let .filesRoot(.fileTapped(file)):
@@ -140,8 +161,8 @@ struct AppFeature {
                 guard let first = playlist.first else { return .none }
                 return .send(.player(.loadTrack(first, playlist, .singleFile)))
 
-            case let .filesPath(.element(id: _, action: .folderTapped(folder))):
-                state.filesPath.append(FilesFeature.State(currentDirectory: folder.url))
+            case let .filesPath(.element(id: _, action: .collectionTapped(folder))):
+                state.filesPath.append(CollectionsFeature.State(currentDirectory: folder.url))
                 return .none
 
             case let .filesPath(.element(id: id, action: .fileTapped(file))):
@@ -169,37 +190,6 @@ struct AppFeature {
                 }
                 return .none
 
-            // MARK: - All Folders Path (same navigation as filesPath)
-
-            case let .allFoldersPath(.element(id: _, action: .folderTapped(folder))):
-                state.allFoldersPath.append(FilesFeature.State(currentDirectory: folder.url))
-                return .none
-
-            case let .allFoldersPath(.element(id: id, action: .fileTapped(file))):
-                if let filesState = state.allFoldersPath[id: id] {
-                    let playlist = filesState.items.compactMap { item -> AudioFile? in
-                        if case let .file(audioFile) = item { return audioFile }
-                        return nil
-                    }
-                    let folderURL = filesState.currentDirectory
-                    let source: PlaylistSource? = folderURL.map { .folder($0) }
-                    return .send(.player(.loadTrack(file, playlist, source)))
-                }
-                return .none
-
-            case let .allFoldersPath(.element(id: id, action: .playAllTapped)):
-                if let filesState = state.allFoldersPath[id: id] {
-                    let playlist = filesState.items.compactMap { item -> AudioFile? in
-                        if case let .file(audioFile) = item { return audioFile }
-                        return nil
-                    }
-                    guard let first = playlist.first else { return .none }
-                    let folderURL = filesState.currentDirectory
-                    let source: PlaylistSource? = folderURL.map { .folder($0) }
-                    return .send(.player(.loadTrack(first, playlist, source)))
-                }
-                return .none
-
             // MARK: - Sheets
 
             case .recordButtonTapped:
@@ -212,6 +202,14 @@ struct AppFeature {
 
             case .dismissRecordingSheet:
                 state.isRecordingSheetPresented = false
+                // Clean up any in-progress/unsaved recording
+                if state.recording.currentRecordingURL != nil {
+                    return .merge(
+                        .send(.recording(.discardRecording)),
+                        .send(.filesRoot(.refreshFiles)),
+                        .send(.home(.loadRecentFiles))
+                    )
+                }
                 return .merge(
                     .send(.filesRoot(.refreshFiles)),
                     .send(.home(.loadRecentFiles))
@@ -271,6 +269,16 @@ struct AppFeature {
                     }
                 }
 
+            // MARK: - Quick Actions
+
+            case .quickActionRecord:
+                state.isRecordingSheetPresented = true
+                return .none
+
+            case .quickActionImport:
+                state.isImportSheetPresented = true
+                return .none
+
             // MARK: - Settings → Player
 
             case let .settings(.setDefaultSkipDuration(duration)):
@@ -314,15 +322,38 @@ struct AppFeature {
             case let .scenePhaseChanged(phase):
                 return .send(.player(.scenePhaseChanged(phase)))
 
-            case .player, .home, .filesRoot, .filesPath, .allFoldersPath, .settings, .recording:
+            // Clear player if currently playing track is deleted (file or parent folder)
+            case .filesRoot(.alert(.presented(.confirmDelete))):
+                if let currentTrack = state.player.currentTrack {
+                    let trackPath = currentTrack.url.path
+                    let shouldClear = state.filesRoot.selectedItems.contains { item in
+                        item.url == currentTrack.url || trackPath.hasPrefix(item.url.path + "/")
+                    }
+                    if shouldClear {
+                        return .send(.player(.clearSession))
+                    }
+                }
+                return .none
+
+            case let .filesPath(.element(id: id, action: .alert(.presented(.confirmDelete)))):
+                if let currentTrack = state.player.currentTrack,
+                   let filesState = state.filesPath[id: id] {
+                    let trackPath = currentTrack.url.path
+                    let shouldClear = filesState.selectedItems.contains { item in
+                        item.url == currentTrack.url || trackPath.hasPrefix(item.url.path + "/")
+                    }
+                    if shouldClear {
+                        return .send(.player(.clearSession))
+                    }
+                }
+                return .none
+
+            case .player, .home, .filesRoot, .filesPath, .settings, .recording:
                 return .none
             }
         }
         .forEach(\.filesPath, action: \.filesPath) {
-            FilesFeature()
-        }
-        .forEach(\.allFoldersPath, action: \.allFoldersPath) {
-            FilesFeature()
+            CollectionsFeature()
         }
     }
 }

@@ -44,7 +44,7 @@
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>SonicPlayer uses the microphone only when Recording Mode is enabled to record audio.</string>
+	<string>Sonic Player uses the microphone only when Recording Mode is enabled to record audio.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
@@ -66,6 +66,25 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+	</array>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.hasan.sonicplayer.record</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Record</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>mic.fill</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.hasan.sonicplayer.import</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Import Media</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>square.and.arrow.down</string>
+		</dict>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>

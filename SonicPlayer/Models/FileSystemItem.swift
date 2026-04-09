@@ -1,7 +1,7 @@
 import Foundation
 
 enum FileSystemItem: Identifiable, Equatable, Hashable {
-    case folder(Folder)
+    case folder(CollectionItem)
     case file(AudioFile)
 
     var id: AnyHashable {
@@ -40,7 +40,7 @@ enum FileSystemItem: Identifiable, Equatable, Hashable {
     }
 }
 
-struct Folder: Identifiable, Equatable, Hashable {
+struct CollectionItem: Identifiable, Equatable, Hashable {
     let id: URL
     let url: URL
     let name: String

@@ -779,8 +779,15 @@
         }
       }
     },
-    "Delete %lld items?" : {
-
+    "Delete %lld %@?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Delete %1$lld %2$@?"
+          }
+        }
+      }
     },
     "Done" : {
       "comment" : "The text on a button that finishes selecting items.",
@@ -1375,7 +1382,6 @@
       }
     },
     "Import Media" : {
-      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {

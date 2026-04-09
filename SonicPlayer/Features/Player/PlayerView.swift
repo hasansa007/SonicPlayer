@@ -5,6 +5,7 @@ import MediaPlayer
 struct PlayerView: View {
     @Bindable var store: StoreOf<PlayerFeature>
     @State private var showQueue = false
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
         ZStack {
@@ -22,6 +23,8 @@ struct PlayerView: View {
 
             if store.currentTrack == nil {
                 emptyStateView
+            } else if verticalSizeClass == .compact {
+                landscapeLayout
             } else {
                 portraitLayout
             }
@@ -66,10 +69,47 @@ struct PlayerView: View {
             fullPlayerControls
         }
         .padding(.horizontal, 24)
-        .padding(.bottom, 16)
+        .padding(.bottom, 40)
     }
 
-    // MARK: - Artwork (simplified — no waveform overlay)
+    private var landscapeLayout: some View {
+        HStack(spacing: 20) {
+            // Left side: artwork or queue
+            VStack(spacing: 8) {
+                if showQueue {
+                    queueListView
+                } else {
+                    artworkView
+                    Text(store.currentTrack?.title ?? "")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.sonicTextPrimary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .frame(width: 260)
+            .clipped()
+
+            // Right side: controls
+            VStack(spacing: 8) {
+                progressSliderWithSkipsView
+                controlsView
+                bottomControlsView
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 4)
+    }
+
+    // MARK: - Artwork
+
+    private var artworkSize: CGFloat {
+        if showQueue { return 80 }
+        if verticalSizeClass == .compact { return 120 }
+        return 280
+    }
 
     private var artworkView: some View {
         Group {
@@ -77,16 +117,22 @@ struct PlayerView: View {
                 Image(uiImage: artwork)
                     .resizable()
                     .aspectRatio(1, contentMode: .fill)
-                    .frame(width: showQueue ? 80 : 280, height: showQueue ? 80 : 280)
+                    .frame(width: artworkSize, height: artworkSize)
                     .clipShape(RoundedRectangle(cornerRadius: showQueue ? 12 : 16))
             } else {
                 RoundedRectangle(cornerRadius: showQueue ? 12 : 16)
                     .fill(LinearGradient.sonicGradient)
-                    .frame(width: showQueue ? 80 : 280, height: showQueue ? 80 : 280)
+                    .frame(width: artworkSize, height: artworkSize)
                     .overlay {
-                        Image(systemName: "waveform")
-                            .font(showQueue ? .title3 : .largeTitle)
-                            .foregroundColor(.white.opacity(0.7))
+                        if store.isPlaying && !showQueue && store.progress > 0 {
+                            PlayerWaveformView(isPlaying: store.isPlaying)
+                                .frame(width: 80, height: 40)
+                                .foregroundColor(.white.opacity(0.8))
+                        } else {
+                            Image(systemName: "waveform")
+                                .font(showQueue ? .title3 : .largeTitle)
+                                .foregroundColor(.white.opacity(0.7))
+                        }
                     }
             }
         }
@@ -297,7 +343,7 @@ struct PlayerView: View {
     }
 
     private var bottomControlsView: some View {
-        HStack(spacing: 16) {
+        HStack {
             // Speed control
             Menu {
                 ForEach(PlaybackSpeed.allCases) { speed in
@@ -323,7 +369,27 @@ struct PlayerView: View {
                     .background(Color.sonicPrimary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
             }
 
-            Spacer()
+            // Repeat mode
+            Button {
+                store.send(.toggleRepeatMode)
+            } label: {
+                Image(systemName: store.repeatMode.icon)
+                    .font(.title3)
+                    .foregroundColor(store.repeatMode == .off ? .sonicTextMuted : .sonicPrimary)
+                    .frame(width: 44, height: 44)
+                    .background(Color.sonicPrimary.opacity(store.repeatMode == .off ? 0.05 : 0.1), in: RoundedRectangle(cornerRadius: 8))
+            }
+
+            // Shuffle
+            Button {
+                store.send(.toggleShuffle)
+            } label: {
+                Image(systemName: "shuffle")
+                    .font(.title3)
+                    .foregroundColor(store.isShuffleEnabled ? .sonicPrimary : .sonicTextMuted)
+                    .frame(width: 44, height: 44)
+                    .background(Color.sonicPrimary.opacity(store.isShuffleEnabled ? 0.1 : 0.05), in: RoundedRectangle(cornerRadius: 8))
+            }
 
             // Queue toggle
             Button {
@@ -413,5 +479,43 @@ struct ScrollingText: View {
                 offset = -(textWidth + 40)
             }
         }
+    }
+}
+
+// MARK: - Player Waveform Animation
+
+struct PlayerWaveformView: View {
+    let isPlaying: Bool
+    @State private var animating = false
+
+    private let barCount = 5
+    private let minHeight: CGFloat = 8
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 5) {
+            ForEach(0..<barCount, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 3)
+                    .frame(width: 6, height: animating ? barHeight(index) : minHeight)
+                    .animation(
+                        isPlaying ?
+                            .easeInOut(duration: Double.random(in: 0.3...0.6))
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(index) * 0.1) :
+                            .easeOut(duration: 0.3),
+                        value: animating
+                    )
+            }
+        }
+        .onAppear {
+            if isPlaying { animating = true }
+        }
+        .onChange(of: isPlaying) { _, newValue in
+            animating = newValue
+        }
+    }
+
+    private func barHeight(_ index: Int) -> CGFloat {
+        let heights: [CGFloat] = [28, 36, 20, 32, 24]
+        return heights[index % heights.count]
     }
 }

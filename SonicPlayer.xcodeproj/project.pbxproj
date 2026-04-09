@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A2000001000000000000001 /* AllCollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000002000000000000001 /* AllCollectionsView.swift */; };
+		A2000001000000000000001 /* CollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000002000000000000001 /* CollectionsView.swift */; };
 		A1000019000000000000001 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000020000000000000001 /* AboutView.swift */; };
 		A1000021000000000000001 /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000022000000000000001 /* HelpView.swift */; };
 		8629C23B2EEA25340052A74B /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2392EEA25340052A74B /* HomeView.swift */; };
@@ -24,14 +24,9 @@
 		86662FED2EF7EAC1000577F1 /* AudioTrimmerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86662FEB2EF7EAC1000577F1 /* AudioTrimmerClient.swift */; };
 		8690789B2EEC9F8D005620F9 /* ArtworkClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8690789A2EEC9F8D005620F9 /* ArtworkClient.swift */; };
 		869078BE2EECC1D7005620F9 /* FileItemRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078B62EECC1D7005620F9 /* FileItemRowView.swift */; };
-		869078BF2EECC1D7005620F9 /* FolderPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078BD2EECC1D7005620F9 /* FolderPickerView.swift */; };
-		869078C02EECC1D7005620F9 /* FilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078B92EECC1D7005620F9 /* FilesView.swift */; };
-		869078C12EECC1D7005620F9 /* FolderPickerFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078BC2EECC1D7005620F9 /* FolderPickerFeature.swift */; };
-		869078C22EECC1D7005620F9 /* FilesFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078B82EECC1D7005620F9 /* FilesFeature.swift */; };
-		869078C32EECC1D7005620F9 /* FolderCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078BB2EECC1D7005620F9 /* FolderCardView.swift */; };
+		869078C22EECC1D7005620F9 /* CollectionsFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078B82EECC1D7005620F9 /* CollectionsFeature.swift */; };
 		869078C42EECC1D7005620F9 /* FileRowFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078B72EECC1D7005620F9 /* FileRowFeature.swift */; };
 		869078C52EECC1D7005620F9 /* FolderCardFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078BA2EECC1D7005620F9 /* FolderCardFeature.swift */; };
-		8692B7E12EFBA00400DFAF7C /* FolderCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8692B7E02EFBA00400DFAF7C /* FolderCard.swift */; };
 		8692B7E32EFC094200DFAF7C /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 8692B7E22EFC094200DFAF7C /* Localizable.xcstrings */; };
 		86A1B2042F1B3F0000A1BEEF /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A1B2032F1B3F0000A1BEEF /* ShareSheet.swift */; };
 		86A1B7012F1C500000A1BEEF /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A1B7002F1C500000A1BEEF /* EmptyStateView.swift */; };
@@ -39,6 +34,9 @@
 		A1000001000000000000001 /* SonicPlayerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000001 /* SonicPlayerApp.swift */; };
 		A1000003000000000000001 /* AppFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000004000000000000001 /* AppFeature.swift */; };
 		A1000005000000000000001 /* AppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000006000000000000001 /* AppView.swift */; };
+		A4000009000000000000002 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4000010000000000000002 /* OnboardingView.swift */; };
+		A4000009000000000000001 /* OnboardingFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4000010000000000000001 /* OnboardingFeature.swift */; };
+		A3000009000000000000001 /* CollectionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000010000000000000001 /* CollectionsSection.swift */; };
 		A1000007000000000000001 /* PlayerFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000008000000000000001 /* PlayerFeature.swift */; };
 		A1000009000000000000001 /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010000000000000001 /* PlayerView.swift */; };
 		A1000010000000000000002 /* MiniPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010000000000000003 /* MiniPlayerView.swift */; };
@@ -55,7 +53,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A2000002000000000000001 /* AllCollectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllCollectionsView.swift; sourceTree = "<group>"; };
+		A2000002000000000000001 /* CollectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsView.swift; sourceTree = "<group>"; };
 		A1000020000000000000001 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 		A1000022000000000000001 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
 		8629C2382EEA25340052A74B /* HomeFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeFeature.swift; sourceTree = "<group>"; };
@@ -73,13 +71,8 @@
 		8690789A2EEC9F8D005620F9 /* ArtworkClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkClient.swift; sourceTree = "<group>"; };
 		869078B62EECC1D7005620F9 /* FileItemRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileItemRowView.swift; sourceTree = "<group>"; };
 		869078B72EECC1D7005620F9 /* FileRowFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileRowFeature.swift; sourceTree = "<group>"; };
-		869078B82EECC1D7005620F9 /* FilesFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesFeature.swift; sourceTree = "<group>"; };
-		869078B92EECC1D7005620F9 /* FilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesView.swift; sourceTree = "<group>"; };
+		869078B82EECC1D7005620F9 /* CollectionsFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsFeature.swift; sourceTree = "<group>"; };
 		869078BA2EECC1D7005620F9 /* FolderCardFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderCardFeature.swift; sourceTree = "<group>"; };
-		869078BB2EECC1D7005620F9 /* FolderCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderCardView.swift; sourceTree = "<group>"; };
-		869078BC2EECC1D7005620F9 /* FolderPickerFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderPickerFeature.swift; sourceTree = "<group>"; };
-		869078BD2EECC1D7005620F9 /* FolderPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderPickerView.swift; sourceTree = "<group>"; };
-		8692B7E02EFBA00400DFAF7C /* FolderCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderCard.swift; sourceTree = "<group>"; };
 		8692B7E22EFC094200DFAF7C /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		86A1B2032F1B3F0000A1BEEF /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
 		86A1B7002F1C500000A1BEEF /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
@@ -87,6 +80,9 @@
 		A1000002000000000000001 /* SonicPlayerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonicPlayerApp.swift; sourceTree = "<group>"; };
 		A1000004000000000000001 /* AppFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFeature.swift; sourceTree = "<group>"; };
 		A1000006000000000000001 /* AppView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppView.swift; sourceTree = "<group>"; };
+		A4000010000000000000002 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		A4000010000000000000001 /* OnboardingFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFeature.swift; sourceTree = "<group>"; };
+		A3000010000000000000001 /* CollectionsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsSection.swift; sourceTree = "<group>"; };
 		A1000008000000000000001 /* PlayerFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerFeature.swift; sourceTree = "<group>"; };
 		A1000010000000000000001 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		A1000010000000000000003 /* MiniPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerView.swift; sourceTree = "<group>"; };
@@ -172,6 +168,9 @@
 				A1000002000000000000001 /* SonicPlayerApp.swift */,
 				A1000004000000000000001 /* AppFeature.swift */,
 				A1000006000000000000001 /* AppView.swift */,
+				A4000010000000000000002 /* OnboardingView.swift */,
+				A4000010000000000000001 /* OnboardingFeature.swift */,
+				A3000010000000000000001 /* CollectionsSection.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -247,17 +246,12 @@
 		A1000050000000000000001 /* Files */ = {
 			isa = PBXGroup;
 			children = (
-				8692B7E02EFBA00400DFAF7C /* FolderCard.swift */,
 				869078B62EECC1D7005620F9 /* FileItemRowView.swift */,
 				86A1B3012F1B4A0100A1BEEF /* FileItemRow.swift */,
 				869078B72EECC1D7005620F9 /* FileRowFeature.swift */,
-				869078B82EECC1D7005620F9 /* FilesFeature.swift */,
-				A2000002000000000000001 /* AllCollectionsView.swift */,
-				869078B92EECC1D7005620F9 /* FilesView.swift */,
+				869078B82EECC1D7005620F9 /* CollectionsFeature.swift */,
+				A2000002000000000000001 /* CollectionsView.swift */,
 				869078BA2EECC1D7005620F9 /* FolderCardFeature.swift */,
-				869078BB2EECC1D7005620F9 /* FolderCardView.swift */,
-				869078BC2EECC1D7005620F9 /* FolderPickerFeature.swift */,
-				869078BD2EECC1D7005620F9 /* FolderPickerView.swift */,
 			);
 			path = Files;
 			sourceTree = "<group>";
@@ -361,18 +355,16 @@
 				A1000001000000000000001 /* SonicPlayerApp.swift in Sources */,
 				A1000003000000000000001 /* AppFeature.swift in Sources */,
 				A1000005000000000000001 /* AppView.swift in Sources */,
+				A4000009000000000000002 /* OnboardingView.swift in Sources */,
+				A4000009000000000000001 /* OnboardingFeature.swift in Sources */,
+				A3000009000000000000001 /* CollectionsSection.swift in Sources */,
 				A1000007000000000000001 /* PlayerFeature.swift in Sources */,
 				A1000009000000000000001 /* PlayerView.swift in Sources */,
 				A1000010000000000000002 /* MiniPlayerView.swift in Sources */,
 				869078BE2EECC1D7005620F9 /* FileItemRowView.swift in Sources */,
 				86A1B3002F1B4A0100A1BEEF /* FileItemRow.swift in Sources */,
-				8692B7E12EFBA00400DFAF7C /* FolderCard.swift in Sources */,
-				869078BF2EECC1D7005620F9 /* FolderPickerView.swift in Sources */,
-				869078C02EECC1D7005620F9 /* FilesView.swift in Sources */,
-				869078C12EECC1D7005620F9 /* FolderPickerFeature.swift in Sources */,
-				869078C22EECC1D7005620F9 /* FilesFeature.swift in Sources */,
-				A2000001000000000000001 /* AllCollectionsView.swift in Sources */,
-				869078C32EECC1D7005620F9 /* FolderCardView.swift in Sources */,
+				869078C22EECC1D7005620F9 /* CollectionsFeature.swift in Sources */,
+				A2000001000000000000001 /* CollectionsView.swift in Sources */,
 				869078C42EECC1D7005620F9 /* FileRowFeature.swift in Sources */,
 				869078C52EECC1D7005620F9 /* FolderCardFeature.swift in Sources */,
 				A1000015000000000000001 /* SettingsFeature.swift in Sources */,
