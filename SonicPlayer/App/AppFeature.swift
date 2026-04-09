@@ -26,8 +26,8 @@ struct AppFeature {
         var isImportSheetPresented: Bool = false
 
         init() {
-            let hasSeenOnboarding = UserDefaults.standard.bool(forKey: "hasSeenOnboarding")
-            if !hasSeenOnboarding {
+            let hasSeenOnboarding_v2 = UserDefaults.standard.bool(forKey: "hasSeenOnboarding_v2")
+            if !hasSeenOnboarding_v2 {
                 self.onboarding = OnboardingFeature.State()
             }
         }
@@ -102,7 +102,7 @@ struct AppFeature {
             // MARK: - Onboarding
 
             case .onboarding(.getStartedTapped):
-                UserDefaults.standard.set(true, forKey: "hasSeenOnboarding")
+                UserDefaults.standard.set(true, forKey: "hasSeenOnboarding_v2")
                 state.onboarding = nil
                 return .none
 

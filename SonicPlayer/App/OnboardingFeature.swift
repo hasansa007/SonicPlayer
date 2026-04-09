@@ -6,7 +6,7 @@ struct OnboardingFeature {
     @ObservableState
     struct State: Equatable {
         var currentPage: Int = 0
-        let totalPages = 4
+        let totalPages = 5
     }
 
     enum Action {
