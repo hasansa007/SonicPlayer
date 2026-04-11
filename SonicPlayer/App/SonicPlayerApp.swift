@@ -5,9 +5,16 @@ import UIKit
 @main
 struct SonicPlayerApp: App {
     @MainActor
-    static let store = Store(initialState: AppFeature.State()) {
-        AppFeature()
-    }
+    static let store: StoreOf<AppFeature> = {
+        if ScreenshotMode.isEnabled, let screen = ScreenshotMode.targetScreen {
+            return Store(initialState: ScreenshotDemoData.buildAppState(for: screen)) {
+                AppFeature()
+            }
+        }
+        return Store(initialState: AppFeature.State()) {
+            AppFeature()
+        }
+    }()
     @AppStorage("appLanguage") private var appLanguage = "system"
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 

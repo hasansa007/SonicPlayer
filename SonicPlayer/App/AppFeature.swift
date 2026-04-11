@@ -129,9 +129,32 @@ struct AppFeature {
                 let queue = state.home.recentFiles
                 return .send(.player(.loadTrack(file, queue, .singleFile)))
 
-            case .home(.dismissAllCollections):
-                state.home.isShowingAllCollections = false
+            case .home(.viewAllCollectionsTapped):
+                state.filesPath.append(CollectionsFeature.State(currentDirectory: nil))
                 return .none
+
+            case let .home(.renameRecentFile(file)):
+                return .send(.filesRoot(.renameItemTapped(.file(file))))
+
+            case let .home(.deleteRecentFile(file)):
+                state.filesRoot.selectedItems = [.file(file)]
+                return .send(.filesRoot(.deleteSelectedTapped))
+
+            case let .home(.editRecentFile(file)):
+                state.filesRoot.editAudio = EditRecordingFeature.State(recording: file)
+                return .none
+
+            case let .home(.moveRecentFile(file)):
+                state.filesRoot.itemsToMove = [.file(file)]
+                state.filesRoot.isShowingCollectionPicker = true
+                return .none
+
+            // Refresh home after edit view dismissal (so recent files reflect any saved changes)
+            case .filesRoot(.editAudio(.dismiss)):
+                return .merge(
+                    .send(.filesRoot(.refreshFiles)),
+                    .send(.home(.loadRecentFiles))
+                )
 
             case .home(.importTapped):
                 state.isImportSheetPresented = true
@@ -321,6 +344,23 @@ struct AppFeature {
 
             case let .scenePhaseChanged(phase):
                 return .send(.player(.scenePhaseChanged(phase)))
+
+            // Clear player if the currently playing track (or its parent) is being moved
+            case .filesRoot(.moveToDestination):
+                if let currentTrack = state.player.currentTrack {
+                    let trackPath = currentTrack.url.path
+                    let isAffected = state.filesRoot.itemsToMove.contains { item in
+                        item.url == currentTrack.url || trackPath.hasPrefix(item.url.path + "/")
+                    }
+                    if isAffected {
+                        return .send(.player(.clearSession))
+                    }
+                }
+                return .none
+
+            // After files are reloaded (after any mutation), refresh home recent files too
+            case .filesRoot(.itemsLoaded):
+                return .send(.home(.loadRecentFiles))
 
             // Clear player if currently playing track is deleted (file or parent folder)
             case .filesRoot(.alert(.presented(.confirmDelete))):

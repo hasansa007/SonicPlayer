@@ -10,7 +10,6 @@ struct HomeFeature {
         var isPlaying: Bool = false
         var playbackProgress: Double = 0
         var recentFiles: [AudioFile] = []
-        var isShowingAllCollections: Bool = false
     }
 
     enum Action {
@@ -22,7 +21,10 @@ struct HomeFeature {
         case importTapped
         case newCollectionTapped
         case viewAllCollectionsTapped
-        case dismissAllCollections
+        case renameRecentFile(AudioFile)
+        case deleteRecentFile(AudioFile)
+        case editRecentFile(AudioFile)
+        case moveRecentFile(AudioFile)
     }
 
     @Dependency(\.fileManager) var fileManager
@@ -31,6 +33,10 @@ struct HomeFeature {
         Reduce { state, action in
             switch action {
             case .loadRecentFiles:
+                // In screenshot mode, skip loading real files to preserve demo data
+                if ScreenshotMode.isEnabled && !state.recentFiles.isEmpty {
+                    return .none
+                }
                 return .run { send in
                     let files = try await loadRecentFiles(fileManager: fileManager)
                     await send(.recentFilesLoaded(files))
@@ -40,15 +46,7 @@ struct HomeFeature {
                 state.recentFiles = files
                 return .none
 
-            case .viewAllCollectionsTapped:
-                state.isShowingAllCollections = true
-                return .none
-
-            case .dismissAllCollections:
-                state.isShowingAllCollections = false
-                return .none
-
-            case .fileTapped, .playTrack, .togglePlayPause, .importTapped, .newCollectionTapped:
+            case .fileTapped, .playTrack, .togglePlayPause, .importTapped, .newCollectionTapped, .viewAllCollectionsTapped, .renameRecentFile, .deleteRecentFile, .editRecentFile, .moveRecentFile:
                 return .none
             }
         }

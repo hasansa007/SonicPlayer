@@ -6,25 +6,16 @@ struct AppView: View {
     @Bindable var store: StoreOf<AppFeature>
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
+    @State private var shareItem: ShareItem?
 
     var body: some View {
         ZStack(alignment: .bottom) {
             // Main content
             NavigationStack(path: $store.scope(state: \.filesPath, action: \.filesPath)) {
-                Group {
-                    if store.home.isShowingAllCollections {
-                        CollectionsView(
-                            store: store.scope(state: \.filesRoot, action: \.filesRoot),
-                            onDismiss: { store.send(.home(.dismissAllCollections)) }
-                        )
-                    } else {
-                        homeRootContent
-                    }
-                }
-                .navigationTitle(store.home.isShowingAllCollections ? "Collections" : "Home")
-                .navigationBarTitleDisplayMode(.large)
-                .toolbar {
-                    if !store.home.isShowingAllCollections {
+                homeRootContent
+                    .navigationTitle("Home")
+                    .navigationBarTitleDisplayMode(.large)
+                    .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button {
                                 store.send(.settingsTapped)
@@ -34,17 +25,46 @@ struct AppView: View {
                             }
                         }
                     }
-                }
-                .navigationDestination(isPresented: isSettingsPresented) {
-                    SettingsView(store: store.scope(state: \.settings, action: \.settings))
-                }
-                .onAppear {
-                    store.send(.filesRoot(.onAppear))
-                    store.send(.home(.loadRecentFiles))
-                }
+                    .navigationDestination(isPresented: isSettingsPresented) {
+                        SettingsView(store: store.scope(state: \.settings, action: \.settings))
+                    }
+                    .alert($store.scope(state: \.filesRoot.alert, action: \.filesRoot.alert))
+                    .alert("Rename", isPresented: Binding(
+                        get: { store.filesRoot.renamingItem != nil },
+                        set: { if !$0 { store.send(.filesRoot(.cancelNameInput)) } }
+                    )) {
+                        TextField("Name", text: Binding(
+                            get: { store.filesRoot.inputText },
+                            set: { store.send(.filesRoot(.setInputText($0))) }
+                        ))
+                        Button("Rename") { store.send(.filesRoot(.confirmNameInput)) }
+                        Button("Cancel", role: .cancel) { store.send(.filesRoot(.cancelNameInput)) }
+                    }
+                    .sheet(item: $store.scope(state: \.filesRoot.editAudio, action: \.filesRoot.editAudio)) { editStore in
+                        EditRecordingView(store: editStore)
+                    }
+                    .sheet(isPresented: Binding(
+                        get: { store.filesRoot.isShowingCollectionPicker },
+                        set: { if !$0 { store.send(.filesRoot(.cancelMove)) } }
+                    )) {
+                        InAppCollectionPicker(
+                            collections: store.filesRoot.availableCollections,
+                            onPick: { url in store.send(.filesRoot(.moveToDestination(url))) },
+                            onCancel: { store.send(.filesRoot(.cancelMove)) }
+                        )
+                    }
+                    .sheet(item: $shareItem) { item in
+                        ActivityView(items: [item.url])
+                    }
+                    .onAppear {
+                        if !ScreenshotMode.isEnabled {
+                            store.send(.filesRoot(.onAppear))
+                            store.send(.home(.loadRecentFiles))
+                        }
+                    }
             } destination: { collectionsStore in
                 CollectionsView(store: collectionsStore)
-                    .navigationTitle(collectionsStore.currentDirectory?.lastPathComponent ?? "Library")
+                    .navigationTitle(collectionsStore.currentDirectory?.lastPathComponent ?? "Collections")
                     .navigationBarTitleDisplayMode(.large)
             }
             .preferredColorScheme(store.settings.colorScheme.colorScheme)
@@ -60,7 +80,7 @@ struct AppView: View {
             }
 
             // Record FAB (home screen only, not on empty state)
-            if !store.isSettingsSheetPresented && store.filesPath.isEmpty && !store.home.isShowingAllCollections && !(store.filesRoot.items.isEmpty && store.home.recentFiles.isEmpty) {
+            if !store.isSettingsSheetPresented && store.filesPath.isEmpty && !(store.filesRoot.items.isEmpty && store.home.recentFiles.isEmpty) {
                 VStack {
                     Spacer()
                     HStack {
@@ -86,7 +106,7 @@ struct AppView: View {
             RecordingView(store: store.scope(state: \.recording, action: \.recording))
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
-                .interactiveDismissDisabled(store.recording.isRecording)
+                .interactiveDismissDisabled(true)
         }
         .sheet(isPresented: isImportSheetPresented) {
             DocumentPicker { urls in
@@ -100,7 +120,14 @@ struct AppView: View {
             store.send(.openedFromFiles(url))
         }
         .onAppear {
-            store.send(.player(.restoreSession))
+            if ScreenshotMode.isEnabled {
+                // In screenshot mode, show recording sheet if needed
+                if ScreenshotMode.targetScreen == .recording || ScreenshotMode.targetScreen == .editRecording {
+                    store.send(.recordButtonTapped)
+                }
+            } else {
+                store.send(.player(.restoreSession))
+            }
         }
         .fullScreenCover(isPresented: Binding(
             get: { store.onboarding != nil },
@@ -227,61 +254,68 @@ private extension AppView {
     var recentFilesSection: some View {
         if !store.home.recentFiles.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Recent Media")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .padding(.horizontal)
+                HStack {
+                    Text("Recent Media")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    Spacer()
+                    HStack(spacing: 3) {
+                        Image(systemName: "hand.draw")
+                            .font(.caption2)
+                        Text("Swipe for actions")
+                            .font(.caption2)
+                    }
+                    .foregroundColor(.sonicTextMuted)
+                }
+                .padding(.horizontal)
 
-                VStack(spacing: 0) {
+                List {
                     ForEach(store.home.recentFiles) { file in
                         recentFileRow(file: file)
-
-                        if file.id != store.home.recentFiles.last?.id {
-                            Divider().padding(.leading, 56)
-                        }
+                            .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                            .listRowBackground(Color.clear)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    store.send(.home(.deleteRecentFile(file)))
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                Button {
+                                    store.send(.home(.renameRecentFile(file)))
+                                } label: {
+                                    Label("Rename", systemImage: "pencil")
+                                }
+                                .tint(.sonicPrimary)
+                            }
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    store.send(.home(.editRecentFile(file)))
+                                } label: {
+                                    Label("Edit", systemImage: "waveform.and.magnifyingglass")
+                                }
+                                .tint(.blue)
+                                Button {
+                                    shareItem = ShareItem(url: file.url)
+                                } label: {
+                                    Label("Share", systemImage: "square.and.arrow.up")
+                                }
+                                .tint(.gray)
+                            }
                     }
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .scrollDisabled(true)
+                .frame(height: CGFloat(store.home.recentFiles.count) * 64)
             }
         }
     }
 
     func recentFileRow(file: AudioFile) -> some View {
-        Button {
-            store.send(.home(.fileTapped(file)))
-        } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(LinearGradient.sonicGradient)
-                        .frame(width: 40, height: 40)
-
-                    Image(systemName: "waveform")
-                        .font(.caption)
-                        .foregroundColor(.white)
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(file.title)
-                        .font(.body)
-                        .foregroundColor(.sonicTextPrimary)
-                        .lineLimit(1)
-
-                    HStack(spacing: 4) {
-                        Text(file.durationFormatted)
-                        Text("·")
-                        Text(file.creationDate, style: .date)
-                    }
-                    .font(.caption)
-                    .foregroundColor(.sonicTextSecondary)
-                }
-
-                Spacer()
-            }
-            .padding(.vertical, 10)
-            .padding(.horizontal)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+        MediaFileRowView(
+            file: file,
+            onTap: { store.send(.home(.fileTapped(file))) }
+        )
     }
 
     // MARK: - Record FAB

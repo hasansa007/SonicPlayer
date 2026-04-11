@@ -45,7 +45,10 @@ struct EditRecordingView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button { dismiss() } label: {
+                    Button {
+                        store.send(.discardChanges)
+                        dismiss()
+                    } label: {
                         Image(systemName: "xmark")
                             .font(.body).fontWeight(.semibold)
                             .foregroundColor(.white)
@@ -102,12 +105,17 @@ struct EditRecordingView: View {
                             overflowMenu
 
                             Button {
+                                store.send(.saveChanges)
                                 dismiss()
                             } label: {
-                                Text("Save")
-                                    .font(.subheadline).fontWeight(.semibold)
-                                    .foregroundColor(.sonicPrimary)
+                                Image(systemName: "checkmark")
+                                    .font(.body).fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .frame(width: 32, height: 32)
+                                    .background(Circle().fill(Color.sonicPrimary))
                             }
+                            .disabled(!store.hasEdits)
+                            .opacity(store.hasEdits ? 1.0 : 0.4)
                         }
                     }
                 }

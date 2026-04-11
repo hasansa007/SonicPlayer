@@ -28,6 +28,7 @@ struct CollectionsFeature {
         // Move State
         var itemsToMove: Set<FileSystemItem> = []
         var isShowingCollectionPicker = false
+        var availableCollections: [CollectionItem] = []
         
         var documentsDirectoryURL: URL?
 
@@ -89,6 +90,8 @@ struct CollectionsFeature {
         case deleteSelectedTapped
         case moveItemTapped(FileSystemItem)
         case moveSelectedTapped
+        case loadCollectionsForPicker
+        case collectionsLoaded([CollectionItem])
         case moveToDestination(URL)
         case cancelMove
         case alert(PresentationAction<Alert>)
@@ -106,6 +109,10 @@ struct CollectionsFeature {
         Reduce { state, action in
             switch action {
             case .onAppear, .refreshFiles:
+                // In screenshot mode, skip loading real files to preserve demo data
+                if ScreenshotMode.isEnabled && !state.items.isEmpty {
+                    return .none
+                }
                 state.isLoading = true
                 state.documentsDirectoryURL = fileManager.documentsDirectory()
                 return .run { [directory = state.currentDirectory] send in
@@ -542,35 +549,55 @@ struct CollectionsFeature {
 
             case let .moveItemTapped(item):
                 state.itemsToMove = [item]
-                state.isShowingCollectionPicker = true
-                return .none
+                return .send(.loadCollectionsForPicker)
 
             case .moveSelectedTapped:
                 state.itemsToMove = state.selectedItems
+                return .send(.loadCollectionsForPicker)
+
+            case .loadCollectionsForPicker:
+                return .run { send in
+                    let collections = await loadAllCollectionsRecursive()
+                    await send(.collectionsLoaded(collections))
+                }
+
+            case let .collectionsLoaded(collections):
+                state.availableCollections = collections
                 state.isShowingCollectionPicker = true
                 return .none
 
             case let .moveToDestination(destination):
                 let itemsToMove = state.itemsToMove
                 state.itemsToMove.removeAll()
+                state.availableCollections.removeAll()
                 state.isShowingCollectionPicker = false
                 state.selectedItems.removeAll()
                 state.isSelectionMode = false
 
-                let itemsToActuallyMove = itemsToMove.filter { $0.url.deletingLastPathComponent() != destination }
-                guard !itemsToActuallyMove.isEmpty else { return .none }
-
                 return .run { send in
-                    let accessing = destination.startAccessingSecurityScopedResource()
-                    defer { if accessing { destination.stopAccessingSecurityScopedResource() } }
+                    for item in itemsToMove {
+                        if item.url.deletingLastPathComponent().path == destination.path {
+                            continue
+                        }
 
-                    for item in itemsToActuallyMove {
+                        let fileName = item.url.lastPathComponent
+                        var targetURL = destination.appendingPathComponent(fileName)
+
+                        var counter = 2
+                        let nameNoExt = item.url.deletingPathExtension().lastPathComponent
+                        let ext = item.url.pathExtension
+                        while FileManager.default.fileExists(atPath: targetURL.path) {
+                            let newName = ext.isEmpty ? "\(nameNoExt) \(counter)" : "\(nameNoExt) \(counter).\(ext)"
+                            targetURL = destination.appendingPathComponent(newName)
+                            counter += 1
+                            if counter > 100 { break }
+                        }
+
                         do {
-                            let fileName = item.url.lastPathComponent
-                            let targetURL = destination.appendingPathComponent(fileName)
                             try FileManager.default.moveItem(at: item.url, to: targetURL)
+                            print("✅ Moved \(item.name) → \(targetURL.path)")
                         } catch {
-                            print("Failed to move \(item.name): \(error.localizedDescription)")
+                            print("❌ Failed to move \(item.name): \(error.localizedDescription)")
                         }
                     }
                     await send(.refreshFiles)
@@ -578,6 +605,7 @@ struct CollectionsFeature {
 
             case .cancelMove:
                 state.itemsToMove.removeAll()
+                state.availableCollections.removeAll()
                 state.isShowingCollectionPicker = false
                 return .none
             }
@@ -593,4 +621,36 @@ struct CollectionsFeature {
             FileRowFeature()
         }
     }
+}
+
+// MARK: - Collection Discovery
+
+/// Recursively walks Documents directory and returns every subfolder as a CollectionItem.
+func loadAllCollectionsRecursive() async -> [CollectionItem] {
+    let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+    var result: [CollectionItem] = []
+
+    func walk(_ dir: URL) {
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: dir,
+            includingPropertiesForKeys: [.isDirectoryKey, .creationDateKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        for url in contents {
+            let resourceValues = try? url.resourceValues(forKeys: [.isDirectoryKey, .creationDateKey])
+            let isDir = resourceValues?.isDirectory ?? false
+            guard isDir else { continue }
+            let creationDate = resourceValues?.creationDate ?? Date()
+            result.append(CollectionItem(
+                id: url,
+                url: url,
+                name: url.lastPathComponent,
+                creationDate: creationDate
+            ))
+            walk(url)
+        }
+    }
+
+    walk(documents)
+    return result
 }

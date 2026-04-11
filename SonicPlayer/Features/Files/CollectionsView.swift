@@ -4,7 +4,6 @@ import UniformTypeIdentifiers
 
 struct CollectionsView: View {
     @Bindable var store: StoreOf<CollectionsFeature>
-    var onDismiss: (() -> Void)? = nil
     @State private var isSelecting = false
     @State private var selectedCollectionIds: Set<URL> = []
     @State private var selectedFileIds: Set<UUID> = []
@@ -79,13 +78,9 @@ struct CollectionsView: View {
             get: { store.isShowingCollectionPicker },
             set: { if !$0 { store.send(.cancelMove) } }
         )) {
-            DocumentPicker(
-                contentTypes: [.folder],
-                allowsMultipleSelection: false,
-                directoryURL: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first,
-                onPick: { urls in
-                    if let url = urls.first { store.send(.moveToDestination(url)) }
-                },
+            InAppCollectionPicker(
+                collections: store.availableCollections,
+                onPick: { url in store.send(.moveToDestination(url)) },
                 onCancel: { store.send(.cancelMove) }
             )
         }
@@ -112,10 +107,10 @@ struct CollectionsView: View {
     // MARK: - Content List
 
     private var contentList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 16) {
-                // Collections Grid
-                if !store.filteredCollectionCards.isEmpty {
+        List {
+            // Collections Grid
+            if !store.filteredCollectionCards.isEmpty {
+                Section {
                     LazyVGrid(
                         columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: horizontalSizeClass == .regular ? 4 : 2),
                         spacing: 12
@@ -124,96 +119,98 @@ struct CollectionsView: View {
                             collectionCard(folder: card.folder, index: index, cardId: card.id)
                         }
                     }
-                    .padding(.horizontal)
                 }
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
 
-                // Play All button
-                if !store.filteredFileRows.isEmpty && store.currentDirectory != nil {
-                    Button {
-                        store.send(.playAllTapped)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "play.fill")
-                                .font(.caption)
-                            Text("Play All")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                        }
-                        .foregroundColor(.sonicPrimary)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Color.sonicPrimary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+            // Play All button
+            if !store.filteredFileRows.isEmpty && store.currentDirectory != nil {
+                Button {
+                    store.send(.playAllTapped)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "play.fill")
+                            .font(.caption)
+                        Text("Play All")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
                     }
-                    .padding(.horizontal)
+                    .foregroundColor(.sonicPrimary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.sonicPrimary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
                 }
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
 
-                // Files Section
-                if !store.filteredFileRows.isEmpty {
-                    LazyVStack(spacing: 8) {
-                        ForEach(store.scope(state: \.filteredFileRows, action: \.fileRows)) { rowStore in
-                            HStack(spacing: 8) {
-                                if isSelecting {
-                                    Button {
-                                        withAnimation(.easeInOut(duration: 0.15)) {
-                                            if selectedFileIds.contains(rowStore.id) {
-                                                selectedFileIds.remove(rowStore.id)
-                                            } else {
-                                                selectedFileIds.insert(rowStore.id)
-                                            }
-                                        }
-                                    } label: {
-                                        Image(systemName: selectedFileIds.contains(rowStore.id) ? "checkmark.circle.fill" : "circle")
-                                            .font(.title3)
-                                            .foregroundColor(selectedFileIds.contains(rowStore.id) ? .sonicPrimary : .sonicTextMuted)
-                                    }
-                                }
-
-                                FileItemRowView(store: rowStore, isSelectionMode: isSelecting)
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                if isSelecting {
-                                    withAnimation(.easeInOut(duration: 0.15)) {
-                                        if selectedFileIds.contains(rowStore.id) {
-                                            selectedFileIds.remove(rowStore.id)
-                                        } else {
-                                            selectedFileIds.insert(rowStore.id)
-                                        }
-                                    }
-                                }
-                            }
-                            .contextMenu {
-                                    if !isSelecting {
-                                        Button {
-                                            shareItem = ShareItem(url: rowStore.file.url)
-                                        } label: {
-                                            Label("Share", systemImage: "square.and.arrow.up")
-                                        }
-                                        Button {
-                                            rowStore.send(.moveTapped)
-                                        } label: {
-                                            Label("Move", systemImage: "folder")
-                                        }
-                                        Button {
-                                            rowStore.send(.renameTapped)
-                                        } label: {
-                                            Label("Rename", systemImage: "pencil")
-                                        }
-                                        Button(role: .destructive) {
-                                            rowStore.send(.deleteTapped)
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
-                                        }
-                                    }
-                                }
-                        }
+            // Files Section
+            if !store.filteredFileRows.isEmpty {
+                HStack {
+                    Spacer()
+                    HStack(spacing: 3) {
+                        Image(systemName: "hand.draw")
+                            .font(.caption2)
+                        Text("Swipe for actions")
+                            .font(.caption2)
                     }
-                    .padding(.horizontal)
+                    .foregroundColor(.sonicTextMuted)
+                }
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+
+                ForEach(store.scope(state: \.filteredFileRows, action: \.fileRows)) { rowStore in
+                    MediaFileRowView(
+                        file: rowStore.file,
+                        showsCollectionName: false,
+                        onTap: { rowStore.send(.tapped) }
+                    )
+                        .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                rowStore.send(.deleteTapped)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            Button {
+                                rowStore.send(.renameTapped)
+                            } label: {
+                                Label("Rename", systemImage: "pencil")
+                            }
+                            .tint(.sonicPrimary)
+                            Button {
+                                rowStore.send(.moveTapped)
+                            } label: {
+                                Label("Move", systemImage: "folder")
+                            }
+                            .tint(.orange)
+                        }
+                        .swipeActions(edge: .leading) {
+                            Button {
+                                rowStore.send(.editTapped)
+                            } label: {
+                                Label("Edit", systemImage: "waveform.and.magnifyingglass")
+                            }
+                            .tint(.blue)
+                            Button {
+                                shareItem = ShareItem(url: rowStore.file.url)
+                            } label: {
+                                Label("Share", systemImage: "square.and.arrow.up")
+                            }
+                            .tint(.gray)
+                        }
                 }
             }
-            .padding(.vertical)
-            .padding(.bottom, 80)
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color.sonicBackground)
         .refreshable {
             await store.send(.refreshFiles).finish()
         }
@@ -223,22 +220,6 @@ struct CollectionsView: View {
 
     @ToolbarContentBuilder
     var toolbarContent: some ToolbarContent {
-        if let onDismiss {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    onDismiss()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                            .font(.body)
-                            .fontWeight(.semibold)
-                        Text("Home")
-                            .font(.body)
-                    }
-                    .foregroundColor(.sonicPrimary)
-                }
-            }
-        }
         ToolbarItem(placement: .navigationBarTrailing) {
             if isSelecting {
                 HStack(spacing: 16) {
