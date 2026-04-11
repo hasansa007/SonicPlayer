@@ -362,17 +362,19 @@ struct CollectionsFeature {
                         }
                     }
                 } else if let item = state.renamingItem {
-                    var name = state.inputText
-                    // Preserve file extension for files
-                    if case .file = item {
-                        let ext = item.url.pathExtension
-                        if !ext.isEmpty && !name.hasSuffix(".\(ext)") {
-                            name = "\(name).\(ext)"
+                    let finalName: String = {
+                        var n = state.inputText
+                        if case .file = item {
+                            let ext = item.url.pathExtension
+                            if !ext.isEmpty && !n.hasSuffix(".\(ext)") {
+                                n = "\(n).\(ext)"
+                            }
                         }
-                    }
+                        return n
+                    }()
                     state.renamingItem = nil
                     return .run { send in
-                        try await fileManager.renameItem(item.url, name)
+                        try await fileManager.renameItem(item.url, finalName)
                         await send(.refreshFiles)
                     }
                 }
