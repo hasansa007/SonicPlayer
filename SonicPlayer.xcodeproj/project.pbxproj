@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A2000001000000000000001 /* CollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000002000000000000001 /* CollectionsView.swift */; };
+		A1000019000000000000001 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000020000000000000001 /* AboutView.swift */; };
+		A1000021000000000000001 /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000022000000000000001 /* HelpView.swift */; };
 		8629C23B2EEA25340052A74B /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2392EEA25340052A74B /* HomeView.swift */; };
 		8629C23C2EEA25340052A74B /* HomeFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2382EEA25340052A74B /* HomeFeature.swift */; };
 		8629C2A72EEB94DF0052A74B /* ArtworkCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2A42EEB94DF0052A74B /* ArtworkCache.swift */; };
@@ -14,30 +17,36 @@
 		8629C2A92EEB94DF0052A74B /* AudioMetadataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2A52EEB94DF0052A74B /* AudioMetadataService.swift */; };
 		8629C2AB2EEBB9710052A74B /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2AA2EEBB9710052A74B /* Theme.swift */; };
 		8629C2AF2EEBBE9B0052A74B /* WaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2AE2EEBBE9B0052A74B /* WaveformView.swift */; };
+		A6000009000000000000001 /* SwipeToDelete.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6000010000000000000001 /* SwipeToDelete.swift */; };
+		A5000009000000000000001 /* AudioWaveformExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5000010000000000000001 /* AudioWaveformExtractor.swift */; };
 		86662FE42EF7E7D7000577F1 /* RecordingFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86662FE12EF7E7D7000577F1 /* RecordingFeature.swift */; };
 		86662FE52EF7E7D7000577F1 /* EditRecordingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86662FE02EF7E7D7000577F1 /* EditRecordingView.swift */; };
 		86662FE62EF7E7D7000577F1 /* RecordingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86662FE22EF7E7D7000577F1 /* RecordingView.swift */; };
 		86662FEC2EF7EAC1000577F1 /* AudioRecorderClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86662FEA2EF7EAC1000577F1 /* AudioRecorderClient.swift */; };
 		86662FED2EF7EAC1000577F1 /* AudioTrimmerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86662FEB2EF7EAC1000577F1 /* AudioTrimmerClient.swift */; };
 		8690789B2EEC9F8D005620F9 /* ArtworkClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8690789A2EEC9F8D005620F9 /* ArtworkClient.swift */; };
-		869078BE2EECC1D7005620F9 /* FileItemRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078B62EECC1D7005620F9 /* FileItemRow.swift */; };
-		869078BF2EECC1D7005620F9 /* FolderPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078BD2EECC1D7005620F9 /* FolderPickerView.swift */; };
-		869078C02EECC1D7005620F9 /* FilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078B92EECC1D7005620F9 /* FilesView.swift */; };
-		869078C12EECC1D7005620F9 /* FolderPickerFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078BC2EECC1D7005620F9 /* FolderPickerFeature.swift */; };
-		869078C22EECC1D7005620F9 /* FilesFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078B82EECC1D7005620F9 /* FilesFeature.swift */; };
-		869078C32EECC1D7005620F9 /* FolderCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078BB2EECC1D7005620F9 /* FolderCardView.swift */; };
+		869078BE2EECC1D7005620F9 /* FileItemRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078B62EECC1D7005620F9 /* FileItemRowView.swift */; };
+		A7000009000000000000001 /* MediaFileRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7000010000000000000001 /* MediaFileRowView.swift */; };
+		A8000009000000000000001 /* InAppCollectionPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8000010000000000000001 /* InAppCollectionPicker.swift */; };
+		869078C22EECC1D7005620F9 /* CollectionsFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078B82EECC1D7005620F9 /* CollectionsFeature.swift */; };
 		869078C42EECC1D7005620F9 /* FileRowFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078B72EECC1D7005620F9 /* FileRowFeature.swift */; };
 		869078C52EECC1D7005620F9 /* FolderCardFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869078BA2EECC1D7005620F9 /* FolderCardFeature.swift */; };
+		8692B7E32EFC094200DFAF7C /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 8692B7E22EFC094200DFAF7C /* Localizable.xcstrings */; };
+		86A1B2042F1B3F0000A1BEEF /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A1B2032F1B3F0000A1BEEF /* ShareSheet.swift */; };
+		86A1B7012F1C500000A1BEEF /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A1B7002F1C500000A1BEEF /* EmptyStateView.swift */; };
+		86A1B3002F1B4A0100A1BEEF /* FileItemRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A1B3012F1B4A0100A1BEEF /* FileItemRow.swift */; };
 		A1000001000000000000001 /* SonicPlayerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000001 /* SonicPlayerApp.swift */; };
 		A1000003000000000000001 /* AppFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000004000000000000001 /* AppFeature.swift */; };
 		A1000005000000000000001 /* AppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000006000000000000001 /* AppView.swift */; };
+		A4000009000000000000002 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4000010000000000000002 /* OnboardingView.swift */; };
+		A4000009000000000000001 /* OnboardingFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4000010000000000000001 /* OnboardingFeature.swift */; };
+		A3000009000000000000001 /* CollectionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000010000000000000001 /* CollectionsSection.swift */; };
+		A5000001000000000000001 /* ScreenshotMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5000002000000000000001 /* ScreenshotMode.swift */; };
 		A1000007000000000000001 /* PlayerFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000008000000000000001 /* PlayerFeature.swift */; };
 		A1000009000000000000001 /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010000000000000001 /* PlayerView.swift */; };
 		A1000010000000000000002 /* MiniPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010000000000000003 /* MiniPlayerView.swift */; };
 		A1000015000000000000001 /* SettingsFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000016000000000000001 /* SettingsFeature.swift */; };
 		A1000017000000000000001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000018000000000000001 /* SettingsView.swift */; };
-		A1000019000000000000001 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000020000000000000001 /* AboutView.swift */; };
-		A1000021000000000000001 /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000022000000000000001 /* HelpView.swift */; };
 		A1000023000000000000001 /* AudioPlayerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000024000000000000001 /* AudioPlayerClient.swift */; };
 		A1000025000000000000001 /* FileManagerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000026000000000000001 /* FileManagerClient.swift */; };
 		A1000027000000000000001 /* AudioFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000028000000000000001 /* AudioFile.swift */; };
@@ -49,6 +58,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A2000002000000000000001 /* CollectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsView.swift; sourceTree = "<group>"; };
+		A1000020000000000000001 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
+		A1000022000000000000001 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
 		8629C2382EEA25340052A74B /* HomeFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeFeature.swift; sourceTree = "<group>"; };
 		8629C2392EEA25340052A74B /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		8629C2A42EEB94DF0052A74B /* ArtworkCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkCache.swift; sourceTree = "<group>"; };
@@ -56,30 +68,36 @@
 		8629C2A62EEB94DF0052A74B /* ColorExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorExtractor.swift; sourceTree = "<group>"; };
 		8629C2AA2EEBB9710052A74B /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		8629C2AE2EEBBE9B0052A74B /* WaveformView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaveformView.swift; sourceTree = "<group>"; };
-		86662FE02EF7E7D7000577F1 /* EditRecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditRecordingView.swift; sourceTree = "<group>"; };
+		A6000010000000000000001 /* SwipeToDelete.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeToDelete.swift; sourceTree = "<group>"; };
+		A5000010000000000000001 /* AudioWaveformExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioWaveformExtractor.swift; sourceTree = "<group>"; };
+		86662FE02EF7E7D7000577F1 /* EditRecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditRecordingView.swift; sourceTree = "<group>"; xcLanguageSpecificationIdentifier = xcode.lang.plist; };
 		86662FE12EF7E7D7000577F1 /* RecordingFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingFeature.swift; sourceTree = "<group>"; };
 		86662FE22EF7E7D7000577F1 /* RecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingView.swift; sourceTree = "<group>"; };
 		86662FEA2EF7EAC1000577F1 /* AudioRecorderClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorderClient.swift; sourceTree = "<group>"; };
 		86662FEB2EF7EAC1000577F1 /* AudioTrimmerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioTrimmerClient.swift; sourceTree = "<group>"; };
 		8690789A2EEC9F8D005620F9 /* ArtworkClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkClient.swift; sourceTree = "<group>"; };
-		869078B62EECC1D7005620F9 /* FileItemRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileItemRow.swift; sourceTree = "<group>"; };
+		869078B62EECC1D7005620F9 /* FileItemRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileItemRowView.swift; sourceTree = "<group>"; };
+		A7000010000000000000001 /* MediaFileRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFileRowView.swift; sourceTree = "<group>"; };
+		A8000010000000000000001 /* InAppCollectionPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InAppCollectionPicker.swift; sourceTree = "<group>"; };
 		869078B72EECC1D7005620F9 /* FileRowFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileRowFeature.swift; sourceTree = "<group>"; };
-		869078B82EECC1D7005620F9 /* FilesFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesFeature.swift; sourceTree = "<group>"; };
-		869078B92EECC1D7005620F9 /* FilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesView.swift; sourceTree = "<group>"; };
+		869078B82EECC1D7005620F9 /* CollectionsFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsFeature.swift; sourceTree = "<group>"; };
 		869078BA2EECC1D7005620F9 /* FolderCardFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderCardFeature.swift; sourceTree = "<group>"; };
-		869078BB2EECC1D7005620F9 /* FolderCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderCardView.swift; sourceTree = "<group>"; };
-		869078BC2EECC1D7005620F9 /* FolderPickerFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderPickerFeature.swift; sourceTree = "<group>"; };
-		869078BD2EECC1D7005620F9 /* FolderPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderPickerView.swift; sourceTree = "<group>"; };
+		8692B7E22EFC094200DFAF7C /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		86A1B2032F1B3F0000A1BEEF /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
+		86A1B7002F1C500000A1BEEF /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		86A1B3012F1B4A0100A1BEEF /* FileItemRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileItemRow.swift; sourceTree = "<group>"; };
 		A1000002000000000000001 /* SonicPlayerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonicPlayerApp.swift; sourceTree = "<group>"; };
 		A1000004000000000000001 /* AppFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFeature.swift; sourceTree = "<group>"; };
 		A1000006000000000000001 /* AppView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppView.swift; sourceTree = "<group>"; };
+		A4000010000000000000002 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		A4000010000000000000001 /* OnboardingFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFeature.swift; sourceTree = "<group>"; };
+		A3000010000000000000001 /* CollectionsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsSection.swift; sourceTree = "<group>"; };
+		A5000002000000000000001 /* ScreenshotMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotMode.swift; sourceTree = "<group>"; };
 		A1000008000000000000001 /* PlayerFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerFeature.swift; sourceTree = "<group>"; };
 		A1000010000000000000001 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		A1000010000000000000003 /* MiniPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerView.swift; sourceTree = "<group>"; };
 		A1000016000000000000001 /* SettingsFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsFeature.swift; sourceTree = "<group>"; };
 		A1000018000000000000001 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		A1000020000000000000001 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
-		A1000022000000000000001 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
 		A1000024000000000000001 /* AudioPlayerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerClient.swift; sourceTree = "<group>"; };
 		A1000026000000000000001 /* FileManagerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileManagerClient.swift; sourceTree = "<group>"; };
 		A1000028000000000000001 /* AudioFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFile.swift; sourceTree = "<group>"; };
@@ -123,13 +141,6 @@
 			path = Recording;
 			sourceTree = "<group>";
 		};
-		86662FE82EF7E7FD000577F1 /* Shared */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Shared;
-			sourceTree = "<group>";
-		};
 		A1000040000000000000001 = {
 			isa = PBXGroup;
 			children = (
@@ -167,6 +178,10 @@
 				A1000002000000000000001 /* SonicPlayerApp.swift */,
 				A1000004000000000000001 /* AppFeature.swift */,
 				A1000006000000000000001 /* AppView.swift */,
+				A4000010000000000000002 /* OnboardingView.swift */,
+				A4000010000000000000001 /* OnboardingFeature.swift */,
+				A3000010000000000000001 /* CollectionsSection.swift */,
+				A5000002000000000000001 /* ScreenshotMode.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -174,7 +189,6 @@
 		A1000044000000000000001 /* Features */ = {
 			isa = PBXGroup;
 			children = (
-				86662FE82EF7E7FD000577F1 /* Shared */,
 				86662FE32EF7E7D7000577F1 /* Recording */,
 				A1000049000000000000001 /* Player */,
 				A1000050000000000000001 /* Files */,
@@ -209,7 +223,11 @@
 		A1000047000000000000001 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				86A1B2032F1B3F0000A1BEEF /* ShareSheet.swift */,
+				86A1B7002F1C500000A1BEEF /* EmptyStateView.swift */,
 				8629C2AE2EEBBE9B0052A74B /* WaveformView.swift */,
+				A6000010000000000000001 /* SwipeToDelete.swift */,
+				A5000010000000000000001 /* AudioWaveformExtractor.swift */,
 				8629C2AA2EEBB9710052A74B /* Theme.swift */,
 				8629C2A42EEB94DF0052A74B /* ArtworkCache.swift */,
 				8629C2A52EEB94DF0052A74B /* AudioMetadataService.swift */,
@@ -222,6 +240,7 @@
 		A1000048000000000000001 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				8692B7E22EFC094200DFAF7C /* Localizable.xcstrings */,
 				A1000034000000000000001 /* Assets.xcassets */,
 			);
 			path = Resources;
@@ -240,14 +259,14 @@
 		A1000050000000000000001 /* Files */ = {
 			isa = PBXGroup;
 			children = (
-				869078B62EECC1D7005620F9 /* FileItemRow.swift */,
+				869078B62EECC1D7005620F9 /* FileItemRowView.swift */,
+				A7000010000000000000001 /* MediaFileRowView.swift */,
+				A8000010000000000000001 /* InAppCollectionPicker.swift */,
+				86A1B3012F1B4A0100A1BEEF /* FileItemRow.swift */,
 				869078B72EECC1D7005620F9 /* FileRowFeature.swift */,
-				869078B82EECC1D7005620F9 /* FilesFeature.swift */,
-				869078B92EECC1D7005620F9 /* FilesView.swift */,
+				869078B82EECC1D7005620F9 /* CollectionsFeature.swift */,
+				A2000002000000000000001 /* CollectionsView.swift */,
 				869078BA2EECC1D7005620F9 /* FolderCardFeature.swift */,
-				869078BB2EECC1D7005620F9 /* FolderCardView.swift */,
-				869078BC2EECC1D7005620F9 /* FolderPickerFeature.swift */,
-				869078BD2EECC1D7005620F9 /* FolderPickerView.swift */,
 			);
 			path = Files;
 			sourceTree = "<group>";
@@ -256,9 +275,9 @@
 			isa = PBXGroup;
 			children = (
 				A1000016000000000000001 /* SettingsFeature.swift */,
-				A1000018000000000000001 /* SettingsView.swift */,
 				A1000020000000000000001 /* AboutView.swift */,
 				A1000022000000000000001 /* HelpView.swift */,
+				A1000018000000000000001 /* SettingsView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -308,6 +327,14 @@
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hans",
+				hi,
+				es,
+				fr,
+				ar,
+				bn,
+				pt,
+				ru,
 			);
 			mainGroup = A1000040000000000000001;
 			packageReferences = (
@@ -328,6 +355,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000033000000000000001 /* Assets.xcassets in Resources */,
+				8692B7E32EFC094200DFAF7C /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -342,27 +370,35 @@
 				A1000001000000000000001 /* SonicPlayerApp.swift in Sources */,
 				A1000003000000000000001 /* AppFeature.swift in Sources */,
 				A1000005000000000000001 /* AppView.swift in Sources */,
+				A4000009000000000000002 /* OnboardingView.swift in Sources */,
+				A4000009000000000000001 /* OnboardingFeature.swift in Sources */,
+				A3000009000000000000001 /* CollectionsSection.swift in Sources */,
+				A5000001000000000000001 /* ScreenshotMode.swift in Sources */,
 				A1000007000000000000001 /* PlayerFeature.swift in Sources */,
 				A1000009000000000000001 /* PlayerView.swift in Sources */,
 				A1000010000000000000002 /* MiniPlayerView.swift in Sources */,
-				869078BE2EECC1D7005620F9 /* FileItemRow.swift in Sources */,
-				869078BF2EECC1D7005620F9 /* FolderPickerView.swift in Sources */,
-				869078C02EECC1D7005620F9 /* FilesView.swift in Sources */,
-				869078C12EECC1D7005620F9 /* FolderPickerFeature.swift in Sources */,
-				869078C22EECC1D7005620F9 /* FilesFeature.swift in Sources */,
-				869078C32EECC1D7005620F9 /* FolderCardView.swift in Sources */,
+				869078BE2EECC1D7005620F9 /* FileItemRowView.swift in Sources */,
+				A7000009000000000000001 /* MediaFileRowView.swift in Sources */,
+				A8000009000000000000001 /* InAppCollectionPicker.swift in Sources */,
+				86A1B3002F1B4A0100A1BEEF /* FileItemRow.swift in Sources */,
+				869078C22EECC1D7005620F9 /* CollectionsFeature.swift in Sources */,
+				A2000001000000000000001 /* CollectionsView.swift in Sources */,
 				869078C42EECC1D7005620F9 /* FileRowFeature.swift in Sources */,
 				869078C52EECC1D7005620F9 /* FolderCardFeature.swift in Sources */,
 				A1000015000000000000001 /* SettingsFeature.swift in Sources */,
-				A1000017000000000000001 /* SettingsView.swift in Sources */,
 				A1000019000000000000001 /* AboutView.swift in Sources */,
 				A1000021000000000000001 /* HelpView.swift in Sources */,
+				A1000017000000000000001 /* SettingsView.swift in Sources */,
 				A1000023000000000000001 /* AudioPlayerClient.swift in Sources */,
 				8629C2A72EEB94DF0052A74B /* ArtworkCache.swift in Sources */,
 				8629C2A82EEB94DF0052A74B /* ColorExtractor.swift in Sources */,
 				8629C2A92EEB94DF0052A74B /* AudioMetadataService.swift in Sources */,
+				86A1B2042F1B3F0000A1BEEF /* ShareSheet.swift in Sources */,
+				86A1B7012F1C500000A1BEEF /* EmptyStateView.swift in Sources */,
 				A1000025000000000000001 /* FileManagerClient.swift in Sources */,
 				8629C2AF2EEBBE9B0052A74B /* WaveformView.swift in Sources */,
+				A6000009000000000000001 /* SwipeToDelete.swift in Sources */,
+				A5000009000000000000001 /* AudioWaveformExtractor.swift in Sources */,
 				86662FE42EF7E7D7000577F1 /* RecordingFeature.swift in Sources */,
 				86662FE52EF7E7D7000577F1 /* EditRecordingView.swift in Sources */,
 				86662FE62EF7E7D7000577F1 /* RecordingView.swift in Sources */,
@@ -379,6 +415,7 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
 
 /* Begin XCBuildConfiguration section */
 		A1000059000000000000001 /* Debug */ = {
@@ -440,6 +477,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
 			name = Debug;
@@ -496,6 +534,7 @@
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
@@ -508,7 +547,7 @@
 				CODE_SIGN_ENTITLEMENTS = SonicPlayer/SonicPlayer.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = A3JC2SBNCR;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -523,7 +562,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1.2;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hasan.sonicplayer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -541,7 +580,7 @@
 				CODE_SIGN_ENTITLEMENTS = SonicPlayer/SonicPlayer.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = A3JC2SBNCR;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -556,7 +595,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1.2;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hasan.sonicplayer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

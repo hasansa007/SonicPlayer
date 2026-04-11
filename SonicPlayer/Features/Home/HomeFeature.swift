@@ -1,181 +1,78 @@
 import ComposableArchitecture
 import Foundation
-import UIKit
 import SwiftUI
 
 @Reducer
 struct HomeFeature {
     @ObservableState
     struct State: Equatable {
-        var recentFolders: [Folder] = []
-        var suggestedFolders: [Folder] = []
         var lastPlayedTrack: AudioFile?
         var isPlaying: Bool = false
-        var playbackProgress: Double = 0 // 0.0 to 1.0
-
-        // Track shown folders for rotation
-        var shownFolderURLs: Set<URL> = []
-        var allAvailableFolders: [Folder] = []
-        var hasRefreshedSuggestions: Bool = false
-
-        // Artwork cache
-        var artworkCache: [URL: UIImage] = [:]
-        var colorCache: [URL: [Color]] = [:]
-
-        static func == (lhs: State, rhs: State) -> Bool {
-            lhs.recentFolders == rhs.recentFolders &&
-            lhs.suggestedFolders == rhs.suggestedFolders &&
-            lhs.lastPlayedTrack == rhs.lastPlayedTrack &&
-            lhs.isPlaying == rhs.isPlaying &&
-            lhs.playbackProgress == rhs.playbackProgress &&
-            lhs.shownFolderURLs == rhs.shownFolderURLs &&
-            lhs.allAvailableFolders == rhs.allAvailableFolders &&
-            lhs.hasRefreshedSuggestions == rhs.hasRefreshedSuggestions &&
-            // Exclude artworkCache from comparison as UIImage is not Equatable
-            lhs.colorCache == rhs.colorCache
-        }
+        var playbackProgress: Double = 0
+        var recentFiles: [AudioFile] = []
     }
 
     enum Action {
-        case onAppear
-        case loadData
-        case dataLoaded([Folder], [Folder], [Folder]) // Recent, Suggested, All
-        case folderTapped(Folder)
-        case libraryTapped
+        case loadRecentFiles
+        case recentFilesLoaded([AudioFile])
+        case fileTapped(AudioFile)
         case playTrack(AudioFile)
-        case updatePlaybackStatus(Bool)
-        case refreshSuggestions(excludingFolderURL: URL)
-
-        // Artwork actions
-        case loadArtwork(URL, isFolder: Bool)
-        case artworkLoaded(URL, UIImage?)
-        case colorsLoaded(URL, [Color])
+        case togglePlayPause
+        case importTapped
+        case newCollectionTapped
+        case viewAllCollectionsTapped
+        case renameRecentFile(AudioFile)
+        case deleteRecentFile(AudioFile)
+        case editRecentFile(AudioFile)
+        case moveRecentFile(AudioFile)
     }
 
     @Dependency(\.fileManager) var fileManager
-    @Dependency(\.artworkClient) var artworkClient
-    
+
     var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
-            case .onAppear:
-                return .send(.loadData)
-
-            case .loadData:
-                return .run { send in
-                    do {
-                        let rootItems = try await fileManager.listItems(nil)
-                        let folders = rootItems.compactMap { item -> Folder? in
-                            if case let .folder(f) = item { return f }
-                            return nil
-                        }
-
-                        // Mock categorization
-                        let recent = Array(folders.prefix(3))
-                        let suggested = Array(folders.dropFirst(3).prefix(5))
-
-                        await send(.dataLoaded(recent, suggested, folders))
-                    } catch {
-                        print("Failed to load home data: \(error)")
-                    }
-                }
-
-            case let .dataLoaded(recent, suggested, allFolders):
-                // Always update allAvailableFolders (file system may have changed)
-                state.allAvailableFolders = allFolders
-
-                // Only update suggestions if they haven't been manually refreshed
-                if !state.hasRefreshedSuggestions {
-                    state.recentFolders = recent
-                    state.suggestedFolders = suggested
-                    // Mark initial suggestions as shown (use standardized URLs)
-                    state.shownFolderURLs = Set(suggested.map { $0.url.standardizedFileURL })
-                }
-                return .none
-                
-            case .folderTapped:
-                return .none
-                
-            case .libraryTapped:
-                return .none
-                
-            case .playTrack:
-                return .none
-                
-            case let .updatePlaybackStatus(isPlaying):
-                state.isPlaying = isPlaying
-                return .none
-
-            case let .refreshSuggestions(excludingFolderURL):
-                // Standardize URL for consistent comparison
-                let standardizedURL = excludingFolderURL.standardizedFileURL
-
-                // Mark as shown
-                state.shownFolderURLs.insert(standardizedURL)
-
-                // Remove from suggestions (create new array instead of mutating)
-                var updatedSuggestions = state.suggestedFolders.filter { $0.url.standardizedFileURL != standardizedURL }
-
-                // Build available pool (exclude only shown folders - recent folders can be suggested)
-                let availableForSuggestion = state.allAvailableFolders.filter { folder in
-                    !state.shownFolderURLs.contains(folder.url.standardizedFileURL)
-                }
-
-                // Rotate in new suggestions to reach 5 total
-                let needed = updatedSuggestions.count + 1
-
-                if needed > 0 {
-                    if !availableForSuggestion.isEmpty {
-                        let newSuggestions = Array(availableForSuggestion.prefix(needed))
-                        updatedSuggestions.append(contentsOf: newSuggestions)
-                        newSuggestions.forEach { state.shownFolderURLs.insert($0.url.standardizedFileURL) }
-                    } else {
-                        // Pool exhausted - reset and try again
-                        state.shownFolderURLs = [standardizedURL]
-
-                        // Get fresh pool
-                        let freshPool = state.allAvailableFolders.filter { folder in
-                            folder.url.standardizedFileURL != standardizedURL
-                        }
-
-                        if !freshPool.isEmpty {
-                            let newSuggestions = Array(freshPool.prefix(needed))
-                            updatedSuggestions.append(contentsOf: newSuggestions)
-                            newSuggestions.forEach { state.shownFolderURLs.insert($0.url.standardizedFileURL) }
-                        }
-                    }
-                }
-
-                // Replace the entire array to trigger observation
-                state.suggestedFolders = updatedSuggestions
-                // Mark that suggestions have been manually refreshed
-                state.hasRefreshedSuggestions = true
-                return .none
-
-            case let .loadArtwork(url, isFolder):
-                // Check if already cached
-                if state.artworkCache[url] != nil && state.colorCache[url] != nil {
+            case .loadRecentFiles:
+                // In screenshot mode, skip loading real files to preserve demo data
+                if ScreenshotMode.isEnabled && !state.recentFiles.isEmpty {
                     return .none
                 }
-
                 return .run { send in
-                    async let artwork = isFolder ?
-                        await artworkClient.getFolderArtwork(url) :
-                        await artworkClient.getArtwork(url)
-                    async let colors = await artworkClient.getColors(url, isFolder, nil)
-
-                    await send(.artworkLoaded(url, await artwork))
-                    await send(.colorsLoaded(url, await colors))
+                    let files = try await loadRecentFiles(fileManager: fileManager)
+                    await send(.recentFilesLoaded(files))
                 }
 
-            case let .artworkLoaded(url, artwork):
-                state.artworkCache[url] = artwork
+            case let .recentFilesLoaded(files):
+                state.recentFiles = files
                 return .none
 
-            case let .colorsLoaded(url, colors):
-                state.colorCache[url] = colors
+            case .fileTapped, .playTrack, .togglePlayPause, .importTapped, .newCollectionTapped, .viewAllCollectionsTapped, .renameRecentFile, .deleteRecentFile, .editRecentFile, .moveRecentFile:
                 return .none
             }
+        }
+    }
+}
+
+private func loadRecentFiles(fileManager: FileManagerClient) async throws -> [AudioFile] {
+    var allFiles: [AudioFile] = []
+    var seenNames: Set<String> = []
+    try await collectFiles(from: nil, into: &allFiles, seenNames: &seenNames, fileManager: fileManager)
+    allFiles.sort { $0.creationDate > $1.creationDate }
+    return Array(allFiles.prefix(10))
+}
+
+private func collectFiles(from directory: URL?, into files: inout [AudioFile], seenNames: inout Set<String>, fileManager: FileManagerClient) async throws {
+    let items = try await fileManager.listItems(directory)
+    for item in items {
+        switch item {
+        case .file(let audioFile):
+            let name = audioFile.url.lastPathComponent
+            if !seenNames.contains(name) {
+                seenNames.insert(name)
+                files.append(audioFile)
+            }
+        case .folder(let folder):
+            try await collectFiles(from: folder.url, into: &files, seenNames: &seenNames, fileManager: fileManager)
         }
     }
 }

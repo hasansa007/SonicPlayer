@@ -35,10 +35,10 @@ extension ArtworkClient: DependencyKey {
                 await cache.loadColors(for: url, isFolder: isFolder, fallbackColors: fallbackColors)
             },
             clearCache: {
-                cache.clearCache()
+                await cache.clearCache()
             },
             getCacheStats: {
-                cache.getCacheStats()
+                await cache.getCacheStats()
             }
         )
     }()

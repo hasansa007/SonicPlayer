@@ -1,107 +1,345 @@
 import ComposableArchitecture
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct AppView: View {
     @Bindable var store: StoreOf<AppFeature>
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
+    @State private var shareItem: ShareItem?
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            tabView
-            .tint(.sonicPrimary)
+            // Main content
+            NavigationStack(path: $store.scope(state: \.filesPath, action: \.filesPath)) {
+                homeRootContent
+                    .navigationTitle("Home")
+                    .navigationBarTitleDisplayMode(.large)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button {
+                                store.send(.settingsTapped)
+                            } label: {
+                                Image(systemName: "gearshape.fill")
+                                    .foregroundColor(.sonicTextSecondary)
+                            }
+                        }
+                    }
+                    .navigationDestination(isPresented: isSettingsPresented) {
+                        SettingsView(store: store.scope(state: \.settings, action: \.settings))
+                    }
+                    .alert($store.scope(state: \.filesRoot.alert, action: \.filesRoot.alert))
+                    .alert("Rename", isPresented: Binding(
+                        get: { store.filesRoot.renamingItem != nil },
+                        set: { if !$0 { store.send(.filesRoot(.cancelNameInput)) } }
+                    )) {
+                        TextField("Name", text: Binding(
+                            get: { store.filesRoot.inputText },
+                            set: { store.send(.filesRoot(.setInputText($0))) }
+                        ))
+                        Button("Rename") { store.send(.filesRoot(.confirmNameInput)) }
+                        Button("Cancel", role: .cancel) { store.send(.filesRoot(.cancelNameInput)) }
+                    }
+                    .sheet(item: $store.scope(state: \.filesRoot.editAudio, action: \.filesRoot.editAudio)) { editStore in
+                        EditRecordingView(store: editStore)
+                    }
+                    .sheet(isPresented: Binding(
+                        get: { store.filesRoot.isShowingCollectionPicker },
+                        set: { if !$0 { store.send(.filesRoot(.cancelMove)) } }
+                    )) {
+                        InAppCollectionPicker(
+                            collections: store.filesRoot.availableCollections,
+                            onPick: { url in store.send(.filesRoot(.moveToDestination(url))) },
+                            onCancel: { store.send(.filesRoot(.cancelMove)) }
+                        )
+                    }
+                    .sheet(item: $shareItem) { item in
+                        ActivityView(items: [item.url])
+                    }
+                    .onAppear {
+                        if !ScreenshotMode.isEnabled {
+                            store.send(.filesRoot(.onAppear))
+                            store.send(.home(.loadRecentFiles))
+                        }
+                    }
+            } destination: { collectionsStore in
+                CollectionsView(store: collectionsStore)
+                    .navigationTitle(collectionsStore.currentDirectory?.lastPathComponent ?? "Collections")
+                    .navigationBarTitleDisplayMode(.large)
+            }
             .preferredColorScheme(store.settings.colorScheme.colorScheme)
-            .toolbarBackground(.ultraThinMaterial, for: .tabBar)
-            .toolbarBackground(.visible, for: .tabBar)
 
-            // Mini Player Overlay (only in play mode)
-            if isBrowsingMode && store.player.shouldShowMiniPlayer {
-                MiniPlayerView(store: store.scope(state: \.player, action: \.player))
-                    .padding(.bottom, 56) // Float above TabBar
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .zIndex(1)
+            // Mini Player (full-width bottom bar)
+            if store.player.shouldShowMiniPlayer {
+                VStack(spacing: 0) {
+                    Spacer()
+                    MiniPlayerView(store: store.scope(state: \.player, action: \.player))
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(1)
+            }
+
+            // Record FAB (home screen only, not on empty state)
+            if !store.isSettingsSheetPresented && store.filesPath.isEmpty && !(store.filesRoot.items.isEmpty && store.home.recentFiles.isEmpty) {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        recordFAB
+                    }
+                }
+                .padding(.trailing, 20)
+                .padding(.bottom, store.player.shouldShowMiniPlayer ? 72 : 20)
+                .zIndex(2)
             }
         }
-        .sheet(isPresented: isPlayerSheetPresented) {
+        // Global sheets
+        .sheet(isPresented: Binding(
+            get: { store.player.isExpanded },
+            set: { store.send(.player(.setExpanded($0))) }
+        )) {
             PlayerView(store: store.scope(state: \.player, action: \.player))
                 .presentationDetents([.large])
-                .presentationDragIndicator(.hidden)
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: isRecordingSheetPresented) {
+            RecordingView(store: store.scope(state: \.recording, action: \.recording))
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .interactiveDismissDisabled(true)
+        }
+        .sheet(isPresented: isImportSheetPresented) {
+            DocumentPicker { urls in
+                store.send(.importFiles(urls))
+            }
         }
         .onChange(of: scenePhase) { _, newPhase in
             store.send(.scenePhaseChanged(newPhase))
         }
+        .onOpenURL { url in
+            store.send(.openedFromFiles(url))
+        }
         .onAppear {
-            store.send(.player(.restoreSession))
+            if ScreenshotMode.isEnabled {
+                // In screenshot mode, show recording sheet if needed
+                if ScreenshotMode.targetScreen == .recording || ScreenshotMode.targetScreen == .editRecording {
+                    store.send(.recordButtonTapped)
+                }
+            } else {
+                store.send(.player(.restoreSession))
+            }
+        }
+        .fullScreenCover(isPresented: Binding(
+            get: { store.onboarding != nil },
+            set: { _ in }
+        )) {
+            if let onboardingStore = store.scope(state: \.onboarding, action: \.onboarding) {
+                OnboardingView(store: onboardingStore)
+            }
         }
     }
 }
 
+// MARK: - Private
+
 private extension AppView {
-    var isBrowsingMode: Bool {
-        !store.isRecordingMode
-    }
 
-    var selectedTab: Binding<AppFeature.Tab> {
+    var isRecordingSheetPresented: Binding<Bool> {
         Binding(
-            get: { store.selectedTab },
-            set: { store.send(.selectTab($0)) }
+            get: { store.isRecordingSheetPresented },
+            set: { if !$0 { store.send(.dismissRecordingSheet) } }
         )
     }
 
-    var isPlayerSheetPresented: Binding<Bool> {
+    var isSettingsPresented: Binding<Bool> {
         Binding(
-            get: { isBrowsingMode && store.player.isExpanded },
-            set: { store.send(.player(.setExpanded($0))) }
+            get: { store.isSettingsSheetPresented },
+            set: { if !$0 { store.send(.dismissSettings) } }
         )
     }
 
-    var homeView: some View {
-        HomeView(store: store.scope(state: \.home, action: \.home))
-            .tabItem { Label("Home", systemImage: "house.fill") }
-            .tag(AppFeature.Tab.home)
+    var isImportSheetPresented: Binding<Bool> {
+        Binding(
+            get: { store.isImportSheetPresented },
+            set: { if !$0 { store.send(.dismissImportSheet) } }
+        )
     }
 
-    var recordingView: some View {
-        RecordingView(store: store.scope(state: \.recording, action: \.recording))
-            .tabItem { Label("Recordings", systemImage: "mic.fill") }
-            .tag(AppFeature.Tab.home)
-    }
 
-    var libraryView: some View {
-        NavigationStack(path: $store.scope(state: \.filesPath, action: \.filesPath)) {
-            FilesView(store: store.scope(state: \.filesRoot, action: \.filesRoot))
-        } destination: { store in
-            FilesView(store: store)
-        }
-        .tabItem { Label("Library", systemImage: "square.stack.3d.up.fill") }
-        .tag(AppFeature.Tab.files)
-    }
+    // MARK: - Expanded Player Overlay
 
-    var settingsView: some View {
-        SettingsView(store: store.scope(state: \.settings, action: \.settings))
-            .tabItem { Label("Settings", systemImage: "gearshape.fill") }
-            .tag(AppFeature.Tab.settings)
-    }
-    
-    var isPad: Bool {
-        UIDevice.current.userInterfaceIdiom == .pad
-    }
-    
+    // MARK: - Home Root Content
+
     @ViewBuilder
-    var tabView: some View {
-        let base = TabView(selection: selectedTab) {
-            if isBrowsingMode {
-                Tab("Home", systemImage: "house.fill", value: AppFeature.Tab.home) { homeView }
-                Tab("Library", systemImage: "square.stack.3d.up.fill", value: AppFeature.Tab.files, role: .search) { libraryView }
-            } else {
-                Tab("Recordings", systemImage: "mic.fill", value: AppFeature.Tab.home) { recordingView }
-            }
-            Tab("Settings", systemImage: "gearshape.fill", value: AppFeature.Tab.settings) { settingsView }
-        }
+    var homeRootContent: some View {
+        ZStack {
+            Color.sonicBackground.ignoresSafeArea()
 
-        if isPad {
-            base.tabViewStyle(.sidebarAdaptable)
-        } else {
-            base
+            if store.filesRoot.isLoading && store.filesRoot.items.isEmpty {
+                ProgressView()
+                    .tint(.sonicPrimary)
+            } else if store.filesRoot.items.isEmpty && store.home.recentFiles.isEmpty {
+                // Empty state
+                VStack(spacing: 20) {
+                    Spacer()
+
+                    Image(systemName: "waveform.circle")
+                        .font(.system(size: 72))
+                        .foregroundStyle(LinearGradient.sonicGradient)
+                        .opacity(0.6)
+
+                    Text("Welcome to SonicPlayer")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.sonicTextPrimary)
+
+                    Text("Record audio, import files, or open media\nfrom other apps to get started.")
+                        .font(.subheadline)
+                        .foregroundColor(.sonicTextSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+
+                    HStack(spacing: 12) {
+                        Button {
+                            store.send(.recordButtonTapped)
+                        } label: {
+                            Label("Record", systemImage: "mic.fill")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                                .background(Color.red, in: Capsule())
+                        }
+
+                        Button {
+                            store.send(.home(.importTapped))
+                        } label: {
+                            Label("Import", systemImage: "square.and.arrow.down")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.sonicPrimary)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                                .background(Color.sonicPrimary.opacity(0.12), in: Capsule())
+                        }
+                    }
+                    .padding(.top, 4)
+
+                    Spacer()
+                }
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        // 1. Collections
+                        collectionsSection
+
+                        // 2. Recent Files
+                        recentFilesSection
+                    }
+                    .padding(.vertical)
+                    .padding(.bottom, store.player.shouldShowMiniPlayer ? 80 : 40)
+                }
+                .refreshable {
+                    await store.send(.filesRoot(.refreshFiles)).finish()
+                    store.send(.home(.loadRecentFiles))
+                }
+            }
+        }
+    }
+
+    // MARK: - Section: Recent Files
+
+    @ViewBuilder
+    var recentFilesSection: some View {
+        if !store.home.recentFiles.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Recent Media")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    Spacer()
+                    HStack(spacing: 3) {
+                        Image(systemName: "hand.draw")
+                            .font(.caption2)
+                        Text("Swipe for actions")
+                            .font(.caption2)
+                    }
+                    .foregroundColor(.sonicTextMuted)
+                }
+                .padding(.horizontal)
+
+                List {
+                    ForEach(store.home.recentFiles) { file in
+                        recentFileRow(file: file)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                            .listRowBackground(Color.clear)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    store.send(.home(.deleteRecentFile(file)))
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                Button {
+                                    store.send(.home(.renameRecentFile(file)))
+                                } label: {
+                                    Label("Rename", systemImage: "pencil")
+                                }
+                                .tint(.sonicPrimary)
+                            }
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    store.send(.home(.editRecentFile(file)))
+                                } label: {
+                                    Label("Edit", systemImage: "waveform.and.magnifyingglass")
+                                }
+                                .tint(.blue)
+                                Button {
+                                    shareItem = ShareItem(url: file.url)
+                                } label: {
+                                    Label("Share", systemImage: "square.and.arrow.up")
+                                }
+                                .tint(.gray)
+                            }
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .scrollDisabled(true)
+                .frame(height: CGFloat(store.home.recentFiles.count) * 64)
+            }
+        }
+    }
+
+    func recentFileRow(file: AudioFile) -> some View {
+        MediaFileRowView(
+            file: file,
+            onTap: { store.send(.home(.fileTapped(file))) }
+        )
+    }
+
+    // MARK: - Record FAB
+
+    var recordFAB: some View {
+        Button {
+            store.send(.recordButtonTapped)
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.red.opacity(0.85), Color.red],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 56, height: 56)
+                    .shadow(color: Color.red.opacity(0.3), radius: 12, x: 0, y: 6)
+
+                Image(systemName: "mic.fill")
+                    .font(.title3)
+                    .foregroundColor(.white)
+            }
         }
     }
 }

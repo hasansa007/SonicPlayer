@@ -3,53 +3,54 @@ import SwiftUI
 
 struct SettingsView: View {
     let store: StoreOf<SettingsFeature>
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.systemID
+    private let supportedLanguages = AppLanguage.supportedLanguages
+    @State private var expandedSection: ExpandableSection?
+
+    private enum ExpandableSection {
+        case speed, skipDuration, theme, language
+    }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.sonicBackground.ignoresSafeArea()
+        ZStack {
+            Color.sonicBackground.ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: 20) {
-                        // App branding
-                        appHeaderView
+            ScrollView {
+                VStack(spacing: 20) {
+                    // App branding
+                    appHeaderView
 
-                        // App Mode
-                        appModeSection
+                    // Playback settings
+                    playbackSettingsSection
 
-                        // Playback settings
-                        playbackSettingsSection
+                    // Appearance settings
+                    appearanceSection
 
-                        // Appearance settings
-                        appearanceSection
-
-                        // About & Help
-                        infoSection
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 80) // Add bottom padding for Mini Player
+                    // About & Help
+                    infoSection
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 80)
             }
-            .navigationTitle("Settings")
-            .sheet(isPresented: Binding(
-                get: { store.showAbout },
-                set: { _ in store.send(.dismissAbout) }
-            )) {
-                AboutView(store: store)
-            }
-            .sheet(isPresented: Binding(
-                get: { store.showHelp },
-                set: { _ in store.send(.dismissHelp) }
-            )) {
-                HelpView(store: store)
-            }
+        }
+        .navigationTitle("Settings")
+        .navigationDestination(isPresented: Binding(
+            get: { store.showAbout },
+            set: { _ in store.send(.dismissAbout) }
+        )) {
+            AboutView(store: store)
+        }
+        .navigationDestination(isPresented: Binding(
+            get: { store.showHelp },
+            set: { _ in store.send(.dismissHelp) }
+        )) {
+            HelpView(store: store)
         }
     }
 
     private var appHeaderView: some View {
         VStack(spacing: 16) {
-            // Logo
             Image("AppLogo")
                 .resizable()
                 .scaledToFit()
@@ -75,102 +76,119 @@ struct SettingsView: View {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
     }
 
-    private var appModeSection: some View {
-        SettingsSection(title: "App Mode", icon: "waveform.circle.fill") {
-            VStack(spacing: 12) {
-                SettingsRow(
-                    icon: store.isRecordingMode ? "mic.fill" : "play.fill",
-                    title: "Recording Mode",
-                    iconColor: store.isRecordingMode ? .red : .sonicPrimary
-                ) {
-                    Toggle("", isOn: Binding(
-                        get: { store.isRecordingMode },
-                        set: { _ in store.send(.toggleRecordingMode) }
-                    ))
-                    .labelsHidden()
-                    .tint(.sonicPrimary)
-                }
-
-                if store.isRecordingMode {
-                    Text("Recording mode enabled. The app will show recording interface instead of the player.")
-                        .font(.caption)
-                        .foregroundColor(.sonicTextSecondary)
-                        .padding(.horizontal, 12)
-                        .padding(.top, 4)
-                }
-            }
-        }
-    }
-
     private var playbackSettingsSection: some View {
         SettingsSection(title: "Playback", icon: "play.circle.fill") {
             VStack(spacing: 12) {
-                // Default playback speed
-                SettingsRow(
-                    icon: "speedometer",
-                    title: "Default Speed",
-                    iconColor: .sonicPrimary
-                ) {
-                    Menu {
-                        ForEach(PlaybackSpeed.allCases) { speed in
-                            Button {
-                                store.send(.setDefaultPlaybackSpeed(speed))
-                            } label: {
-                                HStack {
-                                    Text(speed.displayText)
-                                    if speed == store.defaultPlaybackSpeed {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        expandedSection = expandedSection == .speed ? nil : .speed
+                    }
+                } label: {
+                    SettingsRow(
+                        icon: "speedometer",
+                        title: "Default Speed",
+                        iconColor: .sonicPrimary
+                    ) {
                         HStack(spacing: 4) {
                             Text(store.defaultPlaybackSpeed.displayText)
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                                 .foregroundColor(.sonicPrimary)
                                 .monospacedDigit()
-                            Image(systemName: "chevron.up.chevron.down")
+                            Image(systemName: expandedSection == .speed ? "chevron.up" : "chevron.down")
                                 .font(.caption2)
                                 .foregroundColor(.sonicTextMuted)
                         }
                     }
                 }
+                .buttonStyle(.plain)
+
+                if expandedSection == .speed {
+                    VStack(spacing: 0) {
+                        ForEach(PlaybackSpeed.allCases) { speed in
+                            Button {
+                                store.send(.setDefaultPlaybackSpeed(speed))
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    expandedSection = nil
+                                }
+                            } label: {
+                                HStack {
+                                    Text(speed.displayText)
+                                        .font(.subheadline)
+                                        .foregroundColor(.sonicTextPrimary)
+                                    Spacer()
+                                    if speed == store.defaultPlaybackSpeed {
+                                        Image(systemName: "checkmark")
+                                            .font(.caption)
+                                            .foregroundColor(.sonicPrimary)
+                                    }
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 12)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.leading, 36)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
 
                 Divider()
 
-                // Default skip duration
-                SettingsRow(
-                    icon: "arrow.left.arrow.right",
-                    title: "Skip Duration",
-                    iconColor: .sonicPrimary
-                ) {
-                    Menu {
-                        ForEach(SkipDuration.allCases) { duration in
-                            Button {
-                                store.send(.setDefaultSkipDuration(duration))
-                            } label: {
-                                HStack {
-                                    Text(duration.displayText)
-                                    if duration == store.defaultSkipDuration {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        expandedSection = expandedSection == .skipDuration ? nil : .skipDuration
+                    }
+                } label: {
+                    SettingsRow(
+                        icon: "arrow.left.arrow.right",
+                        title: "Skip Duration",
+                        iconColor: .sonicPrimary
+                    ) {
                         HStack(spacing: 4) {
                             Text(store.defaultSkipDuration.displayText)
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                                 .foregroundColor(.sonicPrimary)
                                 .monospacedDigit()
-                            Image(systemName: "chevron.up.chevron.down")
+                            Image(systemName: expandedSection == .skipDuration ? "chevron.up" : "chevron.down")
                                 .font(.caption2)
                                 .foregroundColor(.sonicTextMuted)
                         }
                     }
+                }
+                .buttonStyle(.plain)
+
+                if expandedSection == .skipDuration {
+                    VStack(spacing: 0) {
+                        ForEach(SkipDuration.allCases) { duration in
+                            Button {
+                                store.send(.setDefaultSkipDuration(duration))
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    expandedSection = nil
+                                }
+                            } label: {
+                                HStack {
+                                    Text(duration.displayText)
+                                        .font(.subheadline)
+                                        .foregroundColor(.sonicTextPrimary)
+                                    Spacer()
+                                    if duration == store.defaultSkipDuration {
+                                        Image(systemName: "checkmark")
+                                            .font(.caption)
+                                            .foregroundColor(.sonicPrimary)
+                                    }
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 12)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.leading, 36)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
         }
@@ -178,36 +196,126 @@ struct SettingsView: View {
 
     private var appearanceSection: some View {
         SettingsSection(title: "Appearance", icon: "paintbrush.fill") {
-            SettingsRow(
-                icon: store.colorScheme.icon,
-                title: "Theme",
-                iconColor: .orange
-            ) {
-                Menu {
-                    ForEach(AppColorScheme.allCases) { scheme in
-                        Button {
-                            store.send(.setColorScheme(scheme))
-                        } label: {
-                            HStack {
-                                Image(systemName: scheme.icon)
-                                Text(scheme.rawValue)
-                                if scheme == store.colorScheme {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
+            VStack(spacing: 12) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        expandedSection = expandedSection == .theme ? nil : .theme
                     }
                 } label: {
-                    HStack(spacing: 4) {
-                        Text(store.colorScheme.rawValue)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.sonicPrimary)
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.caption2)
-                            .foregroundColor(.sonicTextMuted)
+                    SettingsRow(
+                        icon: store.colorScheme.icon,
+                        title: "Theme",
+                        iconColor: .orange
+                    ) {
+                        HStack(spacing: 4) {
+                            Text(store.colorScheme.rawValue)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.sonicPrimary)
+                            Image(systemName: expandedSection == .theme ? "chevron.up" : "chevron.down")
+                                .font(.caption2)
+                                .foregroundColor(.sonicTextMuted)
+                        }
                     }
                 }
+                .buttonStyle(.plain)
+
+                if expandedSection == .theme {
+                    VStack(spacing: 0) {
+                        ForEach(AppColorScheme.allCases) { scheme in
+                            Button {
+                                store.send(.setColorScheme(scheme))
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    expandedSection = nil
+                                }
+                            } label: {
+                                HStack {
+                                    Image(systemName: scheme.icon)
+                                        .font(.body)
+                                        .foregroundColor(.sonicTextSecondary)
+                                        .frame(width: 20)
+                                    Text(scheme.rawValue)
+                                        .font(.subheadline)
+                                        .foregroundColor(.sonicTextPrimary)
+                                    Spacer()
+                                    if scheme == store.colorScheme {
+                                        Image(systemName: "checkmark")
+                                            .font(.caption)
+                                            .foregroundColor(.sonicPrimary)
+                                    }
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 12)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.leading, 36)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                Divider()
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        expandedSection = expandedSection == .language ? nil : .language
+                    }
+                } label: {
+                    SettingsRow(
+                        icon: "globe",
+                        title: "Language",
+                        iconColor: .sonicPrimary
+                    ) {
+                        HStack(spacing: 4) {
+                            Text(selectedLanguage.displayName)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.sonicPrimary)
+                            Image(systemName: expandedSection == .language ? "chevron.up" : "chevron.down")
+                                .font(.caption2)
+                                .foregroundColor(.sonicTextMuted)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+
+                if expandedSection == .language {
+                    VStack(spacing: 0) {
+                        ForEach(supportedLanguages) { language in
+                            Button {
+                                setLanguage(language)
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    expandedSection = nil
+                                }
+                            } label: {
+                                HStack {
+                                    Text(language.displayName)
+                                        .font(.subheadline)
+                                        .foregroundColor(.sonicTextPrimary)
+                                    Spacer()
+                                    if language.id == appLanguage {
+                                        Image(systemName: "checkmark")
+                                            .font(.caption)
+                                            .foregroundColor(.sonicPrimary)
+                                    }
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 12)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.leading, 36)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                Text("Language updates immediately.")
+                    .font(.caption)
+                    .foregroundColor(.sonicTextMuted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 44)
             }
         }
     }
@@ -217,7 +325,7 @@ struct SettingsView: View {
             VStack(spacing: 12) {
                 SettingsButton(
                     icon: "info.circle",
-                    title: "About Sonic Player",
+                    title: "About Sonic",
                     iconColor: .blue
                 ) {
                     store.send(.showAboutTapped)
@@ -234,6 +342,45 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private var selectedLanguage: AppLanguage {
+        supportedLanguages.first { $0.id == appLanguage } ?? .system
+    }
+
+    private func setLanguage(_ language: AppLanguage) {
+        appLanguage = language.id
+        if let code = language.code {
+            UserDefaults.standard.set([code], forKey: "AppleLanguages")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+        }
+    }
+}
+
+struct AppLanguage: Identifiable, Equatable {
+    static let systemID = "system"
+    static let system = AppLanguage(code: nil)
+    static let supportedLanguages: [AppLanguage] = [
+        .system,
+        AppLanguage(code: "en"),
+        AppLanguage(code: "zh-Hans"),
+        AppLanguage(code: "hi"),
+        AppLanguage(code: "es"),
+        AppLanguage(code: "fr"),
+        AppLanguage(code: "ar"),
+        AppLanguage(code: "bn"),
+        AppLanguage(code: "pt"),
+        AppLanguage(code: "ru"),
+    ]
+
+    let code: String?
+    var id: String { code ?? Self.systemID }
+
+    var displayName: String {
+        guard let code else { return NSLocalizedString("System", comment: "System language option") }
+        let locale = Locale(identifier: code)
+        return locale.localizedString(forLanguageCode: code) ?? code
     }
 }
 
@@ -315,7 +462,7 @@ struct SettingsButton: View {
 
                 Spacer()
 
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(.sonicTextMuted)

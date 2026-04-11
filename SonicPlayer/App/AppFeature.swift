@@ -5,73 +5,87 @@ import SwiftUI
 @Reducer
 struct AppFeature {
     @ObservableState
-    struct State: Equatable { // Keep manual Equatable.
-        var selectedTab: Tab = .home
+    struct State: Equatable {
         var player = PlayerFeature.State()
-
         var home = HomeFeature.State()
 
-        // Navigation Stack for Files
-        var filesPath = StackState<FilesFeature.State>()
-        var filesRoot = FilesFeature.State(currentDirectory: nil) // Root
+        // File browser (home)
+        var filesPath = StackState<CollectionsFeature.State>()
+        var filesRoot = CollectionsFeature.State(currentDirectory: nil)
+
 
         var settings = SettingsFeature.State()
         var recording = RecordingFeature.State()
 
-        // App Mode
-        var isRecordingMode: Bool {
-            settings.isRecordingMode
+        // Onboarding
+        var onboarding: OnboardingFeature.State?
+
+        // Sheets
+        var isRecordingSheetPresented: Bool = false
+        var isSettingsSheetPresented: Bool = false
+        var isImportSheetPresented: Bool = false
+
+        init() {
+            let hasSeenOnboarding_v2 = UserDefaults.standard.bool(forKey: "hasSeenOnboarding_v2")
+            if !hasSeenOnboarding_v2 {
+                self.onboarding = OnboardingFeature.State()
+            }
         }
 
         static func == (lhs: State, rhs: State) -> Bool {
-            lhs.selectedTab == rhs.selectedTab &&
             lhs.player == rhs.player &&
             lhs.home == rhs.home &&
             lhs.filesPath == rhs.filesPath &&
-            lhs.recording == rhs.recording
-            // Intentionally ignore:
-            // - `filesRoot`: can be large and changes frequently while browsing.
-            // - `settings`: persists via UserDefaults and doesn't need to drive app-level equality.
+            lhs.onboarding == rhs.onboarding &&
+            lhs.recording == rhs.recording &&
+            lhs.isRecordingSheetPresented == rhs.isRecordingSheetPresented &&
+            lhs.isSettingsSheetPresented == rhs.isSettingsSheetPresented &&
+            lhs.isImportSheetPresented == rhs.isImportSheetPresented
         }
     }
 
     enum Action {
-        case selectTab(Tab)
         case player(PlayerFeature.Action)
         case home(HomeFeature.Action)
 
-        // Files Actions
-        case filesPath(StackAction<FilesFeature.State, FilesFeature.Action>)
-        case filesRoot(FilesFeature.Action)
+        // File browser
+        case filesPath(StackAction<CollectionsFeature.State, CollectionsFeature.Action>)
+        case filesRoot(CollectionsFeature.Action)
 
         case settings(SettingsFeature.Action)
         case recording(RecordingFeature.Action)
+        case onboarding(OnboardingFeature.Action)
 
-        // Refresh logic
-        case checkAndRefreshSuggestions
+        // Sheets
+        case recordButtonTapped
+        case dismissRecordingSheet
+        case settingsTapped
+        case dismissSettings
+        case importFiles([URL])
+        case dismissImportSheet
+        case openedFromFiles(URL)
+
+        // Quick Actions
+        case quickActionRecord
+        case quickActionImport
 
         // Lifecycle
         case scenePhaseChanged(ScenePhase)
     }
 
-    enum Tab: Hashable {
-        case home
-        case files
-        case sharing
-        case settings
-    }
+    @Dependency(\.fileManager) var fileManager
 
     var body: some ReducerOf<Self> {
         Scope(state: \.player, action: \.player) {
             PlayerFeature()
         }
-        
+
         Scope(state: \.home, action: \.home) {
             HomeFeature()
         }
 
         Scope(state: \.filesRoot, action: \.filesRoot) {
-            FilesFeature()
+            CollectionsFeature()
         }
 
         Scope(state: \.settings, action: \.settings) {
@@ -84,46 +98,97 @@ struct AppFeature {
 
         Reduce { state, action in
             switch action {
-            case let .selectTab(tab):
-                state.selectedTab = state.isTabAvailable(tab) ? tab : .home
+
+            // MARK: - Onboarding
+
+            case .onboarding(.getStartedTapped):
+                UserDefaults.standard.set(true, forKey: "hasSeenOnboarding_v2")
+                state.onboarding = nil
                 return .none
-                
-            // Home Actions
-            case .home(.libraryTapped):
-                state.selectedTab = state.isTabAvailable(.files) ? .files : .home
+
+            case let .onboarding(onboardingAction):
+                guard var onboardingState = state.onboarding else { return .none }
+                let onboardingReducer = OnboardingFeature()
+                _ = onboardingReducer.reduce(into: &onboardingState, action: onboardingAction)
+                state.onboarding = onboardingState
                 return .none
-                
-            case let .home(.folderTapped(folder)):
-                state.navigateToFolderInLibrary(folder.url)
-                return .none
-                
+
+            // MARK: - Home Actions
+
             case let .home(.playTrack(track)):
-                if state.player.currentTrack?.id == track.id {
-                    return .send(.player(.playPauseButtonTapped))
-                } else {
+                state.player.isExpanded = true
+                if state.player.currentTrack?.id != track.id {
                     return .send(.player(.loadTrack(track, [track], .singleFile)))
                 }
-                
-            // Handle Root Folder Navigation
-            case let .filesRoot(.folderTapped(folder)):
-                state.filesPath.append(FilesFeature.State(currentDirectory: folder.url))
                 return .none
-                
+
+            case .home(.togglePlayPause):
+                return .send(.player(.playPauseButtonTapped))
+
+            case let .home(.fileTapped(file)):
+                let queue = state.home.recentFiles
+                return .send(.player(.loadTrack(file, queue, .singleFile)))
+
+            case .home(.viewAllCollectionsTapped):
+                state.filesPath.append(CollectionsFeature.State(currentDirectory: nil))
+                return .none
+
+            case let .home(.renameRecentFile(file)):
+                return .send(.filesRoot(.renameItemTapped(.file(file))))
+
+            case let .home(.deleteRecentFile(file)):
+                state.filesRoot.selectedItems = [.file(file)]
+                return .send(.filesRoot(.deleteSelectedTapped))
+
+            case let .home(.editRecentFile(file)):
+                state.filesRoot.editAudio = EditRecordingFeature.State(recording: file)
+                return .none
+
+            case let .home(.moveRecentFile(file)):
+                state.filesRoot.itemsToMove = [.file(file)]
+                state.filesRoot.isShowingCollectionPicker = true
+                return .none
+
+            // Refresh home after edit view dismissal (so recent files reflect any saved changes)
+            case .filesRoot(.editAudio(.dismiss)):
+                return .merge(
+                    .send(.filesRoot(.refreshFiles)),
+                    .send(.home(.loadRecentFiles))
+                )
+
+            case .home(.importTapped):
+                state.isImportSheetPresented = true
+                return .none
+
+            case .home(.newCollectionTapped):
+                return .send(.filesRoot(.createCollectionTapped))
+
+            // MARK: - File Browser
+
+            case let .filesRoot(.collectionTapped(folder)):
+                state.filesPath.append(CollectionsFeature.State(currentDirectory: folder.url))
+                return .none
+
             case let .filesRoot(.fileTapped(file)):
-                // Create playlist from root items
                 let playlist = state.filesRoot.items.compactMap { item -> AudioFile? in
                     if case let .file(audioFile) = item { return audioFile }
                     return nil
                 }
                 return .send(.player(.loadTrack(file, playlist, .singleFile)))
 
-            // Handle Stack Navigation
-            case let .filesPath(.element(id: _, action: .folderTapped(folder))):
-                state.filesPath.append(FilesFeature.State(currentDirectory: folder.url))
+            case .filesRoot(.playAllTapped):
+                let playlist = state.filesRoot.items.compactMap { item -> AudioFile? in
+                    if case let .file(audioFile) = item { return audioFile }
+                    return nil
+                }
+                guard let first = playlist.first else { return .none }
+                return .send(.player(.loadTrack(first, playlist, .singleFile)))
+
+            case let .filesPath(.element(id: _, action: .collectionTapped(folder))):
+                state.filesPath.append(CollectionsFeature.State(currentDirectory: folder.url))
                 return .none
 
             case let .filesPath(.element(id: id, action: .fileTapped(file))):
-                // Create playlist from current folder items
                 if let filesState = state.filesPath[id: id] {
                     let playlist = filesState.items.compactMap { item -> AudioFile? in
                         if case let .file(audioFile) = item { return audioFile }
@@ -134,58 +199,193 @@ struct AppFeature {
                     return .send(.player(.loadTrack(file, playlist, source)))
                 }
                 return .none
-                
-            case .scenePhaseChanged:
-                // Forward scene phase to player for persistence
-                return .send(.player(.scenePhaseChanged))
-                
+
+            case let .filesPath(.element(id: id, action: .playAllTapped)):
+                if let filesState = state.filesPath[id: id] {
+                    let playlist = filesState.items.compactMap { item -> AudioFile? in
+                        if case let .file(audioFile) = item { return audioFile }
+                        return nil
+                    }
+                    guard let first = playlist.first else { return .none }
+                    let folderURL = filesState.currentDirectory
+                    let source: PlaylistSource? = folderURL.map { .folder($0) }
+                    return .send(.player(.loadTrack(first, playlist, source)))
+                }
+                return .none
+
+            // MARK: - Sheets
+
+            case .recordButtonTapped:
+                var effects: [Effect<Action>] = []
+                if state.player.isPlaying {
+                    effects.append(.send(.player(.playPauseButtonTapped)))
+                }
+                state.isRecordingSheetPresented = true
+                return effects.isEmpty ? .none : .merge(effects)
+
+            case .dismissRecordingSheet:
+                state.isRecordingSheetPresented = false
+                // Clean up any in-progress/unsaved recording
+                if state.recording.currentRecordingURL != nil {
+                    return .merge(
+                        .send(.recording(.discardRecording)),
+                        .send(.filesRoot(.refreshFiles)),
+                        .send(.home(.loadRecentFiles))
+                    )
+                }
+                return .merge(
+                    .send(.filesRoot(.refreshFiles)),
+                    .send(.home(.loadRecentFiles))
+                )
+
+            case .settingsTapped:
+                state.isSettingsSheetPresented = true
+                return .none
+
+            case .dismissSettings:
+                state.isSettingsSheetPresented = false
+                return .none
+
+            case .recording(.recordingSaved):
+                // Only dismiss if edit view is NOT being shown
+                if state.recording.editRecording == nil {
+                    state.isRecordingSheetPresented = false
+                }
+                return .merge(
+                    .send(.filesRoot(.refreshFiles)),
+                    .send(.home(.loadRecentFiles))
+                )
+
+            case .recording(.discardRecording):
+                state.isRecordingSheetPresented = false
+                return .none
+
+            case let .importFiles(urls):
+                state.isImportSheetPresented = false
+                return .merge(
+                    .send(.filesRoot(.importFiles(urls))),
+                    .send(.home(.loadRecentFiles))
+                )
+
+            case .dismissImportSheet:
+                state.isImportSheetPresented = false
+                return .none
+
+            case let .openedFromFiles(url):
+                // Import the file then play it
+                return .run { send in
+                    let accessing = url.startAccessingSecurityScopedResource()
+                    defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+
+                    // Import to Documents
+                    let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+                    let dest = docs.appendingPathComponent(url.lastPathComponent)
+                    if !FileManager.default.fileExists(atPath: dest.path) {
+                        try? FileManager.default.copyItem(at: url, to: dest)
+                    }
+
+                    await send(.filesRoot(.refreshFiles))
+
+                    // Load metadata and play
+                    if let file = try? await fileManager.getMetadata(dest) {
+                        await send(.player(.loadTrack(file, [file], .singleFile)))
+                    }
+                }
+
+            // MARK: - Quick Actions
+
+            case .quickActionRecord:
+                state.isRecordingSheetPresented = true
+                return .none
+
+            case .quickActionImport:
+                state.isImportSheetPresented = true
+                return .none
+
+            // MARK: - Settings → Player
+
             case let .settings(.setDefaultSkipDuration(duration)):
                 return .send(.player(.setSkipDuration(duration)))
 
             case let .settings(.setDefaultPlaybackSpeed(speed)):
                 return .send(.player(.setPlaybackSpeed(speed)))
 
-            case .settings(.toggleRecordingMode):
-                // When switching modes, always stop and clear the player (PlayerView + MiniPlayer).
-                state.ensureValidTabForCurrentMode()
-                return .send(.player(.clearSession))
+            // MARK: - Player Events
 
             case .player(.trackLoaded), .player(.sessionLoaded):
                 state.home.lastPlayedTrack = state.player.currentTrack
                 state.home.isPlaying = state.player.isPlaying
                 state.home.playbackProgress = state.player.progress
-                return .send(.checkAndRefreshSuggestions)
-
-            case .checkAndRefreshSuggestions:
-                // Check if playing from a suggested folder
-                if let playlistSource = state.player.currentPlaylistSource,
-                   case let .folder(folderURL) = playlistSource {
-                    // Standardize URLs for comparison
-                    let standardizedFolderURL = folderURL.standardizedFileURL
-                    let isInSuggestions = state.home.suggestedFolders.contains {
-                        $0.url.standardizedFileURL == standardizedFolderURL
-                    }
-                    if isInSuggestions {
-                        return .send(.home(.refreshSuggestions(excludingFolderURL: folderURL)))
-                    }
-                }
                 return .none
 
             case .player(.playPauseButtonTapped):
-                // This action flips the boolean in PlayerFeature immediately (optimistic UI)
-                // We should reflect that in Home
                 state.home.isPlaying = state.player.isPlaying
                 return .none
 
             case .player(.timeUpdate):
-                // Update playback progress for home view
                 state.home.playbackProgress = state.player.progress
                 return .none
-                
-            case .player(.clearSession): // New: Reset UpNext if player session clears
+
+            case .player(.clearSession):
                 state.home.lastPlayedTrack = nil
                 state.home.isPlaying = false
                 state.home.playbackProgress = 0
+                return .none
+
+            // Dismiss recording sheet when edit view closes
+            case .recording(.editRecording(.dismiss)):
+                state.isRecordingSheetPresented = false
+                return .merge(
+                    .send(.filesRoot(.refreshFiles)),
+                    .send(.home(.loadRecentFiles))
+                )
+
+            // MARK: - Lifecycle
+
+            case let .scenePhaseChanged(phase):
+                return .send(.player(.scenePhaseChanged(phase)))
+
+            // Clear player if the currently playing track (or its parent) is being moved
+            case .filesRoot(.moveToDestination):
+                if let currentTrack = state.player.currentTrack {
+                    let trackPath = currentTrack.url.path
+                    let isAffected = state.filesRoot.itemsToMove.contains { item in
+                        item.url == currentTrack.url || trackPath.hasPrefix(item.url.path + "/")
+                    }
+                    if isAffected {
+                        return .send(.player(.clearSession))
+                    }
+                }
+                return .none
+
+            // After files are reloaded (after any mutation), refresh home recent files too
+            case .filesRoot(.itemsLoaded):
+                return .send(.home(.loadRecentFiles))
+
+            // Clear player if currently playing track is deleted (file or parent folder)
+            case .filesRoot(.alert(.presented(.confirmDelete))):
+                if let currentTrack = state.player.currentTrack {
+                    let trackPath = currentTrack.url.path
+                    let shouldClear = state.filesRoot.selectedItems.contains { item in
+                        item.url == currentTrack.url || trackPath.hasPrefix(item.url.path + "/")
+                    }
+                    if shouldClear {
+                        return .send(.player(.clearSession))
+                    }
+                }
+                return .none
+
+            case let .filesPath(.element(id: id, action: .alert(.presented(.confirmDelete)))):
+                if let currentTrack = state.player.currentTrack,
+                   let filesState = state.filesPath[id: id] {
+                    let trackPath = currentTrack.url.path
+                    let shouldClear = filesState.selectedItems.contains { item in
+                        item.url == currentTrack.url || trackPath.hasPrefix(item.url.path + "/")
+                    }
+                    if shouldClear {
+                        return .send(.player(.clearSession))
+                    }
+                }
                 return .none
 
             case .player, .home, .filesRoot, .filesPath, .settings, .recording:
@@ -193,33 +393,7 @@ struct AppFeature {
             }
         }
         .forEach(\.filesPath, action: \.filesPath) {
-            FilesFeature()
+            CollectionsFeature()
         }
-    }
-}
-
-private extension AppFeature.State {
-    func isTabAvailable(_ tab: AppFeature.Tab) -> Bool {
-        guard isRecordingMode else { return true }
-        return tab != .files && tab != .sharing
-    }
-
-    mutating func ensureValidTabForCurrentMode() {
-        if !isTabAvailable(selectedTab) {
-            selectedTab = .home
-        }
-        if isRecordingMode {
-            filesPath.removeAll()
-        }
-    }
-
-    mutating func navigateToFolderInLibrary(_ folderURL: URL) {
-        guard isTabAvailable(.files) else {
-            selectedTab = .home
-            return
-        }
-        selectedTab = .files
-        filesPath.removeAll()
-        filesPath.append(FilesFeature.State(currentDirectory: folderURL))
     }
 }

@@ -4,358 +4,349 @@ import SwiftUI
 struct EditRecordingView: View {
     @Bindable var store: StoreOf<EditRecordingFeature>
     @Environment(\.dismiss) var dismiss
+    @State private var isRenaming = false
+    @State private var renameText = ""
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                // Top bar
-                topBar
+                VStack(spacing: 0) {
+                    Spacer()
 
-                Spacer()
-
-                // Waveform with trim handles
-                if store.isTrimming {
-                    trimWaveformView
+                    // Waveform
+                    waveformArea
                         .padding(.horizontal, 20)
-                } else {
-                    playbackWaveformView
-                        .padding(.horizontal, 20)
+
+                    // Time
+                    Text(formatTime(store.currentTime))
+                        .font(.system(size: 44, weight: .light, design: .rounded))
+                        .foregroundColor(.white)
+                        .monospacedDigit()
+                        .padding(.top, 32)
+                        .padding(.bottom, 24)
+
+                    // Playback controls
+                    playbackControls
+                        .padding(.bottom, 16)
+
+                    Spacer()
                 }
 
-                Spacer()
-
-                // Current time
-                Text(formatTime(store.currentTime))
-                    .font(.system(size: 56, weight: .light, design: .rounded))
-                    .foregroundColor(.white)
-                    .monospacedDigit()
-                    .padding(.vertical, 40)
-
-                // Playback controls
-                playbackControls
-                    .padding(.bottom, 40)
-
-                // Bottom buttons
-                bottomButtons
-                    .padding(.bottom, 40)
+                // Trimming overlay
+                if store.isTrimming_InProgress {
+                    Color.black.opacity(0.7).ignoresSafeArea()
+                    VStack(spacing: 20) {
+                        ProgressView().scaleEffect(1.5).tint(.white)
+                        Text("Trimming audio...").font(.headline).foregroundColor(.white)
+                    }
+                }
             }
-
-            // Trimming overlay
-            if store.isTrimming_InProgress {
-                Color.black.opacity(0.7)
-                    .ignoresSafeArea()
-
-                VStack(spacing: 20) {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .tint(.white)
-
-                    Text("Trimming audio...")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        store.send(.discardChanges)
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.body).fontWeight(.semibold)
+                            .foregroundColor(.white)
+                    }
+                }
+                ToolbarItem(placement: .principal) {
+                    Text(store.recording.title)
                         .font(.headline)
                         .foregroundColor(.white)
+                        .lineLimit(1)
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if store.isTrimming {
+                        HStack(spacing: 12) {
+                            // Apply trim (keep selected range)
+                            Button {
+                                store.send(.applyTrim)
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "scissors")
+                                        .font(.caption)
+                                    Text("Trim")
+                                        .font(.subheadline).fontWeight(.semibold)
+                                }
+                                .foregroundColor(.sonicPrimary)
+                            }
+                            .disabled(store.isTrimming_InProgress)
+
+                            // Cancel trim
+                            Button {
+                                store.send(.cancelTrim)
+                            } label: {
+                                Text("Cancel")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+
+                            // Delete selected range
+                            Button {
+                                store.send(.deleteRangeTapped)
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "trash")
+                                        .font(.caption)
+                                    Text("Delete")
+                                        .font(.subheadline)
+                                }
+                                .foregroundColor(.red)
+                            }
+                            .disabled(store.isTrimming_InProgress)
+                        }
+                    } else {
+                        HStack(spacing: 16) {
+                            overflowMenu
+
+                            Button {
+                                store.send(.saveChanges)
+                                dismiss()
+                            } label: {
+                                Image(systemName: "checkmark")
+                                    .font(.body).fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .frame(width: 32, height: 32)
+                                    .background(Circle().fill(Color.sonicPrimary))
+                            }
+                            .disabled(!store.hasEdits)
+                            .opacity(store.hasEdits ? 1.0 : 0.4)
+                        }
+                    }
                 }
             }
         }
-        .navigationBarHidden(true)
-        .alert("Trim Failed", isPresented: Binding(
+        .alert("Action Failed", isPresented: Binding(
             get: { store.trimError != nil },
             set: { if !$0 { store.send(.cancelTrim) } }
         )) {
-            Button("OK", role: .cancel) {
-                store.send(.cancelTrim)
-            }
+            Button("OK", role: .cancel) { store.send(.cancelTrim) }
         } message: {
-            if let error = store.trimError {
-                Text(error)
+            if let error = store.trimError { Text(error) }
+        }
+        .alert("Rename", isPresented: $isRenaming) {
+            TextField("Name", text: $renameText)
+            Button("Save") {
+                let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty { store.send(.renameTapped(trimmed)) }
             }
+            Button("Cancel", role: .cancel) {}
         }
-        .onAppear {
-            store.send(.onAppear)
-        }
+        .interactiveDismissDisabled()
+        .onAppear { store.send(.onAppear) }
     }
 
-    private var topBar: some View {
-        HStack {
-            if store.isTrimming {
-                Button("Cancel") {
-                    store.send(.cancelTrim)
-                }
-                .font(.headline)
-                .foregroundColor(.white)
+    // MARK: - Overflow Menu (⋯)
 
-                Spacer()
-
-                Text("Trim")
-                    .font(.headline)
-                    .foregroundColor(.white)
-
-                Spacer()
-
-                Button("Apply") {
-                    store.send(.applyTrim)
-                }
-                .font(.headline)
-                .foregroundColor(.white)
-                .disabled(store.isTrimming_InProgress)
-            } else {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.title3)
-                        .foregroundColor(.white)
-                }
-
-                Spacer()
-
-                Text(store.recording.title)
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-
-                Spacer()
-
-                Color.clear.frame(width: 44)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-    }
-
-    private var playbackWaveformView: some View {
-        VStack(spacing: 20) {
-            // Simplified waveform (placeholder)
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(height: 100)
-
-                // Playback position indicator
-                GeometryReader { geometry in
-                    let progress = store.recording.duration > 0 ? store.currentTime / store.recording.duration : 0
-                    Rectangle()
-                        .fill(Color.blue)
-                        .frame(width: 2)
-                        .offset(x: geometry.size.width * CGFloat(progress))
-                }
-            }
-            .frame(height: 100)
-
-            // Timeline
-            HStack {
-                Text(formatTime(0))
-                    .font(.caption)
-                    .foregroundColor(.gray)
-
-                Spacer()
-
-                Text(formatTime(store.recording.duration))
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
-        }
-    }
-
-    private var trimWaveformView: some View {
-        VStack(spacing: 20) {
-            // Waveform with trim region
-            ZStack {
-                // Full waveform (grayed out)
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(height: 100)
-
-                // Trim region overlay
-                GeometryReader { geometry in
-                    let totalWidth = geometry.size.width
-                    let startX = CGFloat(store.trimStart / store.recording.duration) * totalWidth
-                    let endX = CGFloat(store.trimEnd / store.recording.duration) * totalWidth
-                    let trimWidth = endX - startX
-
-                    // Highlighted trim region
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.yellow.opacity(0.6))
-                        .frame(width: max(0, trimWidth), height: 100)
-                        .offset(x: startX)
-
-                    // Left handle
-                    TrimHandle(isLeft: true)
-                        .offset(x: startX - 15)
-                        .gesture(
-                            DragGesture()
-                                .onChanged { value in
-                                    let newStart = (value.location.x / totalWidth) * store.recording.duration
-                                    store.send(.trimStartChanged(max(0, min(newStart, store.trimEnd - 1))))
-                                }
-                        )
-
-                    // Right handle
-                    TrimHandle(isLeft: false)
-                        .offset(x: endX - 15)
-                        .gesture(
-                            DragGesture()
-                                .onChanged { value in
-                                    let newEnd = (value.location.x / totalWidth) * store.recording.duration
-                                    store.send(.trimEndChanged(max(store.trimStart + 1, min(newEnd, store.recording.duration))))
-                                }
-                        )
-
-                    // Playback position
-                    Rectangle()
-                        .fill(Color.blue)
-                        .frame(width: 2)
-                        .offset(x: CGFloat(store.currentTime / store.recording.duration) * totalWidth)
-                }
-            }
-            .frame(height: 100)
-
-            // Timeline
-            HStack {
-                Text(formatTime(store.trimStart))
-                    .font(.caption)
-                    .foregroundColor(.white)
-
-                Spacer()
-
-                Text(formatTime(store.trimEnd))
-                    .font(.caption)
-                    .foregroundColor(.white)
-            }
-
-            // Duration display
-            Text("Duration: \(formatTime(store.trimEnd - store.trimStart))")
-                .font(.subheadline)
-                .foregroundColor(.gray)
-        }
-    }
-
-    private var playbackControls: some View {
-        HStack(spacing: 60) {
-            // Skip backward
+    private var overflowMenu: some View {
+        Menu {
             Button {
-                store.send(.skipBackward)
+                renameText = store.recording.title
+                isRenaming = true
             } label: {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.1))
-                        .frame(width: 60, height: 60)
-
-                    Image(systemName: "gobackward.15")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                }
+                Label("Rename", systemImage: "pencil")
             }
 
-            // Play/Pause
-            Button {
-                store.send(.playPauseTapped)
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 80, height: 80)
-                        .shadow(color: Color.white.opacity(0.3), radius: 10, x: 0, y: 5)
-
-                    Image(systemName: store.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.title)
-                        .foregroundColor(.black)
-                        .offset(x: store.isPlaying ? 0 : 3)
-                }
-            }
-
-            // Skip forward
-            Button {
-                store.send(.skipForward)
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.1))
-                        .frame(width: 60, height: 60)
-
-                    Image(systemName: "goforward.15")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                }
-            }
-        }
-    }
-
-    private var bottomButtons: some View {
-        HStack(spacing: 40) {
-            // Trim button
             Button {
                 store.send(.trimTapped)
             } label: {
-                Text("Trim")
-                    .font(.headline)
-                    .foregroundColor(.black)
-                    .frame(width: 140, height: 50)
-                    .background(
-                        RoundedRectangle(cornerRadius: 25)
-                            .fill(Color.yellow)
-                    )
+                Label("Select & Trim", systemImage: "scissors")
             }
-            .opacity(store.isTrimming ? 0.5 : 1)
-            .disabled(store.isTrimming)
-
-            // Delete button
-            Button {
-                store.send(.deleteRangeTapped)
-            } label: {
-                Text("Delete")
-                    .font(.headline)
-                    .foregroundColor(.black)
-                    .frame(width: 140, height: 50)
-                    .background(
-                        RoundedRectangle(cornerRadius: 25)
-                            .fill(Color.yellow)
-                    )
-            }
-            .opacity(store.isTrimming ? 1 : 0.5)
-            .disabled(!store.isTrimming || store.isTrimming_InProgress)
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.title3)
+                .foregroundColor(.white)
         }
     }
+
+    // MARK: - Waveform
+
+    private var waveformArea: some View {
+        VStack(spacing: 8) {
+            ZStack {
+                if store.isTrimming {
+                    trimWaveform
+                } else {
+                    playbackWaveform
+                }
+            }
+            .frame(height: 120)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            // Timeline
+            HStack {
+                Text(formatTime(store.isTrimming ? store.trimStart : 0))
+                    .font(.caption2).monospacedDigit()
+                    .foregroundColor(.gray)
+                Spacer()
+                if store.isTrimming {
+                    Text("Duration: \(formatTime(store.trimEnd - store.trimStart))")
+                        .font(.caption2)
+                        .foregroundColor(.sonicPrimary)
+                }
+                Spacer()
+                Text(formatTime(store.isTrimming ? store.trimEnd : store.recording.duration))
+                    .font(.caption2).monospacedDigit()
+                    .foregroundColor(.gray)
+            }
+        }
+    }
+
+    private var playbackWaveform: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.06))
+
+            // Waveform bars
+            HStack(spacing: 2) {
+                ForEach(0..<40, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(Color.sonicPrimary.opacity(0.35))
+                        .frame(width: 3, height: CGFloat.random(in: 10...60))
+                }
+            }
+
+            // Playback position
+            GeometryReader { geo in
+                let progress = store.recording.duration > 0 ? store.currentTime / store.recording.duration : 0
+                Rectangle()
+                    .fill(Color.sonicPrimary)
+                    .frame(width: 2)
+                    .offset(x: geo.size.width * CGFloat(progress))
+            }
+
+            // Scrub gesture
+            GeometryReader { geo in
+                Color.clear.contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                let progress = min(max(0, value.location.x / geo.size.width), 1)
+                                let time = progress * store.recording.duration
+                                store.send(.playbackTimeUpdated(time))
+                            }
+                    )
+            }
+        }
+    }
+
+    private var trimWaveform: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.06))
+
+            GeometryReader { geo in
+                let totalWidth = geo.size.width
+                let startX = CGFloat(store.trimStart / store.recording.duration) * totalWidth
+                let endX = CGFloat(store.trimEnd / store.recording.duration) * totalWidth
+
+                // Dimmed areas
+                Rectangle()
+                    .fill(Color.black.opacity(0.5))
+                    .frame(width: startX)
+
+                Rectangle()
+                    .fill(Color.black.opacity(0.5))
+                    .frame(width: totalWidth - endX)
+                    .offset(x: endX)
+
+                // Selected region
+                Rectangle()
+                    .fill(Color.yellow.opacity(0.15))
+                    .frame(width: max(0, endX - startX))
+                    .offset(x: startX)
+
+                // Waveform bars
+                HStack(spacing: 2) {
+                    ForEach(0..<40, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Color.sonicPrimary.opacity(0.35))
+                            .frame(width: 3, height: CGFloat.random(in: 10...60))
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                // Left handle
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.yellow)
+                    .frame(width: 4, height: 120)
+                    .offset(x: startX - 2)
+                    .gesture(
+                        DragGesture()
+                            .onChanged { value in
+                                let newStart = (value.location.x / totalWidth) * store.recording.duration
+                                store.send(.trimStartChanged(max(0, min(newStart, store.trimEnd - 1))))
+                            }
+                    )
+
+                // Right handle
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.yellow)
+                    .frame(width: 4, height: 120)
+                    .offset(x: endX - 2)
+                    .gesture(
+                        DragGesture()
+                            .onChanged { value in
+                                let newEnd = (value.location.x / totalWidth) * store.recording.duration
+                                store.send(.trimEndChanged(max(store.trimStart + 1, min(newEnd, store.recording.duration))))
+                            }
+                    )
+
+                // Playback position
+                Rectangle()
+                    .fill(Color.white)
+                    .frame(width: 2)
+                    .offset(x: CGFloat(store.currentTime / store.recording.duration) * totalWidth)
+            }
+        }
+    }
+
+    // MARK: - Playback Controls
+
+    private var playbackControls: some View {
+        HStack(spacing: 48) {
+            Button { store.send(.skipBackward) } label: {
+                Image(systemName: "gobackward.15")
+                    .font(.title2)
+                    .foregroundColor(.white.opacity(0.7))
+                    .frame(width: 52, height: 52)
+            }
+
+            Button { store.send(.playPauseTapped) } label: {
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 72, height: 72)
+                        .shadow(color: .white.opacity(0.2), radius: 12, x: 0, y: 4)
+
+                    Image(systemName: store.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.title2)
+                        .foregroundColor(.black)
+                        .offset(x: store.isPlaying ? 0 : 2)
+                }
+            }
+
+            Button { store.send(.skipForward) } label: {
+                Image(systemName: "goforward.15")
+                    .font(.title2)
+                    .foregroundColor(.white.opacity(0.7))
+                    .frame(width: 52, height: 52)
+            }
+        }
+    }
+
+    // MARK: - Helpers
 
     private func formatTime(_ time: TimeInterval) -> String {
         let hours = Int(time) / 3600
         let minutes = Int(time) / 60 % 60
         let seconds = Int(time) % 60
         let centiseconds = Int((time.truncatingRemainder(dividingBy: 1)) * 100)
-
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
-        } else {
-            return String(format: "%02d:%02d.%02d", minutes, seconds, centiseconds)
-        }
-    }
-}
-
-// MARK: - Trim Handle
-
-struct TrimHandle: View {
-    let isLeft: Bool
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 4)
-                .fill(Color.yellow)
-                .frame(width: 30, height: 100)
-
-            // Grip lines
-            VStack(spacing: 4) {
-                ForEach(0..<3, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 1)
-                        .fill(Color.black.opacity(0.3))
-                        .frame(width: 2, height: 20)
-                }
-            }
-
-            // Arrow indicator
-            Image(systemName: isLeft ? "chevron.left" : "chevron.right")
-                .font(.caption)
-                .foregroundColor(.black.opacity(0.5))
-        }
+        return String(format: "%02d:%02d:%02d.%02d", hours, minutes, seconds, centiseconds)
     }
 }

@@ -19,6 +19,10 @@
 				<string>public.aac-audio</string>
 				<string>org.xiph.flac</string>
 				<string>public.aiff-audio</string>
+				<string>com.apple.m4a-audio</string>
+				<string>com.apple.protected-mpeg-4-audio</string>
+				<string>org.xiph.ogg</string>
+				<string>org.xiph.opus</string>
 				<string>public.audio</string>
 			</array>
 		</dict>
@@ -34,13 +38,13 @@
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.1.2</string>
+	<string>2.2.0</string>
 	<key>CFBundleVersion</key>
-	<string>10</string>
+	<string>20</string>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>SonicPlayer uses the microphone only when Recording Mode is enabled to record audio.</string>
+	<string>Sonic Player uses the microphone only when Recording Mode is enabled to record audio.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
@@ -62,6 +66,25 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+	</array>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.hasan.sonicplayer.record</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Record</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>mic.fill</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.hasan.sonicplayer.import</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Import Media</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>square.and.arrow.down</string>
+		</dict>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>

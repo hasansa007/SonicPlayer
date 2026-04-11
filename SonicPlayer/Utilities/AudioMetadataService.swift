@@ -68,13 +68,15 @@ struct AudioMetadataService {
             return nil
         }
 
-        let audioExtensions = ["mp3", "m4a", "wav", "aac", "flac", "opus", "ogg"]
+        let audioExtensions = ["mp3", "m4a", "wav", "aac", "flac", "aiff", "m4b", "mp4", "opus", "ogg"]
 
-        for case let fileURL as URL in enumerator {
+        let fileURLs = enumerator.allObjects.compactMap { $0 as? URL }
+
+        for fileURL in fileURLs {
             let fileExtension = fileURL.pathExtension.lowercased()
 
             if audioExtensions.contains(fileExtension) {
-                if let artwork = await extractArtwork(from: fileURL) { // Await the async call
+                if let artwork = await extractArtwork(from: fileURL) {
                     return artwork
                 }
             }

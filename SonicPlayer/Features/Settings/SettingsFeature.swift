@@ -39,15 +39,6 @@ extension UserDefaults {
             set(newValue.rawValue, forKey: "colorScheme")
         }
     }
-
-    var savedRecordingMode: Bool {
-        get {
-            return bool(forKey: "isRecordingMode")
-        }
-        set {
-            set(newValue, forKey: "isRecordingMode")
-        }
-    }
 }
 
 @Reducer
@@ -57,7 +48,6 @@ struct SettingsFeature {
         var defaultPlaybackSpeed: PlaybackSpeed
         var defaultSkipDuration: SkipDuration
         var colorScheme: AppColorScheme
-        var isRecordingMode: Bool
         var showAbout = false
         var showHelp = false
 
@@ -65,7 +55,6 @@ struct SettingsFeature {
             self.defaultPlaybackSpeed = UserDefaults.standard.savedPlaybackSpeed
             self.defaultSkipDuration = UserDefaults.standard.savedSkipDuration
             self.colorScheme = UserDefaults.standard.savedColorScheme
-            self.isRecordingMode = UserDefaults.standard.savedRecordingMode
         }
     }
 
@@ -73,7 +62,6 @@ struct SettingsFeature {
         case setDefaultPlaybackSpeed(PlaybackSpeed)
         case setDefaultSkipDuration(SkipDuration)
         case setColorScheme(AppColorScheme)
-        case toggleRecordingMode
         case showAboutTapped
         case showHelpTapped
         case requestFeatureTapped
@@ -99,11 +87,6 @@ struct SettingsFeature {
                 UserDefaults.standard.savedColorScheme = scheme
                 return .none
 
-            case .toggleRecordingMode:
-                state.isRecordingMode.toggle()
-                UserDefaults.standard.savedRecordingMode = state.isRecordingMode
-                return .none
-
             case .showAboutTapped:
                 state.showAbout = true
                 return .none
@@ -111,10 +94,8 @@ struct SettingsFeature {
             case .showHelpTapped:
                 state.showHelp = true
                 return .none
-                
+
             case .requestFeatureTapped:
-                // Placeholder for feature request logic (e.g., mailto)
-                // TODO: Replace 'support@sonicplayer.app' with your actual support email
                 if let url = URL(string: "mailto:hasansa007@gmail.com?subject=Feature%20Request") {
                     UIApplication.shared.open(url)
                 }

@@ -2,7 +2,7 @@ import ComposableArchitecture
 import Foundation
 
 @Reducer
-struct FilesFeature {
+struct CollectionsFeature {
     @ObservableState
     struct State: Equatable, Identifiable {
         var id: URL? { currentDirectory }
@@ -10,9 +10,8 @@ struct FilesFeature {
         var items: [FileSystemItem] = []
         
         // Child States
-        var folderCards: IdentifiedArrayOf<FolderCardFeature.State> = []
+        var collectionCards: IdentifiedArrayOf<CollectionItemCardFeature.State> = []
         var fileRows: IdentifiedArrayOf<FileRowFeature.State> = []
-        var folderPicker: IdentifiedArrayOf<FolderPickerFeature.State> = []
 
         var isLoading = false
         var searchText = ""
@@ -22,28 +21,19 @@ struct FilesFeature {
         @Presents var editAudio: EditRecordingFeature.State?
 
         // Input State
-        var isCreatingFolder = false
+        var isCreatingCollection = false
         var renamingItem: FileSystemItem?
         var inputText = ""
 
         // Move State
         var itemsToMove: Set<FileSystemItem> = []
-        var availableFolders: [Folder] = []
-        var isShowingFolderPicker = false
+        var isShowingCollectionPicker = false
+        var availableCollections: [CollectionItem] = []
         
-        var sortOption: SortOption = .name
         var documentsDirectoryURL: URL?
 
         var filteredItems: [FileSystemItem] {
-            let sortedItems: [FileSystemItem]
-            switch sortOption {
-            case .name:
-                sortedItems = items.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-            case .date:
-                sortedItems = items.sorted { $0.date > $1.date }
-            case .size:
-                sortedItems = items.sorted { $0.size > $1.size }
-            }
+            let sortedItems: [FileSystemItem] = items
             
             if searchText.isEmpty {
                 return sortedItems
@@ -53,12 +43,12 @@ struct FilesFeature {
             }
         }
         
-        var filteredFolderCards: IdentifiedArrayOf<FolderCardFeature.State> {
+        var filteredCollectionCards: IdentifiedArrayOf<CollectionItemCardFeature.State> {
             let filteredIDs = Set(filteredItems.compactMap { item -> String? in
                 if case let .folder(f) = item { return f.id.absoluteString }
                 return nil
             })
-            return folderCards.filter { filteredIDs.contains($0.id.absoluteString) }
+            return collectionCards.filter { filteredIDs.contains($0.id.absoluteString) }
         }
         
         var filteredFileRows: IdentifiedArrayOf<FileRowFeature.State> {
@@ -69,12 +59,6 @@ struct FilesFeature {
             return fileRows.filter { filteredIDs.contains($0.id) }
         }
     }
-    
-    enum SortOption: String, CaseIterable, Equatable {
-        case name
-        case date
-        case size
-    }
 
     enum Action {
         case onAppear
@@ -82,14 +66,12 @@ struct FilesFeature {
         case itemsLoaded([FileSystemItem])
         case loadFailed
         
-        case folderCards(IdentifiedActionOf<FolderCardFeature>)
+        case collectionCards(IdentifiedActionOf<CollectionItemCardFeature>)
         case fileRows(IdentifiedActionOf<FileRowFeature>)
-        case folderPicker(IdentifiedActionOf<FolderPickerFeature>)
         
-        case folderTapped(Folder)
+        case collectionTapped(CollectionItem)
         case fileTapped(AudioFile)
         case setSearchText(String)
-        case setSortOption(SortOption)
 
         // Selection & Mode
         case toggleSelectionMode
@@ -98,7 +80,7 @@ struct FilesFeature {
         case clearSelection
 
         // Operations
-        case createFolderTapped
+        case createCollectionTapped
         case renameItemTapped(FileSystemItem)
         case setInputText(String)
         case confirmNameInput
@@ -108,12 +90,12 @@ struct FilesFeature {
         case deleteSelectedTapped
         case moveItemTapped(FileSystemItem)
         case moveSelectedTapped
-        case loadFoldersForMove
-        case foldersForMoveLoaded([Folder])
-        case selectDestinationFolder(Folder?)
-        case createFolderInPicker(String)
+        case loadCollectionsForPicker
+        case collectionsLoaded([CollectionItem])
+        case moveToDestination(URL)
         case cancelMove
         case alert(PresentationAction<Alert>)
+        case playAllTapped
         case editAudio(PresentationAction<EditRecordingFeature.Action>)
 
         enum Alert: Equatable {
@@ -127,6 +109,10 @@ struct FilesFeature {
         Reduce { state, action in
             switch action {
             case .onAppear, .refreshFiles:
+                // In screenshot mode, skip loading real files to preserve demo data
+                if ScreenshotMode.isEnabled && !state.items.isEmpty {
+                    return .none
+                }
                 state.isLoading = true
                 state.documentsDirectoryURL = fileManager.documentsDirectory()
                 return .run { [directory = state.currentDirectory] send in
@@ -142,30 +128,30 @@ struct FilesFeature {
                 state.isLoading = false
                 state.items = items
                 
-                // Populate folderCards
-                let folders = items.compactMap { item -> Folder? in
+                // Populate collectionCards
+                let folders = items.compactMap { item -> CollectionItem? in
                     if case let .folder(f) = item { return f }
                     return nil
                 }
                 
-                var newFolderCards: IdentifiedArrayOf<FolderCardFeature.State> = []
+                var newCollectionCards: IdentifiedArrayOf<CollectionItemCardFeature.State> = []
                 for folder in folders {
-                    if let existing = state.folderCards[id: folder.id] {
+                    if let existing = state.collectionCards[id: folder.id] {
                         var updated = existing
                         if updated.folder != folder {
-                             newFolderCards.append(FolderCardFeature.State(folder: folder))
+                             newCollectionCards.append(CollectionItemCardFeature.State(folder: folder))
                         } else {
                             updated.isSelected = state.selectedItems.contains(.folder(folder))
-                            newFolderCards.append(updated)
+                            newCollectionCards.append(updated)
                         }
                     } else {
-                        newFolderCards.append(FolderCardFeature.State(
+                        newCollectionCards.append(CollectionItemCardFeature.State(
                             folder: folder,
                             isSelected: state.selectedItems.contains(.folder(folder))
                         ))
                     }
                 }
-                state.folderCards = newFolderCards
+                state.collectionCards = newCollectionCards
 
                 // Populate fileRows
                 let files = items.compactMap { item -> AudioFile? in
@@ -198,37 +184,37 @@ struct FilesFeature {
                 state.isLoading = false
                 return .none
                 
-            case let .folderCards(.element(id: id, action: .tapped)):
-                if let folder = state.folderCards[id: id]?.folder {
+            case let .collectionCards(.element(id: id, action: .tapped)):
+                if let folder = state.collectionCards[id: id]?.folder {
                     if state.isSelectionMode {
                         return .send(.toggleSelection(.folder(folder)))
                     } else {
-                        return .send(.folderTapped(folder))
+                        return .send(.collectionTapped(folder))
                     }
                 }
                 return .none
                 
-            case let .folderCards(.element(id: id, action: .moveTapped)):
-                 if let folder = state.folderCards[id: id]?.folder {
+            case let .collectionCards(.element(id: id, action: .moveTapped)):
+                 if let folder = state.collectionCards[id: id]?.folder {
                      return .send(.moveItemTapped(.folder(folder)))
                  }
                  return .none
 
-            case let .folderCards(.element(id: id, action: .renameTapped)):
-                 if let folder = state.folderCards[id: id]?.folder {
+            case let .collectionCards(.element(id: id, action: .renameTapped)):
+                 if let folder = state.collectionCards[id: id]?.folder {
                      return .send(.renameItemTapped(.folder(folder)))
                  }
                  return .none
 
-            case let .folderCards(.element(id: id, action: .deleteTapped)):
-                 if let folder = state.folderCards[id: id]?.folder {
+            case let .collectionCards(.element(id: id, action: .deleteTapped)):
+                 if let folder = state.collectionCards[id: id]?.folder {
                      state.selectedItems = [.folder(folder)]
                      return .send(.deleteSelectedTapped)
                  }
                  return .none
                  
-            case let .folderCards(.element(id: id, action: .toggleSelection)):
-                if let folder = state.folderCards[id: id]?.folder {
+            case let .collectionCards(.element(id: id, action: .toggleSelection)):
+                if let folder = state.collectionCards[id: id]?.folder {
                     return .send(.toggleSelection(.folder(folder)))
                 }
                 return .none
@@ -274,10 +260,14 @@ struct FilesFeature {
                 }
                 return .none
 
-            case .folderCards, .fileRows:
+            case .collectionCards, .fileRows:
                 return .none
 
-            case .folderTapped:
+            case .playAllTapped:
+                // Handled by parent — plays all files in current folder
+                return .none
+
+            case .collectionTapped:
                 // Handled by parent
                 return .none
 
@@ -289,16 +279,12 @@ struct FilesFeature {
                 state.searchText = text
                 return .none
                 
-            case let .setSortOption(option):
-                state.sortOption = option
-                return .none
-                
             case .toggleSelectionMode:
                 state.isSelectionMode.toggle()
                 state.selectedItems.removeAll()
-                // Update isSelected in folderCards and fileRows
-                for id in state.folderCards.ids {
-                    state.folderCards[id: id]?.isSelected = false
+                // Update isSelected in collectionCards and fileRows
+                for id in state.collectionCards.ids {
+                    state.collectionCards[id: id]?.isSelected = false
                 }
                 for id in state.fileRows.ids {
                     state.fileRows[id: id]?.isSelected = false
@@ -309,14 +295,14 @@ struct FilesFeature {
                 if state.selectedItems.contains(item) {
                     state.selectedItems.remove(item)
                     if case let .folder(folder) = item {
-                        state.folderCards[id: folder.id]?.isSelected = false
+                        state.collectionCards[id: folder.id]?.isSelected = false
                     } else if case let .file(file) = item {
                         state.fileRows[id: file.id]?.isSelected = false
                     }
                 } else {
                     state.selectedItems.insert(item)
                     if case let .folder(folder) = item {
-                        state.folderCards[id: folder.id]?.isSelected = true
+                        state.collectionCards[id: folder.id]?.isSelected = true
                     } else if case let .file(file) = item {
                         state.fileRows[id: file.id]?.isSelected = true
                     }
@@ -327,7 +313,7 @@ struct FilesFeature {
                 state.selectedItems = Set(state.filteredItems)
                 for item in state.filteredItems {
                     if case let .folder(folder) = item {
-                        state.folderCards[id: folder.id]?.isSelected = true
+                        state.collectionCards[id: folder.id]?.isSelected = true
                     } else if case let .file(file) = item {
                         state.fileRows[id: file.id]?.isSelected = true
                     }
@@ -336,16 +322,16 @@ struct FilesFeature {
                 
             case .clearSelection:
                 state.selectedItems.removeAll()
-                for id in state.folderCards.ids {
-                    state.folderCards[id: id]?.isSelected = false
+                for id in state.collectionCards.ids {
+                    state.collectionCards[id: id]?.isSelected = false
                 }
                 for id in state.fileRows.ids {
                     state.fileRows[id: id]?.isSelected = false
                 }
                 return .none
                 
-            case .createFolderTapped:
-                state.isCreatingFolder = true
+            case .createCollectionTapped:
+                state.isCreatingCollection = true
                 state.inputText = ""
                 return .none
                 
@@ -359,16 +345,31 @@ struct FilesFeature {
                 return .none
                 
             case .confirmNameInput:
-                if state.isCreatingFolder {
-                    let name = state.inputText.isEmpty ? "New Folder" : state.inputText
+                if state.isCreatingCollection {
+                    let name = state.inputText.isEmpty ? "New Collection" : state.inputText
                     let directory = state.currentDirectory
-                    state.isCreatingFolder = false
+                    state.isCreatingCollection = false
                     return .run { send in
-                        try await fileManager.createFolder(name, directory)
+                        try await fileManager.createCollection(name, directory)
                         await send(.refreshFiles)
+                        // Navigate to the newly created folder
+                        let parentURL = directory ?? fileManager.documentsDirectory()
+                        let folderURL = parentURL.appendingPathComponent(name, isDirectory: true)
+                        if FileManager.default.fileExists(atPath: folderURL.path) {
+                            let creationDate = (try? folderURL.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date()
+                            let folder = CollectionItem(id: folderURL, url: folderURL, name: name, creationDate: creationDate)
+                            await send(.collectionTapped(folder))
+                        }
                     }
                 } else if let item = state.renamingItem {
-                    let name = state.inputText
+                    var name = state.inputText
+                    // Preserve file extension for files
+                    if case .file = item {
+                        let ext = item.url.pathExtension
+                        if !ext.isEmpty && !name.hasSuffix(".\(ext)") {
+                            name = "\(name).\(ext)"
+                        }
+                    }
                     state.renamingItem = nil
                     return .run { send in
                         try await fileManager.renameItem(item.url, name)
@@ -378,16 +379,18 @@ struct FilesFeature {
                 return .none
                 
             case .cancelNameInput:
-                state.isCreatingFolder = false
+                state.isCreatingCollection = false
                 state.renamingItem = nil
                 return .none
 
             case let .importFiles(urls):
                 let directory = state.currentDirectory
                 return .run { send in
-                    let audioExtensions: Set<String> = ["mp3", "m4a", "wav", "aac", "flac", "aiff", "m4b", "mp4"]
+                    let audioExtensions: Set<String> = ["mp3", "m4a", "wav", "aac", "flac", "aiff", "m4b", "mp4", "opus", "ogg"]
                     let containsFolder = urls.contains { url in
-                        (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+                        let accessing = url.startAccessingSecurityScopedResource()
+                        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+                        return (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
                     }
 
                     func createUniqueFolder(named name: String, in parent: URL) throws -> URL {
@@ -466,7 +469,7 @@ struct FilesFeature {
                     var targetDirectory = directory
                     if directory == nil, !containsFolder {
                         do {
-                            targetDirectory = try await fileManager.createFolderForImport()
+                            targetDirectory = try await fileManager.createCollectionForImport()
                             print("📁 Created import folder: \(targetDirectory?.path ?? "nil")")
                         } catch {
                             print("❌ Failed to create import folder: \(error.localizedDescription)")
@@ -475,6 +478,8 @@ struct FilesFeature {
                     }
 
                     for (index, url) in urls.enumerated() {
+                        let accessing = url.startAccessingSecurityScopedResource()
+                        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
                         let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
                         print("📄 Importing \(isDirectory ? "folder" : "file") \(index + 1)/\(urls.count): \(url.lastPathComponent)")
                         do {
@@ -514,7 +519,7 @@ struct FilesFeature {
 
             case .deleteSelectedTapped:
                 state.alert = AlertState {
-                    TextState("Delete \(state.selectedItems.count) items?")
+                    TextState("Delete \(state.selectedItems.count) \(state.selectedItems.count == 1 ? "item" : "items")?")
                 } actions: {
                     ButtonState(role: .destructive, action: .confirmDelete) {
                         TextState("Delete")
@@ -544,90 +549,64 @@ struct FilesFeature {
 
             case let .moveItemTapped(item):
                 state.itemsToMove = [item]
-                return .send(.loadFoldersForMove)
+                return .send(.loadCollectionsForPicker)
 
             case .moveSelectedTapped:
                 state.itemsToMove = state.selectedItems
-                return .send(.loadFoldersForMove)
+                return .send(.loadCollectionsForPicker)
 
-            case .loadFoldersForMove:
-                state.isShowingFolderPicker = true
+            case .loadCollectionsForPicker:
                 return .run { send in
-                    // Load all folders recursively
-                    let allFolders = try await loadAllFolders(from: nil, fileManager: fileManager)
-                    await send(.foldersForMoveLoaded(allFolders))
+                    let collections = await loadAllCollectionsRecursive()
+                    await send(.collectionsLoaded(collections))
                 }
 
-            case let .foldersForMoveLoaded(folders):
-                state.availableFolders = folders
-                var rows = [FolderPickerFeature.State(folder: nil)] // Root
-                rows.append(contentsOf: folders.map {
-                    FolderPickerFeature.State(folder: $0, folderPath: folderPath(for: $0))
-                })
-                state.folderPicker = IdentifiedArray(uniqueElements: rows)
+            case let .collectionsLoaded(collections):
+                state.availableCollections = collections
+                state.isShowingCollectionPicker = true
                 return .none
 
-            case let .selectDestinationFolder(folder):
+            case let .moveToDestination(destination):
                 let itemsToMove = state.itemsToMove
-                let destination = folder?.url ?? fileManager.documentsDirectory()
-
-                // Check if any items are already at the destination
-                let itemsAlreadyAtDestination = itemsToMove.filter { item in
-                    item.url.deletingLastPathComponent() == destination
-                }
-
-                // If all items are already at destination, just dismiss
-                if itemsAlreadyAtDestination.count == itemsToMove.count {
-                    state.itemsToMove.removeAll()
-                    state.availableFolders.removeAll()
-                    state.folderPicker.removeAll()
-                    state.isShowingFolderPicker = false
-                    state.selectedItems.removeAll()
-                    state.isSelectionMode = false
-                    return .none
-                }
-
-                // Filter out items already at destination
-                let itemsToActuallyMove = itemsToMove.subtracting(itemsAlreadyAtDestination)
-
                 state.itemsToMove.removeAll()
-                state.availableFolders.removeAll()
-                state.folderPicker.removeAll()
-                state.isShowingFolderPicker = false
+                state.availableCollections.removeAll()
+                state.isShowingCollectionPicker = false
                 state.selectedItems.removeAll()
                 state.isSelectionMode = false
 
                 return .run { send in
-                    for item in itemsToActuallyMove {
+                    for item in itemsToMove {
+                        if item.url.deletingLastPathComponent().path == destination.path {
+                            continue
+                        }
+
+                        let fileName = item.url.lastPathComponent
+                        var targetURL = destination.appendingPathComponent(fileName)
+
+                        var counter = 2
+                        let nameNoExt = item.url.deletingPathExtension().lastPathComponent
+                        let ext = item.url.pathExtension
+                        while FileManager.default.fileExists(atPath: targetURL.path) {
+                            let newName = ext.isEmpty ? "\(nameNoExt) \(counter)" : "\(nameNoExt) \(counter).\(ext)"
+                            targetURL = destination.appendingPathComponent(newName)
+                            counter += 1
+                            if counter > 100 { break }
+                        }
+
                         do {
-                            try await fileManager.moveItem(item.url, destination)
+                            try FileManager.default.moveItem(at: item.url, to: targetURL)
+                            print("✅ Moved \(item.name) → \(targetURL.path)")
                         } catch {
-                            print("Failed to move \(item.name): \(error.localizedDescription)")
+                            print("❌ Failed to move \(item.name): \(error.localizedDescription)")
                         }
                     }
                     await send(.refreshFiles)
                 }
 
-            case let .createFolderInPicker(name):
-                let directory = state.currentDirectory
-                return .run { send in
-                    try await fileManager.createFolder(name, directory)
-                    // Reload folders list after creation
-                    await send(.loadFoldersForMove)
-                }
-
             case .cancelMove:
                 state.itemsToMove.removeAll()
-                state.availableFolders.removeAll()
-                state.folderPicker.removeAll()
-                state.isShowingFolderPicker = false
-                return .none
-                
-            case let .folderPicker(.element(id: id, action: .tapped)):
-                let folder = state.folderPicker[id: id]?.folder
-                return .send(.selectDestinationFolder(folder))
-
-            case .folderPicker:
+                state.availableCollections.removeAll()
+                state.isShowingCollectionPicker = false
                 return .none
             }
         }
@@ -635,40 +614,43 @@ struct FilesFeature {
         .ifLet(\.$editAudio, action: \.editAudio) {
             EditRecordingFeature()
         }
-        .forEach(\.folderCards, action: \.folderCards) {
-            FolderCardFeature()
+        .forEach(\.collectionCards, action: \.collectionCards) {
+            CollectionItemCardFeature()
         }
         .forEach(\.fileRows, action: \.fileRows) {
             FileRowFeature()
         }
-        .forEach(\.folderPicker, action: \.folderPicker) {
-            FolderPickerFeature()
-        }
-    }
-    
-    private func folderPath(for folder: Folder) -> String {
-        let components = folder.url.pathComponents
-        if let docsIndex = components.lastIndex(of: "Documents") {
-            let relevantComponents = Array(components.dropFirst(docsIndex + 1))
-            return relevantComponents.dropLast().joined(separator: " / ")
-        }
-        return ""
     }
 }
 
-// Helper function to load all folders recursively
-private func loadAllFolders(from directory: URL?, fileManager: FileManagerClient) async throws -> [Folder] {
-    let items = try await fileManager.listItems(directory)
-    var folders: [Folder] = []
+// MARK: - Collection Discovery
 
-    for item in items {
-        if case .folder(let folder) = item {
-            folders.append(folder)
-            // Recursively load subfolders
-            let subfolders = try await loadAllFolders(from: folder.url, fileManager: fileManager)
-            folders.append(contentsOf: subfolders)
+/// Recursively walks Documents directory and returns every subfolder as a CollectionItem.
+func loadAllCollectionsRecursive() async -> [CollectionItem] {
+    let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+    var result: [CollectionItem] = []
+
+    func walk(_ dir: URL) {
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: dir,
+            includingPropertiesForKeys: [.isDirectoryKey, .creationDateKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        for url in contents {
+            let resourceValues = try? url.resourceValues(forKeys: [.isDirectoryKey, .creationDateKey])
+            let isDir = resourceValues?.isDirectory ?? false
+            guard isDir else { continue }
+            let creationDate = resourceValues?.creationDate ?? Date()
+            result.append(CollectionItem(
+                id: url,
+                url: url,
+                name: url.lastPathComponent,
+                creationDate: creationDate
+            ))
+            walk(url)
         }
     }
 
-    return folders
+    walk(documents)
+    return result
 }

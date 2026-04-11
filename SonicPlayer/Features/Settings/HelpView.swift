@@ -6,66 +6,23 @@ struct HelpView: View {
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Quick start guide
-                    quickStartSection
+        ScrollView {
+            VStack(spacing: 24) {
+                // FAQ section
+                faqSection
 
-                    // FAQ section
-                    faqSection
+                // Troubleshooting
+                troubleshootingSection
 
-                    // Troubleshooting
-                    troubleshootingSection
-
-                    // Contact support
-                    supportSection
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 24)
+                // Contact support
+                supportSection
             }
-            .background(Color.sonicBackground.ignoresSafeArea())
-            .navigationTitle("Help & Support")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.sonicTextMuted)
-                    }
-                }
-            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 24)
         }
-    }
-
-    private var quickStartSection: some View {
-        HelpSection(
-            title: "Quick Start",
-            icon: "rocket.fill",
-            iconColor: .sonicPrimary
-        ) {
-            VStack(spacing: 16) {
-                StepCard(
-                    number: 1,
-                    title: "Add Audio Files",
-                    description: "Go to the Library tab, tap the … menu, then choose Import to add MP3, M4A, or WAV files (or folders) from the Files app."
-                )
-
-                StepCard(
-                    number: 2,
-                    title: "Browse or Search",
-                    description: "Use Library to browse folders, or the Search tab to quickly find what you want."
-                )
-
-                StepCard(
-                    number: 3,
-                    title: "Control Playback",
-                    description: "Tap a file to play, then use play/pause, skip, and speed controls. Playback continues in the background and from the Lock Screen."
-                )
-            }
-        }
+        .background(Color.sonicBackground.ignoresSafeArea())
+        .navigationTitle("Help & Support")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private var faqSection: some View {
@@ -77,7 +34,7 @@ struct HelpView: View {
             VStack(spacing: 12) {
                 FAQItem(
                     question: "How do I add audio files?",
-                    answer: "In the Library tab, tap the … menu and choose Import. You can import files and folders from the Files app. Supported formats: MP3, M4A, WAV."
+                    answer: "In the Library tab, tap the + button and choose Import. You can import files and folders from the Files app. Supported formats: MP3, M4A, WAV."
                 )
 
                 FAQItem(
@@ -88,6 +45,11 @@ struct HelpView: View {
                 FAQItem(
                     question: "How do I change the playback speed?",
                     answer: "In the Player view, tap the speed control to choose from 0.5× to 2.0×."
+                )
+
+                FAQItem(
+                    question: "How do I change the language?",
+                    answer: "Open Settings and select Language to choose your preferred language."
                 )
 
                 FAQItem(
@@ -102,7 +64,7 @@ struct HelpView: View {
 
                 FAQItem(
                     question: "How do I record and edit audio?",
-                    answer: "Enable Recording Mode in Settings to record audio. You can trim or delete sections of recordings in the editor."
+                    answer: "Open the Recordings tab to record audio. You can trim or delete sections of recordings in the editor."
                 )
             }
         }
@@ -119,7 +81,7 @@ struct HelpView: View {
                     issue: "Files not showing up",
                     solutions: [
                         "Make sure files are in MP3, M4A, or WAV format",
-                        "Try importing again from Library → … → Import",
+                        "Try importing again from Library → + → Import",
                         "Try pulling to refresh in the Library view",
                         "Restart the app"
                     ]
