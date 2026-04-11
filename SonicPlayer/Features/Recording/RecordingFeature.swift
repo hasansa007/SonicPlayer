@@ -220,14 +220,17 @@ struct RecordingFeature {
                 let destination = state.recordingsCollection ?? fileManager.documentsDirectory()
                 try? FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
                 let baseName = state.saveFileName.isEmpty ? "Recording" : state.saveFileName
-                var targetURL = destination.appendingPathComponent("\(baseName).m4a")
 
-                // Handle duplicate names
-                var counter = 2
-                while FileManager.default.fileExists(atPath: targetURL.path) && targetURL != originalURL {
-                    targetURL = destination.appendingPathComponent("\(baseName) \(counter).m4a")
-                    counter += 1
-                }
+                // Compute final target URL (handle duplicates)
+                let finalTargetURL: URL = {
+                    var candidate = destination.appendingPathComponent("\(baseName).m4a")
+                    var counter = 2
+                    while FileManager.default.fileExists(atPath: candidate.path) && candidate != originalURL {
+                        candidate = destination.appendingPathComponent("\(baseName) \(counter).m4a")
+                        counter += 1
+                    }
+                    return candidate
+                }()
 
                 state.isSaveFlowPresented = false
                 state.inlineEdit = nil
@@ -236,14 +239,14 @@ struct RecordingFeature {
                     await audioPlayer.stop()
                     do {
                         // Delete the untouched original recording
-                        if let originalURL, originalURL != targetURL {
+                        if let originalURL, originalURL != finalTargetURL {
                             try? FileManager.default.removeItem(at: originalURL)
                         }
                         // Move edited temp to final destination
-                        if FileManager.default.fileExists(atPath: targetURL.path) {
-                            try? FileManager.default.removeItem(at: targetURL)
+                        if FileManager.default.fileExists(atPath: finalTargetURL.path) {
+                            try? FileManager.default.removeItem(at: finalTargetURL)
                         }
-                        try FileManager.default.moveItem(at: editedURL, to: targetURL)
+                        try FileManager.default.moveItem(at: editedURL, to: finalTargetURL)
                         await send(.recordingSaved(nil))
                     } catch {
                         print("Failed to save recording: \(error.localizedDescription)")
