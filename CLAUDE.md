@@ -35,7 +35,7 @@ No CocoaPods or Carthage. All dependencies managed via Swift Package Manager.
 
 **TCA (The Composable Architecture)** with strict unidirectional data flow:
 
-- **Features/** - Each feature has a `{Name}Feature.swift` (reducer) and `{Name}View.swift` (UI). Home is the exception: it has no view file, its UI is inlined in `App/AppView.swift`
+- **Features/** - **Mid-migration (#5): TCA reducers are being replaced by `@Observable` view models, one feature at a time.** A feature is therefore either a `{Name}Feature.swift` (reducer, not yet migrated) or a `{Name}ViewModel.swift` (migrated), plus its `{Name}View.swift`. Check which before adding to one. Home is a further exception: no view file, its UI is inlined in `App/AppView.swift`
 - **Clients/** - Dependency-injected wrappers around system frameworks (AVFoundation, FileManager)
 - **Models/** - Plain data types (`AudioFile`, `FileSystemItem`, `PlaybackSpeed`)
 - **Domain/** - Pure decision logic, Foundation only, no TCA. Extracted from reducers so its tests survive the TCA→MVVM migration unchanged (#11). Add logic here rather than inlining it in a reducer.
@@ -43,13 +43,22 @@ No CocoaPods or Carthage. All dependencies managed via Swift Package Manager.
 - **App/** - Root `AppFeature` composes all child reducers; `AppView` is a single screen with no tab bar. Player, recording and import are presented as **sheets** over Home; settings is **pushed** via `.navigationDestination` (note the state flag is still named `isSettingsSheetPresented`)
 
 ### Feature modules
-| Feature | Reducer | Purpose |
-|---------|---------|---------|
-| Home | `HomeFeature` | Folder suggestions, recently added |
-| Files | `CollectionsFeature` | File/folder browser with navigation stack |
-| Player | `PlayerFeature` | Playback engine, queue, session persistence |
-| Recording | `RecordingFeature` | Audio capture and trimming |
-| Settings | `SettingsFeature` | Preferences via UserDefaults |
+
+Migration status per #5. Reducers still compose into `AppFeature`; view models are owned by
+`AppView` as `@State`, because `AppFeature.State` is a value type and cannot hold a reference.
+
+| Feature | Type | Status | Purpose |
+|---------|------|--------|---------|
+| Home | `HomeFeature` | reducer | Folder suggestions, recently added |
+| Files | `CollectionsFeature` | reducer | File/folder browser with navigation stack |
+| Player | `PlayerFeature` | reducer | Playback engine, queue, session persistence |
+| Recording | `RecordingFeature` | reducer | Audio capture and trimming |
+| Settings | `SettingsViewModel` | **migrated** (#13) | Preferences via UserDefaults |
+| Onboarding | `OnboardingViewModel` | **migrated** (#14) | First-launch carousel |
+
+Cross-feature communication out of a migrated feature travels through a **closure wired at the
+composition root**, never by reading another feature's state — the shape `willRemoveItems` uses in
+`CollectionsFeature` and that #19 generalises. See `AppView.wireViewModels()`.
 
 ### Key patterns
 - `@Reducer` macro with `@ObservableState`
