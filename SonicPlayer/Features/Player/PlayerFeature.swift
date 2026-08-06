@@ -4,32 +4,8 @@ import Sharing
 import SwiftUI
 import UIKit
 
-struct QueueItem: Codable, Equatable {
-    var fileURL: String
-}
-
-struct PlaybackSession: Codable, Equatable {
-    var fileURL: String
-    var currentTime: TimeInterval
-    var queue: [QueueItem]
-    var playlistSource: PlaylistSource?
-
-    init(fileURL: String = "", currentTime: TimeInterval = 0, queue: [QueueItem] = [], playlistSource: PlaylistSource? = nil) {
-        self.fileURL = fileURL
-        self.currentTime = currentTime
-        self.queue = queue
-        self.playlistSource = playlistSource
-    }
-
-    var isEmpty: Bool {
-        fileURL.isEmpty
-    }
-}
-
-enum PlaylistSource: Equatable, Codable {
-    case folder(URL)
-    case singleFile
-}
+// QueueItem, PlaybackSession and PlaylistSource moved to Domain/PlaybackSession.swift — they
+// never referenced TCA and Slice 6 (#15) needs them independent of it.
 
 @Reducer
 struct PlayerFeature {
@@ -233,40 +209,34 @@ struct PlayerFeature {
 
             case let .retryRestoreSession(track, time, rate, attemptNumber):
                 return Effect.run { send in
-                    let maxRetries = 3
                     do {
                         try await audioPlayer.prepare(track.url)
                         await audioPlayer.setRate(rate)
                         await audioPlayer.seek(time)
                         await audioPlayer.pause()
 
-                        // Check if duration is valid
+                        // AVPlayer often reports 0 for a moment after prepare
                         let duration = await audioPlayer.duration()
 
                         if duration > 0 {
-                            // Success!
                             await send(.durationUpdated(duration))
                             await send(.sessionRestored)
-                        } else if attemptNumber < maxRetries {
-                            // Duration not ready, retry after delay
-                            let delayMs = 500 * (1 << attemptNumber) // 500ms, 1s, 2s
+                        } else if let delayMs = SessionRestorePolicy.delayMilliseconds(forAttempt: attemptNumber) {
                             try await clock.sleep(for: .milliseconds(delayMs))
                             await send(.retryRestoreSession(track, time, rate, attemptNumber + 1))
                         } else {
-                            // Max retries reached, but keep session
+                            // Attempts exhausted, but keep the session
                             await send(.durationUpdated(duration))
                         }
                     } catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoSuchFileError {
                         // File doesn't exist, clear session
                         await send(.trackLoadFailed)
                     } catch {
-                        // Other error - retry if attempts remain
-                        if attemptNumber < maxRetries {
-                            let delayMs = 500 * (1 << attemptNumber)
+                        // Other error — retry if attempts remain, else keep session for manual retry
+                        if let delayMs = SessionRestorePolicy.delayMilliseconds(forAttempt: attemptNumber) {
                             try? await clock.sleep(for: .milliseconds(delayMs))
                             await send(.retryRestoreSession(track, time, rate, attemptNumber + 1))
                         }
-                        // Otherwise keep session for manual retry
                     }
                 }
 
@@ -568,25 +538,25 @@ struct PlayerFeature {
                     return .none
                 }
 
-                // Check if last track finished
-                let isLastTrack = state.currentIndex == state.queue.count - 1
-                let hasFinished = abs(state.currentTime - state.duration) < 1.0 && state.duration > 0
-
-                if isLastTrack && hasFinished {
-                    // Clear session when last track completes
+                if SessionCodec.isFinishedAtEndOfQueue(
+                    currentIndex: state.currentIndex,
+                    queueCount: state.queue.count,
+                    currentTime: state.currentTime,
+                    duration: state.duration
+                ) {
+                    // Clear session when the last track completes
                     state.$session.withLock { session in
                         session = PlaybackSession()
                     }
                 } else {
-                    // Save current state
-                    let queueItems = state.queue.map { QueueItem(fileURL: $0.url.path) }
+                    let saved = SessionCodec.session(
+                        trackURL: currentTrack.url,
+                        currentTime: state.currentTime,
+                        queueURLs: state.queue.map(\.url),
+                        playlistSource: state.currentPlaylistSource
+                    )
                     state.$session.withLock { session in
-                        session = PlaybackSession(
-                            fileURL: currentTrack.url.path,
-                            currentTime: state.currentTime,
-                            queue: queueItems,
-                            playlistSource: state.currentPlaylistSource
-                        )
+                        session = saved
                     }
                 }
                 return .none

@@ -110,11 +110,7 @@ struct RecordingFeature {
                 // Create recordings folder if needed
                 try? FileManager.default.createDirectory(at: recordingsCollection, withIntermediateDirectories: true)
 
-                // Generate filename with timestamp
-                let dateFormatter = DateFormatter()
-                dateFormatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
-                let timestamp = dateFormatter.string(from: Date())
-                let filename = "Recording \(timestamp).m4a"
+                let filename = RecordingFilename.make(at: Date())
                 let recordingURL = recordingsCollection.appendingPathComponent(filename)
 
                 state.currentRecordingURL = recordingURL
