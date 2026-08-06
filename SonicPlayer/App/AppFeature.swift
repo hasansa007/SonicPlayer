@@ -14,29 +14,17 @@ struct AppFeature {
         var filesRoot = CollectionsFeature.State(currentDirectory: nil)
 
 
-        var settings = SettingsFeature.State()
         var recording = RecordingFeature.State()
-
-        // Onboarding
-        var onboarding: OnboardingFeature.State?
 
         // Sheets
         var isRecordingSheetPresented: Bool = false
         var isSettingsSheetPresented: Bool = false
         var isImportSheetPresented: Bool = false
 
-        init() {
-            let hasSeenOnboarding_v2 = UserDefaults.standard.bool(forKey: "hasSeenOnboarding_v2")
-            if !hasSeenOnboarding_v2 {
-                self.onboarding = OnboardingFeature.State()
-            }
-        }
-
         static func == (lhs: State, rhs: State) -> Bool {
             lhs.player == rhs.player &&
             lhs.home == rhs.home &&
             lhs.filesPath == rhs.filesPath &&
-            lhs.onboarding == rhs.onboarding &&
             lhs.recording == rhs.recording &&
             lhs.isRecordingSheetPresented == rhs.isRecordingSheetPresented &&
             lhs.isSettingsSheetPresented == rhs.isSettingsSheetPresented &&
@@ -52,9 +40,7 @@ struct AppFeature {
         case filesPath(StackAction<CollectionsFeature.State, CollectionsFeature.Action>)
         case filesRoot(CollectionsFeature.Action)
 
-        case settings(SettingsFeature.Action)
         case recording(RecordingFeature.Action)
-        case onboarding(OnboardingFeature.Action)
 
         // Sheets
         case recordButtonTapped
@@ -88,23 +74,12 @@ struct AppFeature {
             CollectionsFeature()
         }
 
-        Scope(state: \.settings, action: \.settings) {
-            SettingsFeature()
-        }
-
         Scope(state: \.recording, action: \.recording) {
             RecordingFeature()
         }
 
         Reduce { state, action in
             switch action {
-
-            // MARK: - Onboarding
-
-            case .onboarding(.getStartedTapped):
-                UserDefaults.standard.set(true, forKey: "hasSeenOnboarding_v2")
-                state.onboarding = nil
-                return .none
 
             // MARK: - Home Actions
 
@@ -292,14 +267,6 @@ struct AppFeature {
                 state.isImportSheetPresented = true
                 return .none
 
-            // MARK: - Settings → Player
-
-            case let .settings(.setDefaultSkipDuration(duration)):
-                return .send(.player(.setSkipDuration(duration)))
-
-            case let .settings(.setDefaultPlaybackSpeed(speed)):
-                return .send(.player(.setPlaybackSpeed(speed)))
-
             // MARK: - Player Events
 
             case .player(.trackLoaded), .player(.sessionLoaded):
@@ -345,12 +312,9 @@ struct AppFeature {
             case .filesRoot(.itemsLoaded):
                 return .send(.home(.loadRecentFiles))
 
-            case .player, .home, .filesRoot, .filesPath, .settings, .recording, .onboarding:
+            case .player, .home, .filesRoot, .filesPath, .recording:
                 return .none
             }
-        }
-        .ifLet(\.onboarding, action: \.onboarding) {
-            OnboardingFeature()
         }
         .forEach(\.filesPath, action: \.filesPath) {
             CollectionsFeature()

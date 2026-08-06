@@ -190,8 +190,7 @@ enum ScreenshotDemoData {
 
     static func buildAppState(for screen: ScreenshotMode.Screen) -> AppFeature.State {
         var state = AppFeature.State()
-        // Always skip onboarding in screenshot mode
-        state.onboarding = nil
+        // Onboarding is skipped in screenshot mode by OnboardingViewModel.ifNeeded()
 
         switch screen {
         case .home:

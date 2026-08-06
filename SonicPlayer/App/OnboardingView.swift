@@ -1,8 +1,7 @@
-import ComposableArchitecture
 import SwiftUI
 
 struct OnboardingView: View {
-    @Bindable var store: StoreOf<OnboardingFeature>
+    @Bindable var viewModel: OnboardingViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -13,7 +12,7 @@ struct OnboardingView: View {
                 pageIndicators
                     .padding(.top, 60)
 
-                TabView(selection: $store.currentPage.sending(\.setPage)) {
+                TabView(selection: $viewModel.currentPage) {
                     WelcomePage().tag(0)
                     ImportPage().tag(1)
                     RecordPage().tag(2)
@@ -33,11 +32,11 @@ struct OnboardingView: View {
 
     private var pageIndicators: some View {
         HStack(spacing: 8) {
-            ForEach(0..<store.totalPages, id: \.self) { index in
+            ForEach(0..<viewModel.totalPages, id: \.self) { index in
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(index == store.currentPage ? Color.sonicPrimary : Color.sonicPrimary.opacity(0.25))
-                    .frame(width: index == store.currentPage ? 24 : 8, height: 8)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: store.currentPage)
+                    .fill(index == viewModel.currentPage ? Color.sonicPrimary : Color.sonicPrimary.opacity(0.25))
+                    .frame(width: index == viewModel.currentPage ? 24 : 8, height: 8)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: viewModel.currentPage)
             }
         }
     }
@@ -45,13 +44,13 @@ struct OnboardingView: View {
     // MARK: - Action Button
 
     private var actionButton: some View {
-        let isLast = store.currentPage == store.totalPages - 1
+        let isLast = viewModel.currentPage == viewModel.totalPages - 1
         return Button {
             if isLast {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                store.send(.getStartedTapped)
+                viewModel.getStartedTapped()
             } else {
-                store.send(.nextPage)
+                viewModel.nextPage()
             }
         } label: {
             Text(isLast ? "Get Started" : "Next")
@@ -64,7 +63,7 @@ struct OnboardingView: View {
                 .overlay(Capsule().stroke(Color.sonicPrimary, lineWidth: isLast ? 0 : 2))
         }
         .buttonStyle(OnboardingButtonStyle())
-        .animation(.easeInOut(duration: 0.3), value: store.currentPage)
+        .animation(.easeInOut(duration: 0.3), value: viewModel.currentPage)
     }
 }
 
