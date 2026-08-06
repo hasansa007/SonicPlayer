@@ -137,6 +137,23 @@ Three differences from XCTest that bite when writing new tests:
 - **`#expect`'s message is `Comment?`, not `String`.** A literal or `"\(interpolation)"` works; a
   bare `String` variable does not.
 
+## Release
+
+Pushing to `main` triggers `.github/workflows/distribute.yml`, which archives, signs and uploads
+to TestFlight. **The merge is the release** — there is no separate promotion step.
+
+Before bumping `CFBundleShortVersionString` in `Info.plist`, add a matching section to
+`RELEASE_NOTES.md`. The workflow reads the section whose heading equals `## <version>` and ships it
+as What's New; with no matching section testers get a placeholder and a build warning.
+
+The runner pins **Xcode 26.3**. Do not lower it: `ComposableArchitecture` and `swift-sharing`
+declare `swift-tools-version: 6.1`, so anything below Xcode 16.3 fails during package resolution
+with an error that does not mention Xcode. A guard step asserts the Swift version and fails with a
+readable message instead.
+
+To prove a pipeline change without shipping, run the workflow manually from the Actions tab with
+**dry_run** checked — it archives and exports but skips the upload.
+
 ## Git Workflow
 
 - **main** - stable branch
