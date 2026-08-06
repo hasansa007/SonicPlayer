@@ -93,6 +93,16 @@ struct CollectionsFeature {
         case loadCollectionsForPicker
         case collectionsLoaded([CollectionItem])
         case moveToDestination(URL)
+
+        /// Announces the items an operation is about to remove from their current location —
+        /// deleted outright, or moved elsewhere.
+        ///
+        /// This exists because a parent cannot read the answer out of state. A `Scope` child runs
+        /// before the parent's `Reduce`, and both the delete and move handlers clear
+        /// `selectedItems` / `itemsToMove` as they start, so by the time the parent looks the set
+        /// is empty. Carrying the items in the action is the only way the parent can see them.
+        /// See #22; this is the delegate shape #19 generalises.
+        case willRemoveItems(Set<FileSystemItem>)
         case cancelMove
         case alert(PresentationAction<Alert>)
         case playAllTapped
@@ -530,12 +540,15 @@ struct CollectionsFeature {
                 let itemsToDelete = state.selectedItems
                 state.selectedItems.removeAll()
                 state.isSelectionMode = false
-                return .run { send in
-                    for item in itemsToDelete {
-                        try? await fileManager.deleteItem(item.url)
+                return .merge(
+                    .send(.willRemoveItems(itemsToDelete)),
+                    .run { send in
+                        for item in itemsToDelete {
+                            try? await fileManager.deleteItem(item.url)
+                        }
+                        await send(.refreshFiles)
                     }
-                    await send(.refreshFiles)
-                }
+                )
 
             case .alert:
                 return .none
@@ -570,7 +583,9 @@ struct CollectionsFeature {
                 state.selectedItems.removeAll()
                 state.isSelectionMode = false
 
-                return .run { send in
+                return .merge(
+                    .send(.willRemoveItems(itemsToMove)),
+                    .run { send in
                     for item in itemsToMove {
                         if item.url.deletingLastPathComponent().path == destination.path {
                             continue
@@ -593,8 +608,12 @@ struct CollectionsFeature {
                             print("❌ Failed to move \(item.name): \(error.localizedDescription)")
                         }
                     }
-                    await send(.refreshFiles)
-                }
+                        await send(.refreshFiles)
+                    }
+                )
+
+            case .willRemoveItems:
+                return .none // Handled by parent — see #22
 
             case .cancelMove:
                 state.itemsToMove.removeAll()

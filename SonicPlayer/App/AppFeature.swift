@@ -328,12 +328,15 @@ struct AppFeature {
                 return .send(.player(.scenePhaseChanged(phase)))
 
             // Clear player if the currently playing track (or its parent) is being moved
-            case .filesRoot(.moveToDestination):
+            // Clear the player when the track it is playing is deleted or moved away.
+            //
+            // These read the items out of the ACTION, not out of state. CollectionsFeature runs
+            // first and clears selectedItems/itemsToMove as it starts, so reading state here
+            // always saw an empty set and this never fired — #22.
+            case let .filesRoot(.willRemoveItems(items)),
+                 let .filesPath(.element(id: _, action: .willRemoveItems(items))):
                 if let currentTrack = state.player.currentTrack,
-                   PathMatching.isAffected(
-                       trackURL: currentTrack.url,
-                       byAnyOf: state.filesRoot.itemsToMove.map(\.url)
-                   ) {
+                   PathMatching.isAffected(trackURL: currentTrack.url, byAnyOf: items.map(\.url)) {
                     return .send(.player(.clearSession))
                 }
                 return .none
@@ -341,28 +344,6 @@ struct AppFeature {
             // After files are reloaded (after any mutation), refresh home recent files too
             case .filesRoot(.itemsLoaded):
                 return .send(.home(.loadRecentFiles))
-
-            // Clear player if currently playing track is deleted (file or parent folder)
-            case .filesRoot(.alert(.presented(.confirmDelete))):
-                if let currentTrack = state.player.currentTrack,
-                   PathMatching.isAffected(
-                       trackURL: currentTrack.url,
-                       byAnyOf: state.filesRoot.selectedItems.map(\.url)
-                   ) {
-                    return .send(.player(.clearSession))
-                }
-                return .none
-
-            case let .filesPath(.element(id: id, action: .alert(.presented(.confirmDelete)))):
-                if let currentTrack = state.player.currentTrack,
-                   let filesState = state.filesPath[id: id],
-                   PathMatching.isAffected(
-                       trackURL: currentTrack.url,
-                       byAnyOf: filesState.selectedItems.map(\.url)
-                   ) {
-                    return .send(.player(.clearSession))
-                }
-                return .none
 
             case .player, .home, .filesRoot, .filesPath, .settings, .recording, .onboarding:
                 return .none
