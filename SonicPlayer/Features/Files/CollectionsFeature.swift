@@ -32,6 +32,15 @@ struct CollectionsFeature {
         
         var documentsDirectoryURL: URL?
 
+        /// The audio files in this directory, in display order. Extracted from four identical
+        /// `compactMap` blocks in AppFeature that built the playback queue (#15).
+        var audioFiles: [AudioFile] {
+            items.compactMap { item in
+                if case let .file(audioFile) = item { return audioFile }
+                return nil
+            }
+        }
+
         var filteredItems: [FileSystemItem] {
             let sortedItems: [FileSystemItem] = items
             

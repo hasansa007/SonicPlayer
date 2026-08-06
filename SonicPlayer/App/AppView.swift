@@ -13,6 +13,19 @@ struct AppView: View {
     @State private var settingsViewModel: SettingsViewModel = SettingsViewModel()
     @State private var onboardingViewModel: OnboardingViewModel? = OnboardingViewModel.ifNeeded()
 
+    // Player and Home join them (#15, #16). Home holds the *same* PlayerViewModel instance, which
+    // is what let `HomeFeature`'s three mirrored playback properties be deleted rather than ported
+    // — so they are built together here, not independently.
+    @State private var player: PlayerViewModel
+    @State private var home: HomeViewModel
+
+    init(store: StoreOf<AppFeature>) {
+        self.store = store
+        let player = PlayerViewModel()
+        _player = State(initialValue: player)
+        _home = State(initialValue: HomeViewModel(player: player))
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             // Main content
@@ -55,7 +68,7 @@ struct AppView: View {
                     .onAppear {
                         if !ScreenshotMode.isEnabled {
                             store.send(.filesRoot(.onAppear))
-                            store.send(.home(.loadRecentFiles))
+                            home.loadRecentFiles()
                         }
                     }
             } destination: { collectionsStore in
@@ -66,17 +79,17 @@ struct AppView: View {
             .preferredColorScheme(settingsViewModel.colorScheme.colorScheme)
 
             // Mini Player (full-width bottom bar)
-            if store.player.shouldShowMiniPlayer {
+            if player.shouldShowMiniPlayer {
                 VStack(spacing: 0) {
                     Spacer()
-                    MiniPlayerView(store: store.scope(state: \.player, action: \.player))
+                    MiniPlayerView(player: player)
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .zIndex(1)
             }
 
             // Record FAB (home screen only, not on empty state)
-            if !store.isSettingsSheetPresented && store.filesPath.isEmpty && !(store.filesRoot.items.isEmpty && store.home.recentFiles.isEmpty) {
+            if !store.isSettingsSheetPresented && store.filesPath.isEmpty && !(store.filesRoot.items.isEmpty && home.recentFiles.isEmpty) {
                 VStack {
                     Spacer()
                     HStack {
@@ -85,16 +98,13 @@ struct AppView: View {
                     }
                 }
                 .padding(.trailing, 20)
-                .padding(.bottom, store.player.shouldShowMiniPlayer ? 72 : 20)
+                .padding(.bottom, player.shouldShowMiniPlayer ? 72 : 20)
                 .zIndex(2)
             }
         }
         // Global sheets
-        .sheet(isPresented: Binding(
-            get: { store.player.isExpanded },
-            set: { store.send(.player(.setExpanded($0))) }
-        )) {
-            PlayerView(store: store.scope(state: \.player, action: \.player))
+        .sheet(isPresented: $player.isExpanded) {
+            PlayerView(player: player)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
@@ -110,7 +120,12 @@ struct AppView: View {
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
-            store.send(.scenePhaseChanged(newPhase))
+            player.scenePhaseChanged(newPhase)
+        }
+        .onChange(of: store.commands) { _, commands in
+            guard !commands.isEmpty else { return }
+            commands.forEach(apply)
+            store.send(.commandsHandled)
         }
         .onOpenURL { url in
             store.send(.openedFromFiles(url))
@@ -118,12 +133,15 @@ struct AppView: View {
         .onAppear {
             wireViewModels()
             if ScreenshotMode.isEnabled {
+                if let screen = ScreenshotMode.targetScreen {
+                    ScreenshotDemoData.seedViewModels(player: player, home: home, for: screen)
+                }
                 // In screenshot mode, show recording sheet if needed
                 if ScreenshotMode.targetScreen == .recording || ScreenshotMode.targetScreen == .editRecording {
                     store.send(.recordButtonTapped)
                 }
             } else {
-                store.send(.player(.restoreSession))
+                player.restoreSession()
             }
         }
         .fullScreenCover(isPresented: Binding(
@@ -144,15 +162,41 @@ private extension AppView {
     /// Replaces the cross-feature action taps AppFeature used to carry: settings changes
     /// reaching the player, and onboarding completion clearing itself.
     func wireViewModels() {
-        settingsViewModel.onDefaultPlaybackSpeedChanged = { speed in
-            store.send(.player(.setPlaybackSpeed(speed)))
+        settingsViewModel.onDefaultPlaybackSpeedChanged = { [player] speed in
+            player.setPlaybackSpeed(speed)
         }
-        settingsViewModel.onDefaultSkipDurationChanged = { duration in
-            store.send(.player(.setSkipDuration(duration)))
+        settingsViewModel.onDefaultSkipDurationChanged = { [player] duration in
+            player.setSkipDuration(duration)
         }
         onboardingViewModel?.onGetStarted = {
             OnboardingViewModel.markSeen()
             onboardingViewModel = nil
+        }
+
+        // Home's former `.none // Handled by parent` cases. Each needs reducer state — the file
+        // browser's selection, the navigation stack, a sheet flag — so each lands back on the
+        // store rather than being reimplemented on the view model.
+        home.onImportTapped = { store.send(.importTapped) }
+        home.onNewCollectionTapped = { store.send(.filesRoot(.createCollectionTapped)) }
+        home.onViewAllCollectionsTapped = { store.send(.viewAllCollectionsTapped) }
+        home.onRenameFile = { store.send(.filesRoot(.renameItemTapped(.file($0)))) }
+        home.onDeleteFile = { store.send(.deleteRecentFile($0)) }
+        home.onEditFile = { store.send(.editRecentFile($0)) }
+        home.onMoveFile = { store.send(.moveRecentFile($0)) }
+    }
+
+    /// Drains `AppFeature.State.commands`. Temporary — see the doc comment there; #19 replaces the
+    /// channel with a coordinator that holds the view models directly.
+    func apply(_ command: AppFeature.AppCommand) {
+        switch command {
+        case let .play(file, queue, source):
+            player.loadTrack(file, queue: queue, source: source)
+        case .pauseIfPlaying:
+            player.pauseIfPlaying()
+        case let .clearSessionIfAffected(urls):
+            player.clearSessionIfAffected(by: urls)
+        case .refreshRecents:
+            home.loadRecentFiles()
         }
     }
 
@@ -211,7 +255,7 @@ private extension AppView {
             if store.filesRoot.isLoading && store.filesRoot.items.isEmpty {
                 ProgressView()
                     .tint(.sonicPrimary)
-            } else if store.filesRoot.items.isEmpty && store.home.recentFiles.isEmpty {
+            } else if store.filesRoot.items.isEmpty && home.recentFiles.isEmpty {
                 // Empty state
                 VStack(spacing: 20) {
                     Spacer()
@@ -246,7 +290,7 @@ private extension AppView {
                         }
 
                         Button {
-                            store.send(.home(.importTapped))
+                            home.onImportTapped()
                         } label: {
                             Label("Import", systemImage: "square.and.arrow.down")
                                 .font(.subheadline)
@@ -271,11 +315,11 @@ private extension AppView {
                         recentFilesSection
                     }
                     .padding(.vertical)
-                    .padding(.bottom, store.player.shouldShowMiniPlayer ? 80 : 40)
+                    .padding(.bottom, player.shouldShowMiniPlayer ? 80 : 40)
                 }
                 .refreshable {
                     await store.send(.filesRoot(.refreshFiles)).finish()
-                    store.send(.home(.loadRecentFiles))
+                    home.loadRecentFiles()
                 }
             }
         }
@@ -285,7 +329,7 @@ private extension AppView {
 
     @ViewBuilder
     var recentFilesSection: some View {
-        if !store.home.recentFiles.isEmpty {
+        if !home.recentFiles.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Recent Media")
@@ -303,18 +347,18 @@ private extension AppView {
                 .padding(.horizontal)
 
                 List {
-                    ForEach(store.home.recentFiles) { file in
+                    ForEach(home.recentFiles) { file in
                         recentFileRow(file: file)
                             .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
                             .listRowBackground(Color.clear)
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) {
-                                    store.send(.home(.deleteRecentFile(file)))
+                                    home.onDeleteFile(file)
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
                                 Button {
-                                    store.send(.home(.renameRecentFile(file)))
+                                    home.onRenameFile(file)
                                 } label: {
                                     Label("Rename", systemImage: "pencil")
                                 }
@@ -322,7 +366,7 @@ private extension AppView {
                             }
                             .swipeActions(edge: .leading) {
                                 Button {
-                                    store.send(.home(.editRecentFile(file)))
+                                    home.onEditFile(file)
                                 } label: {
                                     Label("Edit", systemImage: "waveform.and.magnifyingglass")
                                 }
@@ -339,7 +383,7 @@ private extension AppView {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .scrollDisabled(true)
-                .frame(height: CGFloat(store.home.recentFiles.count) * 64)
+                .frame(height: CGFloat(home.recentFiles.count) * 64)
             }
         }
     }
@@ -347,7 +391,7 @@ private extension AppView {
     func recentFileRow(file: AudioFile) -> some View {
         MediaFileRowView(
             file: file,
-            onTap: { store.send(.home(.fileTapped(file))) }
+            onTap: { home.fileTapped(file) }
         )
     }
 

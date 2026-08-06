@@ -44,7 +44,7 @@ extension AppView {
 
                         // "View All" dashed card
                         Button {
-                            store.send(.home(.viewAllCollectionsTapped))
+                            store.send(.viewAllCollectionsTapped)
                         } label: {
                             VStack(spacing: 8) {
                                 Image(systemName: "square.grid.2x2")

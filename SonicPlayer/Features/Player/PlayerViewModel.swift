@@ -90,8 +90,12 @@ final class PlayerViewModel {
         isShuffleEnabled = UserDefaults.standard.savedShuffleEnabled
     }
 
-    deinit {
-        // TCA cancelled in-flight effects when the store scope died. Nothing does that here.
+    /// TCA cancelled in-flight effects when the store scope died. Nothing does that here.
+    ///
+    /// `isolated` because a plain `deinit` on a `@MainActor` class is nonisolated and so cannot
+    /// read the two task properties at all. Both tasks capture `self` weakly, so this is
+    /// reachable rather than kept alive by what it is cancelling.
+    isolated deinit {
         timeObserverTask?.cancel()
         loadTask?.cancel()
     }
@@ -437,6 +441,26 @@ final class PlayerViewModel {
                 attempt += 1
             }
         }
+    }
+
+    /// Stops playback when the playing track is one of `urls`, or lives inside a folder in it.
+    ///
+    /// `AppFeature` used to run this check itself, reading `state.player.currentTrack`. The track
+    /// lives here now, so the check comes with it — the caller sends only what is being removed.
+    /// The items still travel in the message rather than being read back from the file browser,
+    /// because `CollectionsFeature` clears its selection before the removal completes (#22).
+    func clearSessionIfAffected(by urls: [URL]) {
+        guard
+            let currentTrack,
+            PathMatching.isAffected(trackURL: currentTrack.url, byAnyOf: urls)
+        else { return }
+        clearSession()
+    }
+
+    /// Recording takes over the shared `AVAudioSession`, so playback stops before the sheet opens.
+    func pauseIfPlaying() {
+        guard isPlaying else { return }
+        playPauseTapped()
     }
 
     func clearSession() {
