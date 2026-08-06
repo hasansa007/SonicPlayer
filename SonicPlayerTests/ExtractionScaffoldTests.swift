@@ -107,6 +107,66 @@ struct ExtractionScaffoldTests {
         #expect(store.state.commands == [.clearSessionIfAffected([other.url])])
     }
 
+    // MARK: - The command channel (#15) — dies with it at #19
+
+    /// Tapping a file plays it **with the rest of the directory as the queue**. That queue is the
+    /// reason the channel exists at all: it is computed from `filesRoot.items`, which only the
+    /// store has, so the view cannot call `player.loadTrack` itself.
+    @MainActor
+    @Test func test_tappingAFile_emitsPlayWithTheWholeDirectoryAsQueue() async {
+        let a = file("/Docs/A.mp3"), b = file("/Docs/B.mp3")
+
+        var state = AppFeature.State()
+        state.filesRoot.items = [.file(a), .file(b)]
+
+        let store = makeStore(state)
+
+        await store.send(.filesRoot(.fileTapped(a)))
+
+        #expect(store.state.commands == [.play(a, [a, b], .singleFile)])
+    }
+
+    /// Play All starts at the first file rather than wherever the selection was.
+    @MainActor
+    @Test func test_playAll_emitsPlayStartingAtTheFirstFile() async {
+        let a = file("/Docs/A.mp3"), b = file("/Docs/B.mp3")
+
+        var state = AppFeature.State()
+        state.filesRoot.items = [.file(a), .file(b)]
+
+        let store = makeStore(state)
+
+        await store.send(.filesRoot(.playAllTapped))
+
+        #expect(store.state.commands == [.play(a, [a, b], .singleFile)])
+    }
+
+    /// Recording takes over the shared `AVPlayer`, so opening the sheet must pause first. The
+    /// reducer used to check `state.player.isPlaying` and only then send; it cannot see that any
+    /// more, so it always asks and the view model no-ops when nothing is playing.
+    @MainActor
+    @Test func test_openingTheRecordingSheet_emitsPause() async {
+        let store = makeStore(AppFeature.State())
+
+        await store.send(.recordButtonTapped)
+
+        #expect(store.state.commands.contains(.pauseIfPlaying))
+        #expect(store.state.isRecordingSheetPresented)
+    }
+
+    /// `AppView` sends this after draining. Without it the array grows for the life of the app and
+    /// every later `.onChange` replays commands that already ran.
+    @MainActor
+    @Test func test_commandsHandled_emptiesTheChannel() async {
+        let store = makeStore(AppFeature.State())
+
+        await store.send(.recordButtonTapped)
+        #expect(!store.state.commands.isEmpty)
+
+        await store.send(.commandsHandled)
+        #expect(store.state.commands.isEmpty)
+    }
+
     // MARK: -
 
     private func file(_ path: String) -> AudioFile {
