@@ -58,7 +58,7 @@ private func loadRecentFiles(fileManager: FileManagerClient) async throws -> [Au
     var seenNames: Set<String> = []
     try await collectFiles(from: nil, into: &allFiles, seenNames: &seenNames, fileManager: fileManager)
     allFiles.sort { $0.creationDate > $1.creationDate }
-    return Array(allFiles.prefix(10))
+    return Array(allFiles.prefix(3))
 }
 
 private func collectFiles(from directory: URL?, into files: inout [AudioFile], seenNames: inout Set<String>, fileManager: FileManagerClient) async throws {

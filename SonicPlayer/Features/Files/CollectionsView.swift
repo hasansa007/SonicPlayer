@@ -167,7 +167,21 @@ struct CollectionsView: View {
                     MediaFileRowView(
                         file: rowStore.file,
                         showsCollectionName: false,
-                        onTap: { rowStore.send(.tapped) }
+                        isSelecting: isSelecting,
+                        isSelected: selectedFileIds.contains(rowStore.file.id),
+                        onTap: {
+                            if isSelecting {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    if selectedFileIds.contains(rowStore.file.id) {
+                                        selectedFileIds.remove(rowStore.file.id)
+                                    } else {
+                                        selectedFileIds.insert(rowStore.file.id)
+                                    }
+                                }
+                            } else {
+                                rowStore.send(.tapped)
+                            }
+                        }
                     )
                         .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
                         .listRowBackground(Color.clear)

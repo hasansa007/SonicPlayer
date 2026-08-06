@@ -4,11 +4,19 @@ import SwiftUI
 struct MediaFileRowView: View {
     let file: AudioFile
     var showsCollectionName: Bool = true
+    var isSelecting: Bool = false
+    var isSelected: Bool = false
     let onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
+                if isSelecting {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.title3)
+                        .foregroundColor(isSelected ? .sonicPrimary : .sonicTextMuted)
+                }
+
                 ZStack {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(LinearGradient.sonicGradient)
