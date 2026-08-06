@@ -35,7 +35,10 @@ enum PlaylistSource: Equatable, Codable {
 struct PlayerFeature {
     @ObservableState
     struct State: Identifiable, Equatable {
-        var id: String? { currentTrack?.url.absoluteString ?? UUID().uuidString } // Use currentTrack's URL for ID, if any.
+        // Use currentTrack's URL for ID, if any. Must NOT fall back to a fresh UUID: `id` is
+        // computed and is the first clause of `==`, so a random fallback makes State unequal to
+        // itself whenever no track is loaded.
+        var id: String? { currentTrack?.url.absoluteString }
         // Session storage in temp directory
         static var sessionURL: URL {
             let tempDir = FileManager.default.temporaryDirectory
