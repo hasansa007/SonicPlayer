@@ -31,6 +31,34 @@ Requires Xcode 27 — `xcode-select -p` must point at the Xcode app, not Command
 
 No CocoaPods or Carthage. All dependencies managed via Swift Package Manager.
 
+## Architecture — and what it deliberately is not
+
+```
+View (SwiftUI)  ->  ViewModel (@Observable)  ->  Client (struct of closures)  ->  AVFoundation / FileManager
+
+Domain/   pure decision logic, Foundation only, no framework and no TCA
+Models/   plain data types
+```
+
+There is **no Repository, no DataSource, no UseCase and no DTO layer**, and that is a decision
+rather than an omission. Those layers solve problems this app does not have:
+
+| Layer | Why it is absent |
+|---|---|
+| Repository / DataSource | They hide *which source answered* — cache vs network. This app has one source: the filesystem. The clients already are that abstraction, substitutable by plain assignment. |
+| DTO | Wire formats drift from domain models. There is no wire. The only serialised type is `PlaybackSession`, whose JSON shape is pinned by test because it *is* the on-disk contract. |
+| UseCase | They hold orchestration reusable across UIs. There is one UI, and the business rules are pure functions in `Domain/` — wrapping each in a protocol and a class to call one function is ceremony. |
+
+**This changes when a backend appears.** #7 (StudyHub auth) introduces a network, at which point DTOs
+and a repository earn their place — **for that feature**, not retrofitted across a local-only audio
+player.
+
+Known cost of the current shape: orchestration lives in view models. `PlayerViewModel.restoreSession`
+is real business logic in the presentation layer. If a view model keeps growing, extract the
+orchestration into `Domain/` rather than reaching for the full layered stack.
+
+Note also that this codebase is **async/await throughout**, not Combine.
+
 ## Architecture
 
 **TCA (The Composable Architecture)** with strict unidirectional data flow:
