@@ -13,8 +13,8 @@ struct AudioRecorderClient {
     let isRecording: @Sendable () async -> Bool
 }
 
-extension AudioRecorderClient: DependencyKey {
-    static let liveValue: AudioRecorderClient = {
+extension AudioRecorderClient {
+    static let live: AudioRecorderClient = {
         let recorder = RecorderActor()
 
         return Self(
@@ -58,7 +58,7 @@ extension AudioRecorderClient: DependencyKey {
         )
     }()
 
-    static let testValue = Self(
+    static let test = Self(
         checkPermissions: { true },
         requestPermissions: { true },
         startRecording: { _ in },
@@ -67,6 +67,15 @@ extension AudioRecorderClient: DependencyKey {
         peakPower: { 0 },
         isRecording: { false }
     )
+}
+
+// MARK: - TCA bridge
+//
+// Kept separate so #20 can delete this whole extension in one cut, leaving `live`
+// and `test` — which reference no TCA — exactly as they are.
+extension AudioRecorderClient: DependencyKey {
+    static var liveValue: AudioRecorderClient { .live }
+    static var testValue: AudioRecorderClient { .test }
 }
 
 extension DependencyValues {

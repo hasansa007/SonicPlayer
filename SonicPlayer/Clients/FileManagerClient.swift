@@ -16,8 +16,8 @@ struct FileManagerClient {
     var documentsDirectory: @Sendable () -> URL = { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
 }
 
-extension FileManagerClient: DependencyKey {
-    static let liveValue: FileManagerClient = {
+extension FileManagerClient {
+    static let live: FileManagerClient = {
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
         @Sendable func stableAudioID(for url: URL) -> UUID {
@@ -225,7 +225,7 @@ extension FileManagerClient: DependencyKey {
         )
     }()
 
-    static let testValue = Self(
+    static let test = Self(
         listItems: { _ in [] },
         createCollection: { _, _ in },
         createCollectionForImport: { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] },
@@ -245,6 +245,15 @@ extension FileManagerClient: DependencyKey {
         },
         documentsDirectory: { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
     )
+}
+
+// MARK: - TCA bridge
+//
+// Kept separate so #20 can delete this whole extension in one cut, leaving `live`
+// and `test` — which reference no TCA — exactly as they are.
+extension FileManagerClient: DependencyKey {
+    static var liveValue: FileManagerClient { .live }
+    static var testValue: FileManagerClient { .test }
 }
 
 extension DependencyValues {

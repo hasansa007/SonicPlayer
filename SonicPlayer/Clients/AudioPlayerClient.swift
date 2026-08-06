@@ -22,6 +22,15 @@ struct AudioPlayerClient {
     var timeUpdates: @Sendable () async -> AsyncStream<TimeInterval> = { .finished }
 }
 
+// MARK: - TCA bridge
+//
+// Kept separate so #20 can delete this whole extension in one cut, leaving `live`
+// and `test` — which reference no TCA — exactly as they are.
+extension AudioPlayerClient: DependencyKey {
+    static var liveValue: AudioPlayerClient { .live }
+    static var testValue: AudioPlayerClient { .test }
+}
+
 extension DependencyValues {
     var audioPlayer: AudioPlayerClient {
         get { self[AudioPlayerClient.self] }
@@ -29,7 +38,7 @@ extension DependencyValues {
     }
 }
 
-extension AudioPlayerClient: DependencyKey {
+extension AudioPlayerClient {
     static func makeLive() -> AudioPlayerClient {
         let player = AudioPlayerManager()
         return Self(
@@ -83,9 +92,9 @@ extension AudioPlayerClient: DependencyKey {
         )
     }
 
-    static let liveValue: AudioPlayerClient = makeLive()
+    static let live: AudioPlayerClient = makeLive()
 
-    static let testValue = Self()
+    static let test = Self()
 }
 
 // ...

@@ -8,8 +8,8 @@ struct AudioTrimmerClient {
     var deleteAudioRange: @Sendable (URL, TimeInterval, TimeInterval) async throws -> URL
 }
 
-extension AudioTrimmerClient: DependencyKey {
-    static let liveValue: AudioTrimmerClient = {
+extension AudioTrimmerClient {
+    static let live: AudioTrimmerClient = {
         return Self(
             trimAudio: { sourceURL, startTime, endTime in
                 let asset = AVURLAsset(url: sourceURL)
@@ -137,10 +137,19 @@ extension AudioTrimmerClient: DependencyKey {
         )
     }()
 
-    static let testValue = Self(
+    static let test = Self(
         trimAudio: { url, _, _ in url },
         deleteAudioRange: { url, _, _ in url }
     )
+}
+
+// MARK: - TCA bridge
+//
+// Kept separate so #20 can delete this whole extension in one cut, leaving `live`
+// and `test` — which reference no TCA — exactly as they are.
+extension AudioTrimmerClient: DependencyKey {
+    static var liveValue: AudioTrimmerClient { .live }
+    static var testValue: AudioTrimmerClient { .test }
 }
 
 extension DependencyValues {
