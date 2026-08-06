@@ -38,6 +38,7 @@ No CocoaPods or Carthage. All dependencies managed via Swift Package Manager.
 - **Features/** - Each feature has a `{Name}Feature.swift` (reducer) and `{Name}View.swift` (UI). Home is the exception: it has no view file, its UI is inlined in `App/AppView.swift`
 - **Clients/** - Dependency-injected wrappers around system frameworks (AVFoundation, FileManager)
 - **Models/** - Plain data types (`AudioFile`, `FileSystemItem`, `PlaybackSpeed`)
+- **Domain/** - Pure decision logic, Foundation only, no TCA. Extracted from reducers so its tests survive the TCA→MVVM migration unchanged (#11). Add logic here rather than inlining it in a reducer.
 - **Utilities/** - Shared UI components and helpers
 - **App/** - Root `AppFeature` composes all child reducers; `AppView` is a single screen with no tab bar. Player, recording and import are presented as **sheets** over Home; settings is **pushed** via `.navigationDestination` (note the state flag is still named `isSettingsSheetPresented`)
 
@@ -83,6 +84,7 @@ SonicPlayer/
   Features/      # Home/, Player/, Files/, Recording/, Settings/
   Clients/       # AudioPlayerClient, AudioRecorderClient, FileManagerClient, ArtworkClient, AudioTrimmerClient
   Models/        # AudioFile, FileSystemItem, PlaybackSpeed
+  Domain/        # QueueMath, PathMatching, UniqueNameResolver, SessionCodec, SessionRestorePolicy, RecordingFilename, PlaybackSession
   Utilities/     # ColorPalette, Theme, WaveformView, EmptyStateView, ShareSheet, etc.
   Resources/     # Assets.xcassets, Localizable.xcstrings, Quickstart.json, Info.plist
 ```

@@ -109,23 +109,24 @@ final class SessionDomainTests: XCTestCase {
     func test_filenameFormat() {
         let date = Date(timeIntervalSince1970: 1_770_386_097)  // 2026-02-06 established below
         let name = RecordingFilename.make(
-            at: date, timeZone: TimeZone(secondsFromGMT: 0)!
+            at: date, timeZone: TimeZone(secondsFromGMT: 0)!, locale: Locale(identifier: "en_US_POSIX")
         )
         XCTAssertTrue(name.hasPrefix("Recording "), name)
         XCTAssertTrue(name.hasSuffix(".m4a"), name)
     }
 
     func test_filenameUsesDotsNotColons() {
-        let name = RecordingFilename.make(at: Date(), timeZone: TimeZone(secondsFromGMT: 0)!)
+        let name = RecordingFilename.make(at: Date(), timeZone: TimeZone(secondsFromGMT: 0)!, locale: Locale(identifier: "en_US_POSIX"))
         XCTAssertFalse(name.contains(":"), "Colons display as '/' in Finder: \(name)")
     }
 
     func test_filenameIsStableForTheSameInstant() {
         let date = Date(timeIntervalSince1970: 1_000_000)
         let tz = TimeZone(secondsFromGMT: 0)!
+        let posix = Locale(identifier: "en_US_POSIX")
         XCTAssertEqual(
-            RecordingFilename.make(at: date, timeZone: tz),
-            RecordingFilename.make(at: date, timeZone: tz)
+            RecordingFilename.make(at: date, timeZone: tz, locale: posix),
+            RecordingFilename.make(at: date, timeZone: tz, locale: posix)
         )
     }
 
@@ -133,7 +134,10 @@ final class SessionDomainTests: XCTestCase {
         // 2001-09-09 01:46:40 UTC
         let date = Date(timeIntervalSince1970: 1_000_000_000)
         XCTAssertEqual(
-            RecordingFilename.make(at: date, timeZone: TimeZone(secondsFromGMT: 0)!),
+            RecordingFilename.make(
+                at: date, timeZone: TimeZone(secondsFromGMT: 0)!,
+                locale: Locale(identifier: "en_US_POSIX")
+            ),
             "Recording 2001-09-09 01.46.40.m4a"
         )
     }

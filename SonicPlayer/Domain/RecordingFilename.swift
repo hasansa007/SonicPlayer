@@ -14,12 +14,23 @@ enum RecordingFilename {
     static let fileExtension = "m4a"
 
     /// e.g. `Recording 2026-08-06 14.14.57.m4a`
-    static func make(at date: Date, calendar: Calendar = .current, timeZone: TimeZone = .current) -> String {
+    ///
+    /// `locale` defaults to `.current`, matching the bare `DateFormatter` this replaced — tests
+    /// pass `en_US_POSIX` for determinism. Do **not** hardcode POSIX here: on a device using a
+    /// non-Western numbering system (this app ships ar, bn and hi) the current behaviour renders
+    /// the digits in that system, and #11 is behaviour-preserving. See #23 for why that is worth
+    /// changing deliberately rather than as a side effect of an extraction.
+    static func make(
+        at date: Date,
+        calendar: Calendar = .current,
+        timeZone: TimeZone = .current,
+        locale: Locale = .current
+    ) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = dateFormat
         formatter.calendar = calendar
         formatter.timeZone = timeZone
-        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.locale = locale
         return "Recording \(formatter.string(from: date)).\(fileExtension)"
     }
 }
