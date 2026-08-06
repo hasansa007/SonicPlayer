@@ -51,6 +51,11 @@ final class RecordingSaveDismissTests: XCTestCase {
         } withDependencies: {
             $0.fileManager.listItems = { _ in [] }
             $0.audioPlayer.stop = {}
+            // PlayerFeature.State holds @Shared(.fileStorage(session.json)). Without this the
+            // shared value is read from and written to the real temp directory while the test
+            // runs, so PlayerFeature.State compares unequal mid-assertion and TestStore reports
+            // "State was not expected to change" with no visible diff.
+            $0.defaultFileStorage = .inMemory
         }
         store.exhaustivity = .off
         return store
