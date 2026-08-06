@@ -247,10 +247,7 @@ struct AppFeature {
                 return .none
 
             case .recording(.recordingSaved):
-                // Only dismiss if edit view is NOT being shown
-                if state.recording.editRecording == nil {
-                    state.isRecordingSheetPresented = false
-                }
+                state.isRecordingSheetPresented = false
                 return .merge(
                     .send(.filesRoot(.refreshFiles)),
                     .send(.home(.loadRecentFiles))
@@ -331,14 +328,6 @@ struct AppFeature {
                 state.home.isPlaying = false
                 state.home.playbackProgress = 0
                 return .none
-
-            // Dismiss recording sheet when edit view closes
-            case .recording(.editRecording(.dismiss)):
-                state.isRecordingSheetPresented = false
-                return .merge(
-                    .send(.filesRoot(.refreshFiles)),
-                    .send(.home(.loadRecentFiles))
-                )
 
             // MARK: - Lifecycle
 
