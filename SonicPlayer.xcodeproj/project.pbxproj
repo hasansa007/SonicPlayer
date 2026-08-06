@@ -53,6 +53,7 @@
 		A6000009000000000000001 /* SwipeToDelete.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6000010000000000000001 /* SwipeToDelete.swift */; };
 		A7000009000000000000001 /* MediaFileRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7000010000000000000001 /* MediaFileRowView.swift */; };
 		A8000009000000000000001 /* InAppCollectionPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8000010000000000000001 /* InAppCollectionPicker.swift */; };
+		A9000001000000000000001 /* UniqueNameResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000010000000000000001 /* UniqueNameResolver.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -115,6 +116,7 @@
 		A6000010000000000000001 /* SwipeToDelete.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeToDelete.swift; sourceTree = "<group>"; };
 		A7000010000000000000001 /* MediaFileRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFileRowView.swift; sourceTree = "<group>"; };
 		A8000010000000000000001 /* InAppCollectionPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InAppCollectionPicker.swift; sourceTree = "<group>"; };
+		A9000010000000000000001 /* UniqueNameResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UniqueNameResolver.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -176,6 +178,7 @@
 				A1000044000000000000001 /* Features */,
 				A1000045000000000000001 /* Clients */,
 				A1000046000000000000001 /* Models */,
+				A9000020000000000000001 /* Domain */,
 				A1000047000000000000001 /* Utilities */,
 				A1000048000000000000001 /* Resources */,
 			);
@@ -237,6 +240,14 @@
 				A1000030000000000000003 /* FileSystemItem.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		A9000020000000000000001 /* Domain */ = {
+			isa = PBXGroup;
+			children = (
+				A9000010000000000000001 /* UniqueNameResolver.swift */,
+			);
+			path = Domain;
 			sourceTree = "<group>";
 		};
 		A1000047000000000000001 /* Utilities */ = {
@@ -466,6 +477,7 @@
 				A1000029000000000000001 /* PlaybackSpeed.swift in Sources */,
 				A1000030000000000000002 /* FileSystemItem.swift in Sources */,
 				A1000031000000000000001 /* ColorPalette.swift in Sources */,
+				A9000001000000000000001 /* UniqueNameResolver.swift in Sources */,
 				86662FEC2EF7EAC1000577F1 /* AudioRecorderClient.swift in Sources */,
 				86662FED2EF7EAC1000577F1 /* AudioTrimmerClient.swift in Sources */,
 				8690789B2EEC9F8D005620F9 /* ArtworkClient.swift in Sources */,
