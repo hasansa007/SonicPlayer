@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-SonicPlayer is a native iOS audio player app (iOS 18.0+) built with **SwiftUI** and **The Composable Architecture (TCA)** v1.23.1. It supports browsing, playing, and recording audio files with a minimalist Sonic teal design.
+SonicPlayer is a native iOS audio player app (iOS 18.0+) built with **SwiftUI** and **The Composable Architecture (TCA)** v1.26.1. It supports browsing, playing, and recording audio files with a minimalist Sonic teal design.
 
 **Bundle ID:** `com.hasan.sonicplayer`
 
@@ -13,10 +13,21 @@ SonicPlayer is a native iOS audio player app (iOS 18.0+) built with **SwiftUI** 
 open SonicPlayer.xcodeproj
 
 # Build via CLI (iPhone simulator)
-xcodebuild -project SonicPlayer.xcodeproj -scheme SonicPlayer -destination 'platform=iOS Simulator,name=iPhone 16' build
+xcodebuild -project SonicPlayer.xcodeproj -scheme SonicPlayer \
+  -destination 'platform=iOS Simulator,name=iPhone 17' -skipMacroValidation build
+
+# Run the tests
+xcodebuild test -project SonicPlayer.xcodeproj -scheme SonicPlayer \
+  -destination 'platform=iOS Simulator,name=iPhone 17' -skipMacroValidation
 
 # SPM dependencies resolve automatically on first build
 ```
+
+`-skipMacroValidation` is required from the CLI: TCA ships a macro, and Xcode gates
+unapproved macros behind a GUI trust prompt that `xcodebuild` cannot answer. In the Xcode
+app you approve it once instead.
+
+Requires Xcode 27 — `xcode-select -p` must point at the Xcode app, not Command Line Tools.
 
 No CocoaPods or Carthage. All dependencies managed via Swift Package Manager.
 
@@ -24,17 +35,17 @@ No CocoaPods or Carthage. All dependencies managed via Swift Package Manager.
 
 **TCA (The Composable Architecture)** with strict unidirectional data flow:
 
-- **Features/** - Each feature has a `{Name}Feature.swift` (reducer) and `{Name}View.swift` (UI)
+- **Features/** - Each feature has a `{Name}Feature.swift` (reducer) and `{Name}View.swift` (UI). Home is the exception: it has no view file, its UI is inlined in `App/AppView.swift`
 - **Clients/** - Dependency-injected wrappers around system frameworks (AVFoundation, FileManager)
 - **Models/** - Plain data types (`AudioFile`, `FileSystemItem`, `PlaybackSpeed`)
 - **Utilities/** - Shared UI components and helpers
-- **App/** - Root `AppFeature` composes all child reducers; `AppView` is tab-based navigation
+- **App/** - Root `AppFeature` composes all child reducers; `AppView` is a single screen with no tab bar. Player, recording and import are presented as **sheets** over Home; settings is **pushed** via `.navigationDestination` (note the state flag is still named `isSettingsSheetPresented`)
 
 ### Feature modules
 | Feature | Reducer | Purpose |
 |---------|---------|---------|
 | Home | `HomeFeature` | Folder suggestions, recently added |
-| Files | `FilesFeature` | File/folder browser with navigation stack |
+| Files | `CollectionsFeature` | File/folder browser with navigation stack |
 | Player | `PlayerFeature` | Playback engine, queue, session persistence |
 | Recording | `RecordingFeature` | Audio capture and trimming |
 | Settings | `SettingsFeature` | Preferences via UserDefaults |
@@ -60,8 +71,9 @@ No CocoaPods or Carthage. All dependencies managed via Swift Package Manager.
 
 ## Dependencies
 
-- **ComposableArchitecture** v1.23.1 (sole third-party dependency)
-- All transitive deps (swift-dependencies, swift-perception, swift-navigation, etc.) are pinned in `Package.resolved`
+- **ComposableArchitecture** v1.26.1 (sole *direct* third-party dependency; it pulls in 13 more)
+- All transitive deps (swift-dependencies, swift-sharing, swift-perception, swift-navigation, etc.) are pinned in `Package.resolved` — 14 packages in total, all of which leave with TCA
+- Do **not** drop below 1.26: TCA 1.23.1 fails to compile on Xcode 27 (`cannot form key path to main actor-isolated subscript` in `NavigationStack+Observation.swift`, upstream issue #3950)
 
 ## File Structure
 
@@ -77,7 +89,23 @@ SonicPlayer/
 
 ## Testing
 
-No test suite yet. The TCA architecture supports testing via `TestStore` - all reducers are testable through dependency injection with mock clients.
+`SonicPlayerTests` is a unit-test target with zero third-party dependencies. It is a
+file-system-synchronized group, so any `.swift` file dropped into `SonicPlayerTests/` is
+compiled automatically — no project edit needed.
+
+Test reducers with a **non-exhaustive `TestStore`**:
+
+```swift
+let store = TestStore(initialState: state) { AppFeature() } withDependencies: {
+    $0.fileManager.listItems = { _ in [] }
+}
+store.exhaustivity = .off          // assert one thing, don't match every effect
+await store.send(.recording(.recordingSaved))
+XCTAssertFalse(store.state.isRecordingSheetPresented)
+```
+
+Never call `SomeFeature().reduce(into:action:)` directly — it is deprecated as of TCA 1.26,
+and it bypasses the store, so effects never run and the assertion covers less than it appears to.
 
 ## Git Workflow
 

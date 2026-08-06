@@ -18,12 +18,24 @@ struct SonicPlayerApp: App {
     @AppStorage("appLanguage") private var appLanguage = "system"
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
+    /// The unit-test bundle is hosted by this app, so the app launches during test runs. Building
+    /// the root store here would start real work — session restore, the playback clock, the audio
+    /// player — inside the test's dependency context, where those clients are unimplemented. That
+    /// surfaces as failures attributed to whichever test happens to be running, intermittently.
+    /// `store` is lazy, so not touching it here means it is never created under test.
+    private static let isRunningTests =
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+
     var body: some Scene {
         WindowGroup {
-            AppView(store: Self.store)
-                .environment(\.locale, resolvedLocale)
-                .environment(\.layoutDirection, resolvedLayoutDirection)
-                .id(appLanguage)
+            if Self.isRunningTests {
+                EmptyView()
+            } else {
+                AppView(store: Self.store)
+                    .environment(\.locale, resolvedLocale)
+                    .environment(\.layoutDirection, resolvedLayoutDirection)
+                    .id(appLanguage)
+            }
         }
     }
 

@@ -20,8 +20,6 @@ struct RecordingFeature {
 
         // Edit state (inline after recording stops)
         var inlineEdit: EditRecordingFeature.State?
-        // Legacy sheet-based edit (kept for file browser edits)
-        @Presents var editRecording: EditRecordingFeature.State?
 
         var recordingsCollection: URL? {
             guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
@@ -51,15 +49,13 @@ struct RecordingFeature {
         case setSaveFileName(String)
         case setSaveDestination(URL?)
         case saveRecording
-        case saveAndEditRecording
         case discardRecording
-        case recordingSaved(AudioFile?)
+        case recordingSaved
         case dismissSaveFlow
 
         // Edit
         case inlineEditLoaded(AudioFile)
         case inlineEdit(EditRecordingFeature.Action)
-        case editRecording(PresentationAction<EditRecordingFeature.Action>)
 
         // Permission alert
         case setShowPermissionAlert(Bool)
@@ -247,59 +243,28 @@ struct RecordingFeature {
                             try? FileManager.default.removeItem(at: finalTargetURL)
                         }
                         try FileManager.default.moveItem(at: editedURL, to: finalTargetURL)
-                        await send(.recordingSaved(nil))
+                        await send(.recordingSaved)
                     } catch {
                         print("Failed to save recording: \(error.localizedDescription)")
-                        await send(.recordingSaved(nil))
+                        await send(.recordingSaved)
                     }
                 }
 
-            case .saveAndEditRecording:
-                guard let sourceURL = state.currentRecordingURL else { return .none }
-
-                let destination = state.recordingsCollection ?? fileManager.documentsDirectory()
-                try? FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-                let fileName = state.saveFileName.isEmpty ? sourceURL.lastPathComponent : "\(state.saveFileName).m4a"
-                let targetURL = destination.appendingPathComponent(fileName)
-
-                state.isSaveFlowPresented = false
-
-                return .run { send in
-                    do {
-                        if sourceURL != targetURL {
-                            try FileManager.default.moveItem(at: sourceURL, to: targetURL)
-                        }
-                        if let metadata = try? await fileManager.getMetadata(targetURL) {
-                            await send(.recordingSaved(metadata))
-                        }
-                    } catch {
-                        print("Failed to save recording: \(error.localizedDescription)")
-                    }
-                }
-
-            case let .recordingSaved(audioFile):
+            case .recordingSaved:
                 state.currentRecordingURL = nil
                 state.saveFileName = ""
                 state.saveDestination = nil
                 state.inlineEdit = nil
                 state.isSaveFlowPresented = false
-                // If save & edit from file browser, open editor
-                if let audioFile, !state.isSaveFlowPresented {
-                    state.editRecording = EditRecordingFeature.State(recording: audioFile)
-                }
                 return .none
 
             case let .inlineEditLoaded(audioFile):
                 state.inlineEdit = EditRecordingFeature.State(recording: audioFile)
                 return .none
 
-            case let .inlineEdit(editAction):
-                // Forward inline edit actions to the EditRecordingFeature reducer
-                guard var editState = state.inlineEdit else { return .none }
-                let editReducer = EditRecordingFeature()
-                let effect = editReducer.reduce(into: &editState, action: editAction)
-                state.inlineEdit = editState
-                return effect.map { Action.inlineEdit($0) }
+            case .inlineEdit:
+                // Handled by the EditRecordingFeature reducer composed via .ifLet below
+                return .none
 
             case .discardRecording:
                 // Delete edit temp file
@@ -323,20 +288,12 @@ struct RecordingFeature {
                 state.isSaveFlowPresented = false
                 return .none
 
-            case .editRecording(.dismiss):
-                return .run { _ in
-                    await audioPlayer.stop()
-                }
-
-            case .editRecording:
-                return .none
-
             case let .setShowPermissionAlert(show):
                 state.showPermissionAlert = show
                 return .none
             }
         }
-        .ifLet(\.$editRecording, action: \.editRecording) {
+        .ifLet(\.inlineEdit, action: \.inlineEdit) {
             EditRecordingFeature()
         }
     }

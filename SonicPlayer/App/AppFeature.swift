@@ -106,13 +106,6 @@ struct AppFeature {
                 state.onboarding = nil
                 return .none
 
-            case let .onboarding(onboardingAction):
-                guard var onboardingState = state.onboarding else { return .none }
-                let onboardingReducer = OnboardingFeature()
-                _ = onboardingReducer.reduce(into: &onboardingState, action: onboardingAction)
-                state.onboarding = onboardingState
-                return .none
-
             // MARK: - Home Actions
 
             case let .home(.playTrack(track)):
@@ -247,10 +240,7 @@ struct AppFeature {
                 return .none
 
             case .recording(.recordingSaved):
-                // Only dismiss if edit view is NOT being shown
-                if state.recording.editRecording == nil {
-                    state.isRecordingSheetPresented = false
-                }
+                state.isRecordingSheetPresented = false
                 return .merge(
                     .send(.filesRoot(.refreshFiles)),
                     .send(.home(.loadRecentFiles))
@@ -332,14 +322,6 @@ struct AppFeature {
                 state.home.playbackProgress = 0
                 return .none
 
-            // Dismiss recording sheet when edit view closes
-            case .recording(.editRecording(.dismiss)):
-                state.isRecordingSheetPresented = false
-                return .merge(
-                    .send(.filesRoot(.refreshFiles)),
-                    .send(.home(.loadRecentFiles))
-                )
-
             // MARK: - Lifecycle
 
             case let .scenePhaseChanged(phase):
@@ -388,9 +370,12 @@ struct AppFeature {
                 }
                 return .none
 
-            case .player, .home, .filesRoot, .filesPath, .settings, .recording:
+            case .player, .home, .filesRoot, .filesPath, .settings, .recording, .onboarding:
                 return .none
             }
+        }
+        .ifLet(\.onboarding, action: \.onboarding) {
+            OnboardingFeature()
         }
         .forEach(\.filesPath, action: \.filesPath) {
             CollectionsFeature()

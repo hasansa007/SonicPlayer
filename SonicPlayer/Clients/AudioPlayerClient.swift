@@ -135,7 +135,11 @@ private final class AudioPlayerManager: NSObject, ObservableObject {
         // Setup audio session
         let audioSession = AVAudioSession.sharedInstance()
         try audioSession.setCategory(.playback, mode: .spokenAudio)
-        try audioSession.setActive(true)
+        // Activate off the main thread: setActive(_:) is a synchronous call
+        // that AVAudioSession warns can block the main thread.
+        try await Task.detached {
+            try AVAudioSession.sharedInstance().setActive(true)
+        }.value
 
         // Create player
         let playerItem = AVPlayerItem(url: url)
