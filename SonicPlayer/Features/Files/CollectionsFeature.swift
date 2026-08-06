@@ -399,16 +399,7 @@ struct CollectionsFeature {
                     }
 
                     func createUniqueFolder(named name: String, in parent: URL) throws -> URL {
-                        var finalName = name
-                        var folderURL = parent.appendingPathComponent(finalName, isDirectory: true)
-                        var counter = 2
-
-                        while FileManager.default.fileExists(atPath: folderURL.path) {
-                            finalName = "\(name) \(counter)"
-                            folderURL = parent.appendingPathComponent(finalName, isDirectory: true)
-                            counter += 1
-                        }
-
+                        let folderURL = UniqueNameResolver.resolve(baseName: name, in: parent)
                         try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: false)
                         return folderURL
                     }
@@ -585,18 +576,15 @@ struct CollectionsFeature {
                             continue
                         }
 
-                        let fileName = item.url.lastPathComponent
-                        var targetURL = destination.appendingPathComponent(fileName)
-
-                        var counter = 2
-                        let nameNoExt = item.url.deletingPathExtension().lastPathComponent
-                        let ext = item.url.pathExtension
-                        while FileManager.default.fileExists(atPath: targetURL.path) {
-                            let newName = ext.isEmpty ? "\(nameNoExt) \(counter)" : "\(nameNoExt) \(counter).\(ext)"
-                            targetURL = destination.appendingPathComponent(newName)
-                            counter += 1
-                            if counter > 100 { break }
-                        }
+                        // `limit: 100` preserves this site's pre-existing bail-out. On reaching it
+                        // the returned URL still collides and the moveItem below throws — kept as
+                        // it was rather than silently fixed. See UniqueNameResolverTests.
+                        let targetURL = UniqueNameResolver.resolve(
+                            baseName: item.url.deletingPathExtension().lastPathComponent,
+                            ext: item.url.pathExtension,
+                            in: destination,
+                            limit: 100
+                        )
 
                         do {
                             try FileManager.default.moveItem(at: item.url, to: targetURL)

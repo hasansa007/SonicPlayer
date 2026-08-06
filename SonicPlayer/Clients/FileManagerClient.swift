@@ -152,29 +152,13 @@ extension FileManagerClient: DependencyKey {
             createCollection: { name, parentURL in
                 let targetPath = parentURL ?? documentsDirectory
 
-                var finalName = name
-                var newCollectionURL = targetPath.appendingPathComponent(finalName)
-                var counter = 2
-
-                while FileManager.default.fileExists(atPath: newCollectionURL.path) {
-                    finalName = "\(name) \(counter)"
-                    newCollectionURL = targetPath.appendingPathComponent(finalName)
-                    counter += 1
-                }
-
+                let newCollectionURL = UniqueNameResolver.resolve(baseName: name, in: targetPath)
                 try FileManager.default.createDirectory(at: newCollectionURL, withIntermediateDirectories: false)
             },
             createCollectionForImport: {
-                var newCollectionName = "New Collection"
-                var counter = 1
-                var proposedCollectionURL = documentsDirectory.appendingPathComponent(newCollectionName)
-
-                while FileManager.default.fileExists(atPath: proposedCollectionURL.path) {
-                    counter += 1
-                    newCollectionName = "New Collection \(counter)"
-                    proposedCollectionURL = documentsDirectory.appendingPathComponent(newCollectionName)
-                }
-
+                let proposedCollectionURL = UniqueNameResolver.resolve(
+                    baseName: "New Collection", in: documentsDirectory
+                )
                 try FileManager.default.createDirectory(at: proposedCollectionURL, withIntermediateDirectories: false)
                 return proposedCollectionURL
             },
@@ -182,21 +166,12 @@ extension FileManagerClient: DependencyKey {
                 try FileManager.default.removeItem(at: url)
             },
             moveItem: { from, toDirectory in
-                // toDirectory is the destination folder, we need to append the filename
-                let fileName = from.lastPathComponent
-                let destination = toDirectory.appendingPathComponent(fileName)
-
-                // Handle duplicate names
-                var finalDestination = destination
-                var counter = 2
-                let nameWithoutExtension = from.deletingPathExtension().lastPathComponent
-                let fileExtension = from.pathExtension
-
-                while FileManager.default.fileExists(atPath: finalDestination.path) {
-                    let newName = fileExtension.isEmpty ? "\(nameWithoutExtension) \(counter)" : "\(nameWithoutExtension) \(counter).\(fileExtension)"
-                    finalDestination = toDirectory.appendingPathComponent(newName)
-                    counter += 1
-                }
+                // toDirectory is the destination folder; the filename is appended, deduped
+                let finalDestination = UniqueNameResolver.resolve(
+                    baseName: from.deletingPathExtension().lastPathComponent,
+                    ext: from.pathExtension,
+                    in: toDirectory
+                )
 
                 try FileManager.default.moveItem(at: from, to: finalDestination)
             },
@@ -222,18 +197,11 @@ extension FileManagerClient: DependencyKey {
                 }
 
                 let fileName = sourceURL.lastPathComponent
-                var destinationURL = finalDestinationDirectory.appendingPathComponent(fileName)
-
-                // Handle duplicate names
-                var counter = 2
-                let nameWithoutExtension = sourceURL.deletingPathExtension().lastPathComponent
-                let fileExtension = sourceURL.pathExtension
-
-                while FileManager.default.fileExists(atPath: destinationURL.path) {
-                    let newName = fileExtension.isEmpty ? "\(nameWithoutExtension) \(counter)" : "\(nameWithoutExtension) \(counter).\(fileExtension)"
-                    destinationURL = finalDestinationDirectory.appendingPathComponent(newName)
-                    counter += 1
-                }
+                let destinationURL = UniqueNameResolver.resolve(
+                    baseName: sourceURL.deletingPathExtension().lastPathComponent,
+                    ext: sourceURL.pathExtension,
+                    in: finalDestinationDirectory
+                )
 
                 // Use Data read/write instead of copyItem to avoid corruption
                 do {

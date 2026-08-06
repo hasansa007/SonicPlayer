@@ -110,11 +110,7 @@ struct RecordingFeature {
                 // Create recordings folder if needed
                 try? FileManager.default.createDirectory(at: recordingsCollection, withIntermediateDirectories: true)
 
-                // Generate filename with timestamp
-                let dateFormatter = DateFormatter()
-                dateFormatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
-                let timestamp = dateFormatter.string(from: Date())
-                let filename = "Recording \(timestamp).m4a"
+                let filename = RecordingFilename.make(at: Date())
                 let recordingURL = recordingsCollection.appendingPathComponent(filename)
 
                 state.currentRecordingURL = recordingURL
@@ -217,16 +213,11 @@ struct RecordingFeature {
                 try? FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
                 let baseName = state.saveFileName.isEmpty ? "Recording" : state.saveFileName
 
-                // Compute final target URL (handle duplicates)
-                let finalTargetURL: URL = {
-                    var candidate = destination.appendingPathComponent("\(baseName).m4a")
-                    var counter = 2
-                    while FileManager.default.fileExists(atPath: candidate.path) && candidate != originalURL {
-                        candidate = destination.appendingPathComponent("\(baseName) \(counter).m4a")
-                        counter += 1
-                    }
-                    return candidate
-                }()
+                // Compute final target URL. `excluding: originalURL` keeps the name when saving a
+                // recording over itself, instead of producing "<name> 2.m4a".
+                let finalTargetURL = UniqueNameResolver.resolve(
+                    baseName: baseName, ext: "m4a", in: destination, excluding: originalURL
+                )
 
                 state.isSaveFlowPresented = false
                 state.inlineEdit = nil

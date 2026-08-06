@@ -4,32 +4,8 @@ import Sharing
 import SwiftUI
 import UIKit
 
-struct QueueItem: Codable, Equatable {
-    var fileURL: String
-}
-
-struct PlaybackSession: Codable, Equatable {
-    var fileURL: String
-    var currentTime: TimeInterval
-    var queue: [QueueItem]
-    var playlistSource: PlaylistSource?
-
-    init(fileURL: String = "", currentTime: TimeInterval = 0, queue: [QueueItem] = [], playlistSource: PlaylistSource? = nil) {
-        self.fileURL = fileURL
-        self.currentTime = currentTime
-        self.queue = queue
-        self.playlistSource = playlistSource
-    }
-
-    var isEmpty: Bool {
-        fileURL.isEmpty
-    }
-}
-
-enum PlaylistSource: Equatable, Codable {
-    case folder(URL)
-    case singleFile
-}
+// QueueItem, PlaybackSession and PlaylistSource moved to Domain/PlaybackSession.swift — they
+// never referenced TCA and Slice 6 (#15) needs them independent of it.
 
 @Reducer
 struct PlayerFeature {
@@ -233,40 +209,34 @@ struct PlayerFeature {
 
             case let .retryRestoreSession(track, time, rate, attemptNumber):
                 return Effect.run { send in
-                    let maxRetries = 3
                     do {
                         try await audioPlayer.prepare(track.url)
                         await audioPlayer.setRate(rate)
                         await audioPlayer.seek(time)
                         await audioPlayer.pause()
 
-                        // Check if duration is valid
+                        // AVPlayer often reports 0 for a moment after prepare
                         let duration = await audioPlayer.duration()
 
                         if duration > 0 {
-                            // Success!
                             await send(.durationUpdated(duration))
                             await send(.sessionRestored)
-                        } else if attemptNumber < maxRetries {
-                            // Duration not ready, retry after delay
-                            let delayMs = 500 * (1 << attemptNumber) // 500ms, 1s, 2s
+                        } else if let delayMs = SessionRestorePolicy.delayMilliseconds(forAttempt: attemptNumber) {
                             try await clock.sleep(for: .milliseconds(delayMs))
                             await send(.retryRestoreSession(track, time, rate, attemptNumber + 1))
                         } else {
-                            // Max retries reached, but keep session
+                            // Attempts exhausted, but keep the session
                             await send(.durationUpdated(duration))
                         }
                     } catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoSuchFileError {
                         // File doesn't exist, clear session
                         await send(.trackLoadFailed)
                     } catch {
-                        // Other error - retry if attempts remain
-                        if attemptNumber < maxRetries {
-                            let delayMs = 500 * (1 << attemptNumber)
+                        // Other error — retry if attempts remain, else keep session for manual retry
+                        if let delayMs = SessionRestorePolicy.delayMilliseconds(forAttempt: attemptNumber) {
                             try? await clock.sleep(for: .milliseconds(delayMs))
                             await send(.retryRestoreSession(track, time, rate, attemptNumber + 1))
                         }
-                        // Otherwise keep session for manual retry
                     }
                 }
 
@@ -359,12 +329,10 @@ struct PlayerFeature {
                 if let newQueue = queue {
                     if state.isShuffleEnabled {
                         state.originalQueue = newQueue
-                        var shuffled = newQueue
-                        shuffled.removeAll { $0 == track }
-                        shuffled.shuffle()
-                        shuffled.insert(track, at: 0)
-                        state.queue = shuffled
-                        state.currentIndex = 0
+                        if let result = QueueMath.shuffling(newQueue, keeping: track) {
+                            state.queue = result.queue
+                            state.currentIndex = result.currentIndex
+                        }
                     } else {
                         state.queue = newQueue
                         state.currentIndex = newQueue.firstIndex(of: track) ?? 0
@@ -439,13 +407,17 @@ struct PlayerFeature {
                 return .none
 
             case .previousTrack:
-                if state.currentTime > 3 {
-                    return Effect.send(.seekToPosition(0))
+                switch QueueMath.decideOnPrevious(
+                    currentTime: state.currentTime,
+                    hasPreviousTrack: state.hasPreviousTrack,
+                    currentIndex: state.currentIndex
+                ) {
+                case .restart:
+                    return .send(.seekToPosition(0))
+                case let .previous(index):
+                    state.currentIndex = index
+                    return .send(.loadTrack(state.queue[index], nil, nil))
                 }
-                guard state.hasPreviousTrack else { return .send(.seekToPosition(0)) }
-                state.currentIndex -= 1
-                let prev = state.queue[state.currentIndex]
-                                    return Effect.send(.loadTrack(prev, nil, nil))
             case let .jumpToTrack(index):
                 guard index >= 0 && index < state.queue.count else { return .none }
                 state.currentIndex = index
@@ -467,30 +439,40 @@ struct PlayerFeature {
                 state.currentTime = time
 
                 // Check if track finished
-                if state.isPlaying && state.duration > 0 && (state.duration - time) < 1.0 {
-                    if state.repeatMode == .one {
-                        // Repeat current track — seek to start and resume
-                        state.currentTime = 0
-                        let rate = state.playbackSpeed.rawValue
-                        return .run { send in
-                            await audioPlayer.seek(0)
-                            await audioPlayer.resume()
-                            await audioPlayer.setRate(rate)
-                        }
-                    } else if state.hasNextTrack {
-                        return .send(.nextTrack)
-                    } else if state.repeatMode == .all && !state.queue.isEmpty {
-                        // Wrap to first track
-                        return .send(.jumpToTrack(0))
-                    } else {
-                        // End of queue - stop playback, stay on current track
-                        state.isPlaying = false
-                        state.currentTime = state.duration
-                        return .merge(
-                            .run { _ in await audioPlayer.pause() },
-                            .cancel(id: CancelID.timeObserver)
-                        )
+                switch QueueMath.decideOnTrackEnd(
+                    isPlaying: state.isPlaying,
+                    duration: state.duration,
+                    currentTime: time,
+                    repeatMode: state.repeatMode,
+                    hasNextTrack: state.hasNextTrack,
+                    queueIsEmpty: state.queue.isEmpty
+                ) {
+                case .repeatCurrent:
+                    state.currentTime = 0
+                    let rate = state.playbackSpeed.rawValue
+                    return .run { send in
+                        await audioPlayer.seek(0)
+                        await audioPlayer.resume()
+                        await audioPlayer.setRate(rate)
                     }
+
+                case .advance:
+                    return .send(.nextTrack)
+
+                case .wrapToStart:
+                    return .send(.jumpToTrack(0))
+
+                case .stop:
+                    // Stay on the current track, parked at the end
+                    state.isPlaying = false
+                    state.currentTime = state.duration
+                    return .merge(
+                        .run { _ in await audioPlayer.pause() },
+                        .cancel(id: CancelID.timeObserver)
+                    )
+
+                case .none:
+                    break // still playing — fall through to the periodic work below
                 }
 
                 // Update Now Playing info periodically (every ~3 seconds based on 0.5s interval)
@@ -556,35 +538,31 @@ struct PlayerFeature {
                     return .none
                 }
 
-                // Check if last track finished
-                let isLastTrack = state.currentIndex == state.queue.count - 1
-                let hasFinished = abs(state.currentTime - state.duration) < 1.0 && state.duration > 0
-
-                if isLastTrack && hasFinished {
-                    // Clear session when last track completes
+                if SessionCodec.isFinishedAtEndOfQueue(
+                    currentIndex: state.currentIndex,
+                    queueCount: state.queue.count,
+                    currentTime: state.currentTime,
+                    duration: state.duration
+                ) {
+                    // Clear session when the last track completes
                     state.$session.withLock { session in
                         session = PlaybackSession()
                     }
                 } else {
-                    // Save current state
-                    let queueItems = state.queue.map { QueueItem(fileURL: $0.url.path) }
+                    let saved = SessionCodec.session(
+                        trackURL: currentTrack.url,
+                        currentTime: state.currentTime,
+                        queueURLs: state.queue.map(\.url),
+                        playlistSource: state.currentPlaylistSource
+                    )
                     state.$session.withLock { session in
-                        session = PlaybackSession(
-                            fileURL: currentTrack.url.path,
-                            currentTime: state.currentTime,
-                            queue: queueItems,
-                            playlistSource: state.currentPlaylistSource
-                        )
+                        session = saved
                     }
                 }
                 return .none
                 
             case .toggleRepeatMode:
-                switch state.repeatMode {
-                case .off: state.repeatMode = .all
-                case .all: state.repeatMode = .one
-                case .one: state.repeatMode = .off
-                }
+                state.repeatMode = QueueMath.nextRepeatMode(after: state.repeatMode)
                 UserDefaults.standard.savedRepeatMode = state.repeatMode
                 return .none
 
@@ -594,13 +572,9 @@ struct PlayerFeature {
                 if state.isShuffleEnabled {
                     // Save original queue and shuffle
                     state.originalQueue = state.queue
-                    if let currentTrack = state.currentTrack {
-                        var shuffled = state.queue
-                        shuffled.removeAll { $0 == currentTrack }
-                        shuffled.shuffle()
-                        shuffled.insert(currentTrack, at: 0)
-                        state.queue = shuffled
-                        state.currentIndex = 0
+                    if let result = QueueMath.shuffling(state.queue, keeping: state.currentTrack) {
+                        state.queue = result.queue
+                        state.currentIndex = result.currentIndex
                     }
                 } else {
                     // Restore original queue order
