@@ -359,12 +359,10 @@ struct PlayerFeature {
                 if let newQueue = queue {
                     if state.isShuffleEnabled {
                         state.originalQueue = newQueue
-                        var shuffled = newQueue
-                        shuffled.removeAll { $0 == track }
-                        shuffled.shuffle()
-                        shuffled.insert(track, at: 0)
-                        state.queue = shuffled
-                        state.currentIndex = 0
+                        if let result = QueueMath.shuffling(newQueue, keeping: track) {
+                            state.queue = result.queue
+                            state.currentIndex = result.currentIndex
+                        }
                     } else {
                         state.queue = newQueue
                         state.currentIndex = newQueue.firstIndex(of: track) ?? 0
@@ -439,13 +437,17 @@ struct PlayerFeature {
                 return .none
 
             case .previousTrack:
-                if state.currentTime > 3 {
-                    return Effect.send(.seekToPosition(0))
+                switch QueueMath.decideOnPrevious(
+                    currentTime: state.currentTime,
+                    hasPreviousTrack: state.hasPreviousTrack,
+                    currentIndex: state.currentIndex
+                ) {
+                case .restart:
+                    return .send(.seekToPosition(0))
+                case let .previous(index):
+                    state.currentIndex = index
+                    return .send(.loadTrack(state.queue[index], nil, nil))
                 }
-                guard state.hasPreviousTrack else { return .send(.seekToPosition(0)) }
-                state.currentIndex -= 1
-                let prev = state.queue[state.currentIndex]
-                                    return Effect.send(.loadTrack(prev, nil, nil))
             case let .jumpToTrack(index):
                 guard index >= 0 && index < state.queue.count else { return .none }
                 state.currentIndex = index
@@ -467,30 +469,40 @@ struct PlayerFeature {
                 state.currentTime = time
 
                 // Check if track finished
-                if state.isPlaying && state.duration > 0 && (state.duration - time) < 1.0 {
-                    if state.repeatMode == .one {
-                        // Repeat current track — seek to start and resume
-                        state.currentTime = 0
-                        let rate = state.playbackSpeed.rawValue
-                        return .run { send in
-                            await audioPlayer.seek(0)
-                            await audioPlayer.resume()
-                            await audioPlayer.setRate(rate)
-                        }
-                    } else if state.hasNextTrack {
-                        return .send(.nextTrack)
-                    } else if state.repeatMode == .all && !state.queue.isEmpty {
-                        // Wrap to first track
-                        return .send(.jumpToTrack(0))
-                    } else {
-                        // End of queue - stop playback, stay on current track
-                        state.isPlaying = false
-                        state.currentTime = state.duration
-                        return .merge(
-                            .run { _ in await audioPlayer.pause() },
-                            .cancel(id: CancelID.timeObserver)
-                        )
+                switch QueueMath.decideOnTrackEnd(
+                    isPlaying: state.isPlaying,
+                    duration: state.duration,
+                    currentTime: time,
+                    repeatMode: state.repeatMode,
+                    hasNextTrack: state.hasNextTrack,
+                    queueIsEmpty: state.queue.isEmpty
+                ) {
+                case .repeatCurrent:
+                    state.currentTime = 0
+                    let rate = state.playbackSpeed.rawValue
+                    return .run { send in
+                        await audioPlayer.seek(0)
+                        await audioPlayer.resume()
+                        await audioPlayer.setRate(rate)
                     }
+
+                case .advance:
+                    return .send(.nextTrack)
+
+                case .wrapToStart:
+                    return .send(.jumpToTrack(0))
+
+                case .stop:
+                    // Stay on the current track, parked at the end
+                    state.isPlaying = false
+                    state.currentTime = state.duration
+                    return .merge(
+                        .run { _ in await audioPlayer.pause() },
+                        .cancel(id: CancelID.timeObserver)
+                    )
+
+                case .none:
+                    break // still playing — fall through to the periodic work below
                 }
 
                 // Update Now Playing info periodically (every ~3 seconds based on 0.5s interval)
@@ -580,11 +592,7 @@ struct PlayerFeature {
                 return .none
                 
             case .toggleRepeatMode:
-                switch state.repeatMode {
-                case .off: state.repeatMode = .all
-                case .all: state.repeatMode = .one
-                case .one: state.repeatMode = .off
-                }
+                state.repeatMode = QueueMath.nextRepeatMode(after: state.repeatMode)
                 UserDefaults.standard.savedRepeatMode = state.repeatMode
                 return .none
 
@@ -594,13 +602,9 @@ struct PlayerFeature {
                 if state.isShuffleEnabled {
                     // Save original queue and shuffle
                     state.originalQueue = state.queue
-                    if let currentTrack = state.currentTrack {
-                        var shuffled = state.queue
-                        shuffled.removeAll { $0 == currentTrack }
-                        shuffled.shuffle()
-                        shuffled.insert(currentTrack, at: 0)
-                        state.queue = shuffled
-                        state.currentIndex = 0
+                    if let result = QueueMath.shuffling(state.queue, keeping: state.currentTrack) {
+                        state.queue = result.queue
+                        state.currentIndex = result.currentIndex
                     }
                 } else {
                     // Restore original queue order

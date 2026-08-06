@@ -329,14 +329,12 @@ struct AppFeature {
 
             // Clear player if the currently playing track (or its parent) is being moved
             case .filesRoot(.moveToDestination):
-                if let currentTrack = state.player.currentTrack {
-                    let trackPath = currentTrack.url.path
-                    let isAffected = state.filesRoot.itemsToMove.contains { item in
-                        item.url == currentTrack.url || trackPath.hasPrefix(item.url.path + "/")
-                    }
-                    if isAffected {
-                        return .send(.player(.clearSession))
-                    }
+                if let currentTrack = state.player.currentTrack,
+                   PathMatching.isAffected(
+                       trackURL: currentTrack.url,
+                       byAnyOf: state.filesRoot.itemsToMove.map(\.url)
+                   ) {
+                    return .send(.player(.clearSession))
                 }
                 return .none
 
@@ -346,27 +344,23 @@ struct AppFeature {
 
             // Clear player if currently playing track is deleted (file or parent folder)
             case .filesRoot(.alert(.presented(.confirmDelete))):
-                if let currentTrack = state.player.currentTrack {
-                    let trackPath = currentTrack.url.path
-                    let shouldClear = state.filesRoot.selectedItems.contains { item in
-                        item.url == currentTrack.url || trackPath.hasPrefix(item.url.path + "/")
-                    }
-                    if shouldClear {
-                        return .send(.player(.clearSession))
-                    }
+                if let currentTrack = state.player.currentTrack,
+                   PathMatching.isAffected(
+                       trackURL: currentTrack.url,
+                       byAnyOf: state.filesRoot.selectedItems.map(\.url)
+                   ) {
+                    return .send(.player(.clearSession))
                 }
                 return .none
 
             case let .filesPath(.element(id: id, action: .alert(.presented(.confirmDelete)))):
                 if let currentTrack = state.player.currentTrack,
-                   let filesState = state.filesPath[id: id] {
-                    let trackPath = currentTrack.url.path
-                    let shouldClear = filesState.selectedItems.contains { item in
-                        item.url == currentTrack.url || trackPath.hasPrefix(item.url.path + "/")
-                    }
-                    if shouldClear {
-                        return .send(.player(.clearSession))
-                    }
+                   let filesState = state.filesPath[id: id],
+                   PathMatching.isAffected(
+                       trackURL: currentTrack.url,
+                       byAnyOf: filesState.selectedItems.map(\.url)
+                   ) {
+                    return .send(.player(.clearSession))
                 }
                 return .none
 
