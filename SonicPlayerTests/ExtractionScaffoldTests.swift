@@ -179,22 +179,15 @@ final class ExtractionScaffoldTests: XCTestCase {
 
     // MARK: - PathMatching, through AppFeature's delete
 
-    /// # Pins a BUG, not the intended behaviour — see #22.
+    /// Regression test for #22.
     ///
-    /// Deleting the folder the playing track lives in is *supposed* to clear the session. It
-    /// does not. `CollectionsFeature` handles the same action first and calls
-    /// `state.selectedItems.removeAll()` (`CollectionsFeature.swift:531`), and in TCA a `Scope`
-    /// child runs before the parent's `Reduce` — so `AppFeature` evaluates `PathMatching`
-    /// against an empty set and never sends `.clearSession`.
-    ///
-    /// This asserts what the app currently does, because #11 is behaviour-preserving by
-    /// contract and a characterization test that asserted the *intended* behaviour would fail
-    /// for the right reason at the wrong time. **When #22 is fixed, invert this test.**
-    ///
-    /// Note the `Domain` tests for `PathMatching` all pass: the predicate is correct, it is
-    /// simply never given the data. Only driving the reducer exposes that.
+    /// Deleting the folder the playing track lives in must clear the session. It did not,
+    /// because `CollectionsFeature` runs first (a `Scope` child precedes the parent's `Reduce`)
+    /// and clears `selectedItems` as it starts, so `AppFeature` evaluated `PathMatching` against
+    /// an empty set. The items now travel in `.willRemoveItems` instead of being read back out
+    /// of state.
     @MainActor
-    func test_deletingTheFolderContainingTheTrack_doesNotClearTheSession_bug22() async {
+    func test_deletingTheFolderContainingTheTrack_clearsTheSession() async {
         let track = AudioFile(
             url: URL(fileURLWithPath: "/Docs/Podcasts/Ep1.mp3"),
             title: "Ep1", duration: 100, fileSize: 1, format: .mp3,
@@ -226,18 +219,77 @@ final class ExtractionScaffoldTests: XCTestCase {
         store.exhaustivity = .off
 
         await store.send(.filesRoot(.alert(.presented(.confirmDelete))))
-        await store.finish()
+        await store.receive(\.filesRoot.willRemoveItems)
+        await store.receive(\.player.clearSession)
 
-        XCTAssertNotNil(
+        XCTAssertNil(
             store.state.player.currentTrack,
-            """
-            Currently the session survives the delete (#22). If this now fails, the bug has been \
-            fixed — invert the assertion to XCTAssertNil and close this out.
-            """
+            "Deleting the folder the playing track lives in must clear the session (#22)."
         )
         XCTAssertTrue(
             store.state.filesRoot.selectedItems.isEmpty,
-            "The child clearing selectedItems is what starves the parent's check."
+            "The child still clears its selection — the parent just no longer depends on it."
+        )
+    }
+
+    /// #22 covered the move path too, and nothing tested it before.
+    @MainActor
+    func test_movingTheTrackAwayClearsTheSession() async {
+        let track = AudioFile(
+            url: URL(fileURLWithPath: "/Docs/Podcasts/Ep1.mp3"),
+            title: "Ep1", duration: 100, fileSize: 1, format: .mp3,
+            creationDate: Date(timeIntervalSince1970: 0)
+        )
+
+        var state = AppFeature.State()
+        state.player.currentTrack = track
+        state.filesRoot.itemsToMove = [.file(track)]
+
+        let store = TestStore(initialState: state) { AppFeature() } withDependencies: {
+            $0.defaultFileStorage = .inMemory
+            $0.fileManager.listItems = { _ in [] }
+            $0.audioPlayer.stop = {}
+        }
+        store.exhaustivity = .off
+
+        await store.send(.filesRoot(.moveToDestination(URL(fileURLWithPath: "/Docs/Archive"))))
+        await store.receive(\.filesRoot.willRemoveItems)
+        await store.receive(\.player.clearSession)
+
+        XCTAssertNil(store.state.player.currentTrack)
+    }
+
+    /// The predicate must still discriminate — moving an unrelated file must not stop playback.
+    @MainActor
+    func test_movingAnUnrelatedFileLeavesThePlayerAlone() async {
+        let playing = AudioFile(
+            url: URL(fileURLWithPath: "/Docs/Podcasts/Ep1.mp3"),
+            title: "Ep1", duration: 100, fileSize: 1, format: .mp3,
+            creationDate: Date(timeIntervalSince1970: 0)
+        )
+        let other = AudioFile(
+            url: URL(fileURLWithPath: "/Docs/Music/Song.mp3"),
+            title: "Song", duration: 100, fileSize: 1, format: .mp3,
+            creationDate: Date(timeIntervalSince1970: 0)
+        )
+
+        var state = AppFeature.State()
+        state.player.currentTrack = playing
+        state.filesRoot.itemsToMove = [.file(other)]
+
+        let store = TestStore(initialState: state) { AppFeature() } withDependencies: {
+            $0.defaultFileStorage = .inMemory
+            $0.fileManager.listItems = { _ in [] }
+            $0.audioPlayer.stop = {}
+        }
+        store.exhaustivity = .off
+
+        await store.send(.filesRoot(.moveToDestination(URL(fileURLWithPath: "/Docs/Archive"))))
+        await store.receive(\.filesRoot.willRemoveItems)
+
+        XCTAssertNotNil(
+            store.state.player.currentTrack,
+            "Moving an unrelated file must not stop playback."
         )
     }
 }
