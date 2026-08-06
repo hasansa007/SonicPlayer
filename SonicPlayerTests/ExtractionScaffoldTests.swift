@@ -1,5 +1,6 @@
 import ComposableArchitecture
-import XCTest
+import Foundation
+import Testing
 
 @testable import SonicPlayer
 
@@ -17,20 +18,17 @@ import XCTest
 ///   the delete/move session clearing                   dies with AppFeature     -> #19
 ///
 /// Delete each block when its reducer goes, rather than porting it.
-final class ExtractionScaffoldTests: XCTestCase {
+@Suite(.serialized)
+struct ExtractionScaffoldTests {
 
     private func file(_ name: String) -> AudioFile {
-        AudioFile(
-            url: URL(fileURLWithPath: "/Docs/\(name).mp3"),
+        AudioFile(url: URL(fileURLWithPath: "/Docs/\(name).mp3"),
             title: name, duration: 100, fileSize: 1, format: .mp3,
-            creationDate: Date(timeIntervalSince1970: 0)
-        )
+            creationDate: Date(timeIntervalSince1970: 0))
     }
 
     @MainActor
-    private func playerStore(
-        _ mutate: (inout PlayerFeature.State) -> Void
-    ) -> TestStore<PlayerFeature.State, PlayerFeature.Action> {
+    private func playerStore(_ mutate: (inout PlayerFeature.State) -> Void) -> TestStore<PlayerFeature.State, PlayerFeature.Action> {
         var state = PlayerFeature.State()
         mutate(&state)
         let store = TestStore(initialState: state) {
@@ -63,7 +61,7 @@ final class ExtractionScaffoldTests: XCTestCase {
     /// The branch is only entered while playing. This is the guard that keeps the periodic
     /// now-playing work running instead of being swallowed by the end-of-track path.
     @MainActor
-    func test_timeUpdate_whilePaused_doesNotStopPlayback() async {
+    @Test func test_timeUpdate_whilePaused_doesNotStopPlayback() async {
         let a = file("A")
         let store = playerStore {
             $0.currentTrack = a; $0.queue = [a]; $0.currentIndex = 0
@@ -72,12 +70,12 @@ final class ExtractionScaffoldTests: XCTestCase {
 
         await store.send(.timeUpdate(99.9))
 
-        XCTAssertFalse(store.state.isPlaying)
-        XCTAssertEqual(store.state.currentTime, 99.9, "position must still be recorded")
+        #expect(!(store.state.isPlaying))
+        #expect(store.state.currentTime == 99.9, "position must still be recorded")
     }
 
     @MainActor
-    func test_timeUpdate_midTrack_justRecordsPosition() async {
+    @Test func test_timeUpdate_midTrack_justRecordsPosition() async {
         let a = file("A"), b = file("B")
         let store = playerStore {
             $0.currentTrack = a; $0.queue = [a, b]; $0.currentIndex = 0
@@ -86,12 +84,12 @@ final class ExtractionScaffoldTests: XCTestCase {
 
         await store.send(.timeUpdate(40))
 
-        XCTAssertEqual(store.state.currentTime, 40)
-        XCTAssertTrue(store.state.isPlaying)
+        #expect(store.state.currentTime == 40)
+        #expect(store.state.isPlaying)
     }
 
     @MainActor
-    func test_timeUpdate_atEndOfQueue_stopsAndParksAtTheEnd() async {
+    @Test func test_timeUpdate_atEndOfQueue_stopsAndParksAtTheEnd() async {
         let a = file("A")
         let store = playerStore {
             $0.currentTrack = a; $0.queue = [a]; $0.currentIndex = 0
@@ -100,12 +98,12 @@ final class ExtractionScaffoldTests: XCTestCase {
 
         await store.send(.timeUpdate(99.9))
 
-        XCTAssertFalse(store.state.isPlaying)
-        XCTAssertEqual(store.state.currentTime, 100, "parks at duration, not at the tick time")
+        #expect(!(store.state.isPlaying))
+        #expect(store.state.currentTime == 100, "parks at duration, not at the tick time")
     }
 
     @MainActor
-    func test_timeUpdate_repeatOne_seeksBackToZeroAndKeepsPlaying() async {
+    @Test func test_timeUpdate_repeatOne_seeksBackToZeroAndKeepsPlaying() async {
         let a = file("A")
         let store = playerStore {
             $0.currentTrack = a; $0.queue = [a]; $0.currentIndex = 0
@@ -114,14 +112,14 @@ final class ExtractionScaffoldTests: XCTestCase {
 
         await store.send(.timeUpdate(99.9))
 
-        XCTAssertEqual(store.state.currentTime, 0)
-        XCTAssertTrue(store.state.isPlaying, "repeat-one must not pause")
+        #expect(store.state.currentTime == 0)
+        #expect(store.state.isPlaying, "repeat-one must not pause")
     }
 
     // MARK: - QueueMath.decideOnPrevious, through PlayerFeature.previousTrack
 
     @MainActor
-    func test_previousTrack_pastThreeSeconds_restartsWithoutChangingIndex() async {
+    @Test func test_previousTrack_pastThreeSeconds_restartsWithoutChangingIndex() async {
         let a = file("A"), b = file("B")
         let store = playerStore {
             $0.currentTrack = b; $0.queue = [a, b]; $0.currentIndex = 1
@@ -133,12 +131,12 @@ final class ExtractionScaffoldTests: XCTestCase {
         // received action, so the state does not reflect it until it is taken off the queue.
         await store.receive(\.seekToPosition)
 
-        XCTAssertEqual(store.state.currentIndex, 1, "must not step back")
-        XCTAssertEqual(store.state.currentTime, 0)
+        #expect(store.state.currentIndex == 1, "must not step back")
+        #expect(store.state.currentTime == 0)
     }
 
     @MainActor
-    func test_previousTrack_earlyInTheTrack_stepsBack() async {
+    @Test func test_previousTrack_earlyInTheTrack_stepsBack() async {
         let a = file("A"), b = file("B")
         let store = playerStore {
             $0.currentTrack = b; $0.queue = [a, b]; $0.currentIndex = 1
@@ -147,11 +145,11 @@ final class ExtractionScaffoldTests: XCTestCase {
 
         await store.send(.previousTrack)
 
-        XCTAssertEqual(store.state.currentIndex, 0)
+        #expect(store.state.currentIndex == 0)
     }
 
     @MainActor
-    func test_previousTrack_onFirstTrack_restartsRatherThanUnderflowing() async {
+    @Test func test_previousTrack_onFirstTrack_restartsRatherThanUnderflowing() async {
         let a = file("A")
         let store = playerStore {
             $0.currentTrack = a; $0.queue = [a]; $0.currentIndex = 0
@@ -160,21 +158,21 @@ final class ExtractionScaffoldTests: XCTestCase {
 
         await store.send(.previousTrack)
 
-        XCTAssertEqual(store.state.currentIndex, 0)
+        #expect(store.state.currentIndex == 0)
     }
 
     // MARK: - QueueMath.nextRepeatMode, through PlayerFeature.toggleRepeatMode
 
     @MainActor
-    func test_toggleRepeatMode_cyclesOffAllOneOff() async {
+    @Test func test_toggleRepeatMode_cyclesOffAllOneOff() async {
         let store = playerStore { $0.repeatMode = .off }
 
         await store.send(.toggleRepeatMode)
-        XCTAssertEqual(store.state.repeatMode, .all)
+        #expect(store.state.repeatMode == .all)
         await store.send(.toggleRepeatMode)
-        XCTAssertEqual(store.state.repeatMode, .one)
+        #expect(store.state.repeatMode == .one)
         await store.send(.toggleRepeatMode)
-        XCTAssertEqual(store.state.repeatMode, .off)
+        #expect(store.state.repeatMode == .off)
     }
 
     // MARK: - PathMatching, through AppFeature's delete
@@ -187,17 +185,13 @@ final class ExtractionScaffoldTests: XCTestCase {
     /// an empty set. The items now travel in `.willRemoveItems` instead of being read back out
     /// of state.
     @MainActor
-    func test_deletingTheFolderContainingTheTrack_clearsTheSession() async {
-        let track = AudioFile(
-            url: URL(fileURLWithPath: "/Docs/Podcasts/Ep1.mp3"),
+    @Test func test_deletingTheFolderContainingTheTrack_clearsTheSession() async {
+        let track = AudioFile(url: URL(fileURLWithPath: "/Docs/Podcasts/Ep1.mp3"),
             title: "Ep1", duration: 100, fileSize: 1, format: .mp3,
-            creationDate: Date(timeIntervalSince1970: 0)
-        )
+            creationDate: Date(timeIntervalSince1970: 0))
         let folderURL = URL(fileURLWithPath: "/Docs/Podcasts")
-        let folder = CollectionItem(
-            id: folderURL, url: folderURL, name: "Podcasts",
-            creationDate: Date(timeIntervalSince1970: 0)
-        )
+        let folder = CollectionItem(id: folderURL, url: folderURL, name: "Podcasts",
+            creationDate: Date(timeIntervalSince1970: 0))
 
         var state = AppFeature.State()
         state.player.currentTrack = track
@@ -222,24 +216,16 @@ final class ExtractionScaffoldTests: XCTestCase {
         await store.receive(\.filesRoot.willRemoveItems)
         await store.receive(\.player.clearSession)
 
-        XCTAssertNil(
-            store.state.player.currentTrack,
-            "Deleting the folder the playing track lives in must clear the session (#22)."
-        )
-        XCTAssertTrue(
-            store.state.filesRoot.selectedItems.isEmpty,
-            "The child still clears its selection — the parent just no longer depends on it."
-        )
+        #expect(store.state.player.currentTrack == nil, "Deleting the folder the playing track lives in must clear the session (#22).")
+        #expect(store.state.filesRoot.selectedItems.isEmpty, "The child still clears its selection — the parent just no longer depends on it.")
     }
 
     /// #22 covered the move path too, and nothing tested it before.
     @MainActor
-    func test_movingTheTrackAwayClearsTheSession() async {
-        let track = AudioFile(
-            url: URL(fileURLWithPath: "/Docs/Podcasts/Ep1.mp3"),
+    @Test func test_movingTheTrackAwayClearsTheSession() async {
+        let track = AudioFile(url: URL(fileURLWithPath: "/Docs/Podcasts/Ep1.mp3"),
             title: "Ep1", duration: 100, fileSize: 1, format: .mp3,
-            creationDate: Date(timeIntervalSince1970: 0)
-        )
+            creationDate: Date(timeIntervalSince1970: 0))
 
         var state = AppFeature.State()
         state.player.currentTrack = track
@@ -256,22 +242,18 @@ final class ExtractionScaffoldTests: XCTestCase {
         await store.receive(\.filesRoot.willRemoveItems)
         await store.receive(\.player.clearSession)
 
-        XCTAssertNil(store.state.player.currentTrack)
+        #expect(store.state.player.currentTrack == nil)
     }
 
     /// The predicate must still discriminate — moving an unrelated file must not stop playback.
     @MainActor
-    func test_movingAnUnrelatedFileLeavesThePlayerAlone() async {
-        let playing = AudioFile(
-            url: URL(fileURLWithPath: "/Docs/Podcasts/Ep1.mp3"),
+    @Test func test_movingAnUnrelatedFileLeavesThePlayerAlone() async {
+        let playing = AudioFile(url: URL(fileURLWithPath: "/Docs/Podcasts/Ep1.mp3"),
             title: "Ep1", duration: 100, fileSize: 1, format: .mp3,
-            creationDate: Date(timeIntervalSince1970: 0)
-        )
-        let other = AudioFile(
-            url: URL(fileURLWithPath: "/Docs/Music/Song.mp3"),
+            creationDate: Date(timeIntervalSince1970: 0))
+        let other = AudioFile(url: URL(fileURLWithPath: "/Docs/Music/Song.mp3"),
             title: "Song", duration: 100, fileSize: 1, format: .mp3,
-            creationDate: Date(timeIntervalSince1970: 0)
-        )
+            creationDate: Date(timeIntervalSince1970: 0))
 
         var state = AppFeature.State()
         state.player.currentTrack = playing
@@ -287,9 +269,6 @@ final class ExtractionScaffoldTests: XCTestCase {
         await store.send(.filesRoot(.moveToDestination(URL(fileURLWithPath: "/Docs/Archive"))))
         await store.receive(\.filesRoot.willRemoveItems)
 
-        XCTAssertNotNil(
-            store.state.player.currentTrack,
-            "Moving an unrelated file must not stop playback."
-        )
+        #expect(store.state.player.currentTrack != nil, "Moving an unrelated file must not stop playback.")
     }
 }

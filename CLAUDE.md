@@ -104,19 +104,38 @@ SonicPlayer/
 file-system-synchronized group, so any `.swift` file dropped into `SonicPlayerTests/` is
 compiled automatically — no project edit needed.
 
+Tests use **Swift Testing** (`@Suite`, `@Test`, `#expect`) — never XCTest (#27).
+
 Test reducers with a **non-exhaustive `TestStore`**:
 
 ```swift
-let store = TestStore(initialState: state) { AppFeature() } withDependencies: {
-    $0.fileManager.listItems = { _ in [] }
+@Suite(.serialized)          // see the parallelism note below
+struct RecordingTests {
+    @MainActor
+    @Test func savingDismissesTheSheet() async {
+        let store = TestStore(initialState: state) { AppFeature() } withDependencies: {
+            $0.defaultFileStorage = .inMemory   // PlayerFeature.State holds @Shared(.fileStorage)
+            $0.fileManager.listItems = { _ in [] }
+        }
+        store.exhaustivity = .off       // assert one thing, don't match every effect
+        await store.send(.recording(.recordingSaved))
+        #expect(!store.state.isRecordingSheetPresented)
+    }
 }
-store.exhaustivity = .off          // assert one thing, don't match every effect
-await store.send(.recording(.recordingSaved))
-XCTAssertFalse(store.state.isRecordingSheetPresented)
 ```
 
 Never call `SomeFeature().reduce(into:action:)` directly — it is deprecated as of TCA 1.26,
 and it bypasses the store, so effects never run and the assertion covers less than it appears to.
+
+Three differences from XCTest that bite when writing new tests:
+
+- **Suites run in parallel**, across and within. Any suite touching global mutable state —
+  `UserDefaults` (which `AppFeature.State()` reads), or the shared `AudioPlayerManager` — needs
+  `@Suite(.serialized)`, or must be made genuinely concurrency-safe. A captured `var` written from
+  inside a `@Sendable` client closure is a data race; use `Mutex`.
+- **`Testing` does not re-export Foundation.** Add `import Foundation` for `URL`, `Date`, `UUID`.
+- **`#expect`'s message is `Comment?`, not `String`.** A literal or `"\(interpolation)"` works; a
+  bare `String` variable does not.
 
 ## Git Workflow
 

@@ -1,5 +1,7 @@
+import Synchronization
 import SwiftUI
-import XCTest
+import Foundation
+import Testing
 
 @testable import SonicPlayer
 
@@ -10,78 +12,82 @@ import XCTest
 /// Deliberately no `import ComposableArchitecture` in this file. If a future change makes one
 /// necessary here, the seam has regressed. (SwiftUI is imported only for `Color`, which the
 /// artwork client's palette is expressed in — unrelated to the dependency machinery.)
-final class ClientSubstitutionTests: XCTestCase {
+@Suite(.serialized)
+struct ClientSubstitutionTests {
 
     // MARK: - .test is a usable stand-in
 
-    func test_trimmerTestValue_isIdentity() async throws {
+    @Test func test_trimmerTestValue_isIdentity() async throws {
         let url = URL(fileURLWithPath: "/Docs/A.m4a")
         let trimmed = try await AudioTrimmerClient.test.trimAudio(url, 0, 10)
         let deleted = try await AudioTrimmerClient.test.deleteAudioRange(url, 0, 10)
-        XCTAssertEqual(trimmed, url)
-        XCTAssertEqual(deleted, url)
+        #expect(trimmed == url)
+        #expect(deleted == url)
     }
 
-    func test_recorderTestValue_reportsNoPermissionSideEffects() async {
-        // XCTAssert* take autoclosures, which cannot contain `await` — hoist first.
+    @Test func test_recorderTestValue_reportsNoPermissionSideEffects() async {
+        // Hoisted from the XCTest original, where XCTAssert*'s autoclosure could not contain
+        // `await`. #expect has no such limit, but the bindings read better than inlining.
         let hasPermission = await AudioRecorderClient.test.checkPermissions()
         let isRecording = await AudioRecorderClient.test.isRecording()
         let currentTime = await AudioRecorderClient.test.currentTime()
 
-        XCTAssertTrue(hasPermission)
-        XCTAssertFalse(isRecording)
-        XCTAssertEqual(currentTime, 0)
+        #expect(hasPermission)
+        #expect(!(isRecording))
+        #expect(currentTime == 0)
     }
 
     /// `getColors` does not return "nothing" when stubbed — it honours the caller's fallback,
     /// and falls back to the sonic teal palette when none is given. Callers rely on getting a
     /// usable palette rather than an empty array, so a stub returning `[]` would be the wrong
     /// stand-in.
-    func test_artworkTestValue_yieldsTheCallersFallbackPalette() async {
+    @Test func test_artworkTestValue_yieldsTheCallersFallbackPalette() async {
         let url = URL(fileURLWithPath: "/Docs/A.mp3")
         let artwork = await ArtworkClient.test.getArtwork(url)
         let defaulted = await ArtworkClient.test.getColors(url, false, nil)
         let supplied = await ArtworkClient.test.getColors(url, false, [.red, .green])
 
-        XCTAssertNil(artwork, "no image without touching disk")
-        XCTAssertEqual(defaulted, Color.sonicTealColors)
-        XCTAssertEqual(supplied, [.red, .green])
+        #expect(artwork == nil, "no image without touching disk")
+        #expect(defaulted == Color.sonicTealColors)
+        #expect(supplied == [.red, .green])
     }
 
     // MARK: - substitution needs no framework
 
     /// The point of the struct-of-closures shape: a caller takes the client as a value, and a
     /// test hands it a different one. This is what replaces `@Dependency` in slices 4 onward.
-    func test_aClientCanBeSubstitutedByPlainAssignment() async throws {
-        var spyCalledWith: URL?
+    @Test func test_aClientCanBeSubstitutedByPlainAssignment() async throws {
+        // The client's `trimAudio` closure is `@Sendable`, so the spy it writes to must be
+        // concurrency-safe — a plain captured `var` is a data race under Swift 6.
+        let spyCalledWith = Mutex<URL?>(nil)
         var client = AudioTrimmerClient.test
         client.trimAudio = { url, _, _ in
-            spyCalledWith = url
+            spyCalledWith.withLock { $0 = url }
             return URL(fileURLWithPath: "/Docs/trimmed.m4a")
         }
 
         let result = try await client.trimAudio(URL(fileURLWithPath: "/Docs/original.m4a"), 1, 2)
 
-        XCTAssertEqual(spyCalledWith?.lastPathComponent, "original.m4a")
-        XCTAssertEqual(result.lastPathComponent, "trimmed.m4a")
+        #expect(spyCalledWith.withLock { $0?.lastPathComponent } == "original.m4a")
+        #expect(result.lastPathComponent == "trimmed.m4a")
     }
 
     // MARK: - .live is constructible
 
     /// Not exercised — `live` wraps AVFoundation and the real filesystem. This only asserts it
     /// can be built, which is what proves the TCA bridge is not load-bearing for construction.
-    func test_liveClientsAreConstructibleWithoutTheDependencyMachinery() {
-        XCTAssertNotNil(AudioTrimmerClient.live.trimAudio)
-        XCTAssertNotNil(AudioRecorderClient.live.startRecording)
-        XCTAssertNotNil(ArtworkClient.live.getArtwork)
-        XCTAssertNotNil(FileManagerClient.live.listItems)
-        XCTAssertNotNil(AudioPlayerClient.live.play)
+    @Test func test_liveClientsAreConstructibleWithoutTheDependencyMachinery() {
+        #expect(AudioTrimmerClient.live.trimAudio != nil)
+        #expect(AudioRecorderClient.live.startRecording != nil)
+        #expect(ArtworkClient.live.getArtwork != nil)
+        #expect(FileManagerClient.live.listItems != nil)
+        #expect(AudioPlayerClient.live.play != nil)
     }
 
     /// The player client wraps a process-lifetime AudioPlayerManager that PlayerFeature and
     /// EditRecordingFeature deliberately share. Extracting `live` must not have turned that into
     /// two instances — #15 depends on the sharing being preserved, warts and all.
-    func test_thePlayerClientIsStillASingleSharedInstance() async {
+    @Test func test_thePlayerClientIsStillASingleSharedInstance() async {
         let a = AudioPlayerClient.live
         let b = AudioPlayerClient.live
         await a.seek(12)
@@ -90,6 +96,6 @@ final class ClientSubstitutionTests: XCTestCase {
         let fromA = await a.currentTime()
         let fromB = await b.currentTime()
 
-        XCTAssertEqual(fromA, fromB)
+        #expect(fromA == fromB)
     }
 }

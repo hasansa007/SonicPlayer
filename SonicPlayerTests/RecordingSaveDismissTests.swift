@@ -1,5 +1,6 @@
 import ComposableArchitecture
-import XCTest
+import Foundation
+import Testing
 
 @testable import SonicPlayer
 
@@ -15,27 +16,25 @@ import XCTest
 /// Collapsing it to an unconditional dismiss is therefore behaviour-preserving.
 /// This test pins the resulting behaviour so a future change cannot quietly
 /// reintroduce a path where saving a recording leaves the sheet open.
-final class RecordingSaveDismissTests: XCTestCase {
+@Suite(.serialized)
+struct RecordingSaveDismissTests {
 
     @MainActor
-    func test_recordingSaved_dismissesTheRecordingSheet() async {
+    @Test func test_recordingSaved_dismissesTheRecordingSheet() async {
         let store = makeStore()
 
         await store.send(.recording(.recordingSaved))
 
-        XCTAssertFalse(
-            store.state.isRecordingSheetPresented,
-            "Saving a recording must always dismiss the recording sheet."
-        )
+        #expect(!(store.state.isRecordingSheetPresented), "Saving a recording must always dismiss the recording sheet.")
     }
 
     @MainActor
-    func test_discardRecording_dismissesTheRecordingSheet() async {
+    @Test func test_discardRecording_dismissesTheRecordingSheet() async {
         let store = makeStore()
 
         await store.send(.recording(.discardRecording))
 
-        XCTAssertFalse(store.state.isRecordingSheetPresented)
+        #expect(!(store.state.isRecordingSheetPresented))
     }
 
     /// A non-exhaustive store focused on the sheet flag. The overrides keep the
