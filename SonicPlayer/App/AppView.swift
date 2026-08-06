@@ -8,6 +8,11 @@ struct AppView: View {
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @State private var shareItem: ShareItem?
 
+    // Settings and onboarding are @Observable view models rather than reducers (#13, #14).
+    // They live here because AppFeature's State is a value type and cannot hold a reference.
+    @State private var settingsViewModel: SettingsViewModel = SettingsViewModel()
+    @State private var onboardingViewModel: OnboardingViewModel? = OnboardingViewModel.ifNeeded()
+
     var body: some View {
         ZStack(alignment: .bottom) {
             // Main content
@@ -26,27 +31,18 @@ struct AppView: View {
                         }
                     }
                     .navigationDestination(isPresented: isSettingsPresented) {
-                        SettingsView(store: store.scope(state: \.settings, action: \.settings))
+                        SettingsView(viewModel: settingsViewModel)
                     }
                     .alert($store.scope(state: \.filesRoot.alert, action: \.filesRoot.alert))
-                    .alert("Rename", isPresented: Binding(
-                        get: { store.filesRoot.renamingItem != nil },
-                        set: { if !$0 { store.send(.filesRoot(.cancelNameInput)) } }
-                    )) {
-                        TextField("Name", text: Binding(
-                            get: { store.filesRoot.inputText },
-                            set: { store.send(.filesRoot(.setInputText($0))) }
-                        ))
+                    .alert("Rename", isPresented: isRenaming) {
+                        TextField("Name", text: renameText)
                         Button("Rename") { store.send(.filesRoot(.confirmNameInput)) }
                         Button("Cancel", role: .cancel) { store.send(.filesRoot(.cancelNameInput)) }
                     }
                     .sheet(item: $store.scope(state: \.filesRoot.editAudio, action: \.filesRoot.editAudio)) { editStore in
                         EditRecordingView(store: editStore)
                     }
-                    .sheet(isPresented: Binding(
-                        get: { store.filesRoot.isShowingCollectionPicker },
-                        set: { if !$0 { store.send(.filesRoot(.cancelMove)) } }
-                    )) {
+                    .sheet(isPresented: isCollectionPickerPresented) {
                         InAppCollectionPicker(
                             collections: store.filesRoot.availableCollections,
                             onPick: { url in store.send(.filesRoot(.moveToDestination(url))) },
@@ -67,7 +63,7 @@ struct AppView: View {
                     .navigationTitle(collectionsStore.currentDirectory?.lastPathComponent ?? "Collections")
                     .navigationBarTitleDisplayMode(.large)
             }
-            .preferredColorScheme(store.settings.colorScheme.colorScheme)
+            .preferredColorScheme(settingsViewModel.colorScheme.colorScheme)
 
             // Mini Player (full-width bottom bar)
             if store.player.shouldShowMiniPlayer {
@@ -120,6 +116,7 @@ struct AppView: View {
             store.send(.openedFromFiles(url))
         }
         .onAppear {
+            wireViewModels()
             if ScreenshotMode.isEnabled {
                 // In screenshot mode, show recording sheet if needed
                 if ScreenshotMode.targetScreen == .recording || ScreenshotMode.targetScreen == .editRecording {
@@ -130,11 +127,11 @@ struct AppView: View {
             }
         }
         .fullScreenCover(isPresented: Binding(
-            get: { store.onboarding != nil },
+            get: { onboardingViewModel != nil },
             set: { _ in }
         )) {
-            if let onboardingStore = store.scope(state: \.onboarding, action: \.onboarding) {
-                OnboardingView(store: onboardingStore)
+            if let onboardingViewModel {
+                OnboardingView(viewModel: onboardingViewModel)
             }
         }
     }
@@ -144,10 +141,46 @@ struct AppView: View {
 
 private extension AppView {
 
+    /// Replaces the cross-feature action taps AppFeature used to carry: settings changes
+    /// reaching the player, and onboarding completion clearing itself.
+    func wireViewModels() {
+        settingsViewModel.onDefaultPlaybackSpeedChanged = { speed in
+            store.send(.player(.setPlaybackSpeed(speed)))
+        }
+        settingsViewModel.onDefaultSkipDurationChanged = { duration in
+            store.send(.player(.setSkipDuration(duration)))
+        }
+        onboardingViewModel?.onGetStarted = {
+            OnboardingViewModel.markSeen()
+            onboardingViewModel = nil
+        }
+    }
+
     var isRecordingSheetPresented: Binding<Bool> {
         Binding(
             get: { store.isRecordingSheetPresented },
             set: { if !$0 { store.send(.dismissRecordingSheet) } }
+        )
+    }
+
+    var isRenaming: Binding<Bool> {
+        Binding(
+            get: { store.filesRoot.renamingItem != nil },
+            set: { if !$0 { store.send(.filesRoot(.cancelNameInput)) } }
+        )
+    }
+
+    var renameText: Binding<String> {
+        Binding(
+            get: { store.filesRoot.inputText },
+            set: { store.send(.filesRoot(.setInputText($0))) }
+        )
+    }
+
+    var isCollectionPickerPresented: Binding<Bool> {
+        Binding(
+            get: { store.filesRoot.isShowingCollectionPicker },
+            set: { if !$0 { store.send(.filesRoot(.cancelMove)) } }
         )
     }
 

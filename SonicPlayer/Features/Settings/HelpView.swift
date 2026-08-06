@@ -1,8 +1,7 @@
-import ComposableArchitecture
 import SwiftUI
 
 struct HelpView: View {
-    let store: StoreOf<SettingsFeature>
+    @Bindable var viewModel: SettingsViewModel
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
@@ -133,7 +132,7 @@ struct HelpView: View {
                     title: "Request a Feature",
                     subtitle: "Tell us what you want to see next"
                 ) {
-                    store.send(.requestFeatureTapped)
+                    viewModel.requestFeatureTapped()
                 }
             }
         }

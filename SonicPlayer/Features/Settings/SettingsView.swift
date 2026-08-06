@@ -1,8 +1,7 @@
-import ComposableArchitecture
 import SwiftUI
 
 struct SettingsView: View {
-    let store: StoreOf<SettingsFeature>
+    @Bindable var viewModel: SettingsViewModel
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.systemID
     private let supportedLanguages = AppLanguage.supportedLanguages
     @State private var expandedSection: ExpandableSection?
@@ -36,16 +35,16 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationDestination(isPresented: Binding(
-            get: { store.showAbout },
-            set: { _ in store.send(.dismissAbout) }
+            get: { viewModel.showAbout },
+            set: { _ in viewModel.dismissAbout() }
         )) {
-            AboutView(store: store)
+            AboutView(viewModel: viewModel)
         }
         .navigationDestination(isPresented: Binding(
-            get: { store.showHelp },
-            set: { _ in store.send(.dismissHelp) }
+            get: { viewModel.showHelp },
+            set: { _ in viewModel.dismissHelp() }
         )) {
-            HelpView(store: store)
+            HelpView(viewModel: viewModel)
         }
     }
 
@@ -90,7 +89,7 @@ struct SettingsView: View {
                         iconColor: .sonicPrimary
                     ) {
                         HStack(spacing: 4) {
-                            Text(store.defaultPlaybackSpeed.displayText)
+                            Text(viewModel.defaultPlaybackSpeed.displayText)
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                                 .foregroundColor(.sonicPrimary)
@@ -107,7 +106,7 @@ struct SettingsView: View {
                     VStack(spacing: 0) {
                         ForEach(PlaybackSpeed.allCases) { speed in
                             Button {
-                                store.send(.setDefaultPlaybackSpeed(speed))
+                                viewModel.setDefaultPlaybackSpeed(speed)
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     expandedSection = nil
                                 }
@@ -117,7 +116,7 @@ struct SettingsView: View {
                                         .font(.subheadline)
                                         .foregroundColor(.sonicTextPrimary)
                                     Spacer()
-                                    if speed == store.defaultPlaybackSpeed {
+                                    if speed == viewModel.defaultPlaybackSpeed {
                                         Image(systemName: "checkmark")
                                             .font(.caption)
                                             .foregroundColor(.sonicPrimary)
@@ -147,7 +146,7 @@ struct SettingsView: View {
                         iconColor: .sonicPrimary
                     ) {
                         HStack(spacing: 4) {
-                            Text(store.defaultSkipDuration.displayText)
+                            Text(viewModel.defaultSkipDuration.displayText)
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                                 .foregroundColor(.sonicPrimary)
@@ -164,7 +163,7 @@ struct SettingsView: View {
                     VStack(spacing: 0) {
                         ForEach(SkipDuration.allCases) { duration in
                             Button {
-                                store.send(.setDefaultSkipDuration(duration))
+                                viewModel.setDefaultSkipDuration(duration)
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     expandedSection = nil
                                 }
@@ -174,7 +173,7 @@ struct SettingsView: View {
                                         .font(.subheadline)
                                         .foregroundColor(.sonicTextPrimary)
                                     Spacer()
-                                    if duration == store.defaultSkipDuration {
+                                    if duration == viewModel.defaultSkipDuration {
                                         Image(systemName: "checkmark")
                                             .font(.caption)
                                             .foregroundColor(.sonicPrimary)
@@ -203,12 +202,12 @@ struct SettingsView: View {
                     }
                 } label: {
                     SettingsRow(
-                        icon: store.colorScheme.icon,
+                        icon: viewModel.colorScheme.icon,
                         title: "Theme",
                         iconColor: .orange
                     ) {
                         HStack(spacing: 4) {
-                            Text(store.colorScheme.rawValue)
+                            Text(viewModel.colorScheme.rawValue)
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                                 .foregroundColor(.sonicPrimary)
@@ -224,7 +223,7 @@ struct SettingsView: View {
                     VStack(spacing: 0) {
                         ForEach(AppColorScheme.allCases) { scheme in
                             Button {
-                                store.send(.setColorScheme(scheme))
+                                viewModel.setColorScheme(scheme)
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     expandedSection = nil
                                 }
@@ -238,7 +237,7 @@ struct SettingsView: View {
                                         .font(.subheadline)
                                         .foregroundColor(.sonicTextPrimary)
                                     Spacer()
-                                    if scheme == store.colorScheme {
+                                    if scheme == viewModel.colorScheme {
                                         Image(systemName: "checkmark")
                                             .font(.caption)
                                             .foregroundColor(.sonicPrimary)
@@ -328,7 +327,7 @@ struct SettingsView: View {
                     title: "About Sonic",
                     iconColor: .blue
                 ) {
-                    store.send(.showAboutTapped)
+                    viewModel.showAboutTapped()
                 }
 
                 Divider()
@@ -338,7 +337,7 @@ struct SettingsView: View {
                     title: "Help & Support",
                     iconColor: .green
                 ) {
-                    store.send(.showHelpTapped)
+                    viewModel.showHelpTapped()
                 }
             }
         }

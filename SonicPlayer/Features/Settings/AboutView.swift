@@ -1,8 +1,7 @@
-import ComposableArchitecture
 import SwiftUI
 
 struct AboutView: View {
-    let store: StoreOf<SettingsFeature>
+    @Bindable var viewModel: SettingsViewModel
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
