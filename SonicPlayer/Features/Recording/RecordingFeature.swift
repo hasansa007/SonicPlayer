@@ -262,13 +262,9 @@ struct RecordingFeature {
                 state.inlineEdit = EditRecordingFeature.State(recording: audioFile)
                 return .none
 
-            case let .inlineEdit(editAction):
-                // Forward inline edit actions to the EditRecordingFeature reducer
-                guard var editState = state.inlineEdit else { return .none }
-                let editReducer = EditRecordingFeature()
-                let effect = editReducer.reduce(into: &editState, action: editAction)
-                state.inlineEdit = editState
-                return effect.map { Action.inlineEdit($0) }
+            case .inlineEdit:
+                // Handled by the EditRecordingFeature reducer composed via .ifLet below
+                return .none
 
             case .discardRecording:
                 // Delete edit temp file
@@ -296,6 +292,9 @@ struct RecordingFeature {
                 state.showPermissionAlert = show
                 return .none
             }
+        }
+        .ifLet(\.inlineEdit, action: \.inlineEdit) {
+            EditRecordingFeature()
         }
     }
 }

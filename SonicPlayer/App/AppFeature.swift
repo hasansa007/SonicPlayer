@@ -106,13 +106,6 @@ struct AppFeature {
                 state.onboarding = nil
                 return .none
 
-            case let .onboarding(onboardingAction):
-                guard var onboardingState = state.onboarding else { return .none }
-                let onboardingReducer = OnboardingFeature()
-                _ = onboardingReducer.reduce(into: &onboardingState, action: onboardingAction)
-                state.onboarding = onboardingState
-                return .none
-
             // MARK: - Home Actions
 
             case let .home(.playTrack(track)):
@@ -377,9 +370,12 @@ struct AppFeature {
                 }
                 return .none
 
-            case .player, .home, .filesRoot, .filesPath, .settings, .recording:
+            case .player, .home, .filesRoot, .filesPath, .settings, .recording, .onboarding:
                 return .none
             }
+        }
+        .ifLet(\.onboarding, action: \.onboarding) {
+            OnboardingFeature()
         }
         .forEach(\.filesPath, action: \.filesPath) {
             CollectionsFeature()
