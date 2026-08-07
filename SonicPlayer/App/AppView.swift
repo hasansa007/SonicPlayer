@@ -156,7 +156,20 @@ struct AppView: View {
             player.scenePhaseChanged(newPhase)
         }
         .onOpenURL { url in
-            openedFromFiles(url)
+            // Straight to the player: it owns playback, and it is the only place that can make
+            // the import outrank the session restore that runs alongside it on a launch started
+            // BY this open (#33).
+            player.openFromFiles(url) {
+                filesRoot.refreshFiles()
+            }
+        }
+        .alert("Action Failed", isPresented: Binding(
+            get: { player.openError != nil },
+            set: { if !$0 { player.openError = nil } }
+        )) {
+            Button("OK", role: .cancel) { player.openError = nil }
+        } message: {
+            if let error = player.openError { Text(error) }
         }
         .onAppear {
             wireViewModels()
@@ -234,28 +247,6 @@ private extension AppView {
         }
         // Any reload of the root browser refreshes Home's recents, which are drawn from it.
         filesRoot.onItemsLoaded = { home.loadRecentFiles() }
-    }
-
-    /// Import a file handed over by another app, then play it.
-    ///
-    /// Was `AppFeature.openedFromFiles`. Unchanged apart from where it lives — including that it
-    /// resolves the played file from a path computed before the import runs, which is #33.
-    func openedFromFiles(_ url: URL) {
-        Task {
-            let accessing = url.startAccessingSecurityScopedResource()
-            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-
-            let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-            let dest = docs.appendingPathComponent(url.lastPathComponent)
-            if !FileManager.default.fileExists(atPath: dest.path) {
-                try? FileManager.default.copyItem(at: url, to: dest)
-            }
-            filesRoot.refreshFiles()
-
-            if let file = try? await FileManagerClient.live.getMetadata(dest) {
-                player.loadTrack(file, queue: [file], source: .singleFile)
-            }
-        }
     }
 
     var isRecordingSheetPresented: Binding<Bool> {

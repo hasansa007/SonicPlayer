@@ -45,6 +45,7 @@
 		A6000009000000000000001 /* SwipeToDelete.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6000010000000000000001 /* SwipeToDelete.swift */; };
 		A7000009000000000000001 /* MediaFileRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7000010000000000000001 /* MediaFileRowView.swift */; };
 		A8000009000000000000001 /* InAppCollectionPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8000010000000000000001 /* InAppCollectionPicker.swift */; };
+		A8000099000000000000001 /* OpenInImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8000098000000000000001 /* OpenInImport.swift */; };
 		A9000001000000000000001 /* UniqueNameResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000010000000000000001 /* UniqueNameResolver.swift */; };
 		A9000002000000000000001 /* PathMatching.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000011000000000000001 /* PathMatching.swift */; };
 		A9000003000000000000001 /* QueueMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000012000000000000001 /* QueueMath.swift */; };
@@ -119,6 +120,7 @@
 		A6000010000000000000001 /* SwipeToDelete.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeToDelete.swift; sourceTree = "<group>"; };
 		A7000010000000000000001 /* MediaFileRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFileRowView.swift; sourceTree = "<group>"; };
 		A8000010000000000000001 /* InAppCollectionPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InAppCollectionPicker.swift; sourceTree = "<group>"; };
+		A8000098000000000000001 /* OpenInImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenInImport.swift; sourceTree = "<group>"; };
 		A9000010000000000000001 /* UniqueNameResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UniqueNameResolver.swift; sourceTree = "<group>"; };
 		A9000011000000000000001 /* PathMatching.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathMatching.swift; sourceTree = "<group>"; };
 		A9000012000000000000001 /* QueueMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueMath.swift; sourceTree = "<group>"; };
@@ -306,6 +308,7 @@
 			children = (
 				A7000010000000000000001 /* MediaFileRowView.swift */,
 				A8000010000000000000001 /* InAppCollectionPicker.swift */,
+				A8000098000000000000001 /* OpenInImport.swift */,
 				86A1B3012F1B4A0100A1BEEF /* FileItemRow.swift */,
 				AB000031000000000000001 /* CollectionsViewModel.swift */,
 				AB000033000000000000001 /* FolderImport.swift */,
@@ -481,6 +484,7 @@
 				A1000010000000000000002 /* MiniPlayerView.swift in Sources */,
 				A7000009000000000000001 /* MediaFileRowView.swift in Sources */,
 				A8000009000000000000001 /* InAppCollectionPicker.swift in Sources */,
+				A8000099000000000000001 /* OpenInImport.swift in Sources */,
 				86A1B3002F1B4A0100A1BEEF /* FileItemRow.swift in Sources */,
 				AB000030000000000000001 /* CollectionsViewModel.swift in Sources */,
 				AB000032000000000000001 /* FolderImport.swift in Sources */,

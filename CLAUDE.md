@@ -69,8 +69,16 @@ Do not retrofit those layers onto the offline features to make the codebase look
 is not the goal; each layer paying for itself is.
 
 Known cost of the current shape: orchestration lives in view models. `PlayerViewModel.restoreSession`
-is real business logic in the presentation layer. If a view model keeps growing, extract the
-orchestration into `Domain/` rather than reaching for the full layered stack.
+and `PlayerViewModel.openFromFiles` are real business logic in the presentation layer. If a view
+model keeps growing, extract the orchestration into `Domain/` rather than reaching for the full
+layered stack.
+
+`openFromFiles` also shows the limit of that rule. Its I/O half went to `OpenInImport` in
+`Features/Files/` rather than `Domain/`, for the same reason the recursive folder import does not
+live there: it is security-scoped access and a copy, with no decision left over once those are
+removed. **`Domain/` is for logic you can state without I/O, not for everything that is not a
+view.** What stayed on the view model is the part that genuinely coordinates two things — the
+import and the session restore it has to outrank (#33).
 
 Note also that this codebase is **async/await throughout**, not Combine.
 
@@ -103,6 +111,10 @@ Cross-feature communication travels through a **closure wired at the composition
 reading another feature's state. `CollectionsViewModel.onWillRemoveItems` is the canonical shape,
 and it is that shape for a reason: the items **travel in the call** rather than being read back,
 because the selection is cleared before the removal runs (#22). See `AppView.wireViewModels()`.
+
+Not everything is in that helper: `.onOpenURL` calls `player.openFromFiles(_:onImported:)` and
+passes its callback inline (#33). Same shape and same place, but a reader who only greps
+`wireViewModels()` will not find it.
 
 **The `AppCommand` channel is gone (#18).** It existed for one reason: playing a tapped file
 needed the queue, which was computed from `filesRoot.items` and lived only in the store.
