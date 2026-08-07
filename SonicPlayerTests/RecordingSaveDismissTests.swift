@@ -101,8 +101,8 @@ struct RecordingSaveDismissTests {
         RecordingViewModel(audioRecorder: .test, audioPlayer: player(), fileManager: .test)
     }
 
-    /// `@DependencyClient` leaves closures without an explicit default unimplemented, and an
-    /// unimplemented call reports a failure. Both finishing paths stop the shared player.
+    /// Every closure on `.test` reports rather than silently succeeding (`TestClients.swift`).
+    /// Both finishing paths stop the shared player, so `stop` is stubbed.
     private static func player() -> AudioPlayerClient {
         var client = AudioPlayerClient.test
         client.stop = {}

@@ -69,10 +69,9 @@ struct PlayerViewModelTests {
     @MainActor
     private func makePlayer(playing path: String?) -> PlayerViewModel {
         var audioPlayer = AudioPlayerClient.test
-        // `@DependencyClient` leaves every closure without an explicit default unimplemented, and
-        // an unimplemented call reports a failure. `stop` needs a stub precisely *because* the
-        // behaviour under test reaches it: clearing the session must stop playback, not just
-        // forget the track.
+        // Every closure on `.test` reports rather than silently succeeding (`TestClients.swift`).
+        // `stop` needs a stub precisely *because* the behaviour under test reaches it: clearing
+        // the session must stop playback, not just forget the track.
         audioPlayer.stop = {}
 
         let player = PlayerViewModel(

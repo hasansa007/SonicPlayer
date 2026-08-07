@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-SonicPlayer is a native iOS audio player app (iOS 18.0+) built with **SwiftUI** and `@Observable` MVVM. TCA v1.26.1 is still a dependency — the clients use its `@DependencyClient` macro — and #20 removes it. It supports browsing, playing, and recording audio files with a minimalist Sonic teal design.
+SonicPlayer is a native iOS audio player app (iOS 18.0+) built with **SwiftUI** and `@Observable` MVVM, with **zero third-party dependencies** (#20). It supports browsing, playing, and recording audio files with a minimalist Sonic teal design.
 
 **Bundle ID:** `com.hasan.sonicplayer`
 
@@ -14,18 +14,17 @@ open SonicPlayer.xcodeproj
 
 # Build via CLI (iPhone simulator)
 xcodebuild -project SonicPlayer.xcodeproj -scheme SonicPlayer \
-  -destination 'platform=iOS Simulator,name=iPhone 17' -skipMacroValidation build
+  -destination 'platform=iOS Simulator,name=iPhone 17' build
 
 # Run the tests
 xcodebuild test -project SonicPlayer.xcodeproj -scheme SonicPlayer \
-  -destination 'platform=iOS Simulator,name=iPhone 17' -skipMacroValidation
-
-# SPM dependencies resolve automatically on first build
+  -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
-`-skipMacroValidation` is required from the CLI: TCA ships a macro, and Xcode gates
-unapproved macros behind a GUI trust prompt that `xcodebuild` cannot answer. In the Xcode
-app you approve it once instead.
+**There are no dependencies to resolve.** `-skipMacroValidation` used to be required here because
+TCA shipped a macro and Xcode gates unapproved macros behind a GUI trust prompt `xcodebuild` cannot
+answer. No package means no macro, so the flag is gone (#20). If you see it in an older command it
+is harmless but pointless.
 
 Requires Xcode 27 — `xcode-select -p` must point at the Xcode app, not Command Line Tools.
 
@@ -158,9 +157,13 @@ which is what keeps it uncreated under test; `isRunningTests` in that file depen
 
 ## Dependencies
 
-- **ComposableArchitecture** v1.26.1 (sole *direct* third-party dependency; it pulls in 13 more)
-- All transitive deps (swift-dependencies, swift-sharing, swift-perception, swift-navigation, etc.) are pinned in `Package.resolved` — 14 packages in total, all of which leave with TCA
-- Do **not** drop below 1.26: TCA 1.23.1 fails to compile on Xcode 27 (`cannot form key path to main actor-isolated subscript` in `NavigationStack+Observation.swift`, upstream issue #3950)
+**None.** `Package.resolved` pins zero packages as of #20, which removed ComposableArchitecture
+and the 13 transitive packages it pulled in (swift-dependencies, swift-sharing, swift-perception,
+swift-navigation, swift-syntax, …).
+
+Adding one back is a decision, not a convenience — the whole of epic #5 was spent getting here.
+The clients are structs of closures and the tests need no framework; if something looks like it
+needs a package, check `ARCHITECTURE.md` first.
 
 ## File Structure
 
@@ -248,10 +251,14 @@ Before bumping `CFBundleShortVersionString` in `Info.plist`, add a matching sect
 `RELEASE_NOTES.md`. The workflow reads the section whose heading equals `## <version>` and ships it
 as What's New; with no matching section testers get a placeholder and a build warning.
 
-The runner pins **Xcode 26.3**. Do not lower it: `ComposableArchitecture` and `swift-sharing`
-declare `swift-tools-version: 6.1`, so anything below Xcode 16.3 fails during package resolution
-with an error that does not mention Xcode. A guard step asserts the Swift version and fails with a
-readable message instead.
+The runner pins **Xcode 26.3**, and the guard step asserts the toolchain can build the project.
+
+**The original reason for the pin is gone**: it was that `ComposableArchitecture` and
+`swift-sharing` declared `swift-tools-version: 6.1`, so anything below Xcode 16.3 failed during
+package resolution with an error that never mentioned Xcode. There are no packages now (#20), so
+that failure mode cannot occur. The pin stays because 26.3 is the newest available on `macos-15`
+and the closest to the local toolchain — not because of a package constraint. Do not re-derive the
+old reason from an older copy of this paragraph.
 
 To prove a pipeline change without shipping, run the workflow manually from the Actions tab with
 **dry_run** checked — it archives and exports but skips the upload.

@@ -30,9 +30,10 @@ jobs:
         run: |
           # 16.2 was pinned here and CANNOT build this project. It exists on macos-15, so
           # xcode-select succeeds and the failure surfaces later as an opaque SwiftPM manifest
-          # error. ComposableArchitecture 1.26.1 and swift-sharing 2.9.1 both declare
-          # swift-tools-version: 6.1, which needs Swift 6.1 — Xcode 16.3 at minimum.
-          # 26.3 is the newest on macos-15 and the closest available to the local toolchain.
+          # error. That was because ComposableArchitecture and swift-sharing declared
+          # swift-tools-version: 6.1, needing Swift 6.1 — Xcode 16.3 at minimum. #20 removed
+          # every package, so that specific failure is gone; 26.3 stays because it is the
+          # newest on macos-15 and the closest available to the local toolchain.
           sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer
           xcodebuild -version
           swift --version
@@ -92,8 +93,7 @@ jobs:
             -scheme SonicPlayer \
             -destination 'generic/platform=iOS' \
             -archivePath $RUNNER_TEMP/SonicPlayer.xcarchive \
-            -configuration Release \
-            -skipMacroValidation
+            -configuration Release
 
       - name: Write App Store Connect API key
         env:

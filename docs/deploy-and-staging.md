@@ -44,10 +44,14 @@ Use it after any change to the workflow, the signing setup, or the Xcode pin.
 
 ## The Xcode pin
 
-The runner pins **Xcode 26.3**. Do not lower it. `ComposableArchitecture` and `swift-sharing`
-declare `swift-tools-version: 6.1`, so anything below Xcode 16.3 fails during package resolution
-with an error that never mentions Xcode. A guard step asserts the Swift version up front and fails
-with a readable message instead of that one.
+The runner pins **Xcode 26.3**, and a guard step asserts up front that the toolchain can build
+the project.
+
+**The package constraint that originally forced this is gone.** Until #20 the reason was that
+`ComposableArchitecture` and `swift-sharing` declared `swift-tools-version: 6.1`, so anything below
+Xcode 16.3 failed during package resolution with an error that never mentioned Xcode. The project
+now has zero packages, so that failure mode no longer exists. 26.3 remains the pin because it is
+the newest available on `macos-15` and the closest to the local toolchain.
 
 ## Why this file exists
 

@@ -93,7 +93,7 @@ New features go the migrated way — do not add reducers to a codebase that is r
 
 After making changes, verify the build:
 ```bash
-xcodebuild -project SonicPlayer.xcodeproj -scheme SonicPlayer -destination 'platform=iOS Simulator,name=iPhone 17' -skipMacroValidation build 2>&1 | tail -5
+xcodebuild -project SonicPlayer.xcodeproj -scheme SonicPlayer -destination 'platform=iOS Simulator,name=iPhone 17' build 2>&1 | tail -5
 ```
 
 A successful build ends with `** BUILD SUCCEEDED **`.

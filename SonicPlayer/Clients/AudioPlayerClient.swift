@@ -1,9 +1,7 @@
 import AVFoundation
-import ComposableArchitecture
 import Foundation
 import MediaPlayer
 
-@DependencyClient
 struct AudioPlayerClient {
     var prepare: @Sendable (URL) async throws -> Void
     var play: @Sendable (URL) async throws -> Void
@@ -19,24 +17,9 @@ struct AudioPlayerClient {
     var currentTime: @Sendable () async -> TimeInterval = { 0 }
     var duration: @Sendable () async -> TimeInterval = { 0 }
     var isPlaying: @Sendable () async -> Bool = { false }
-    var timeUpdates: @Sendable () async -> AsyncStream<TimeInterval> = { .finished }
+    var timeUpdates: @Sendable () async -> AsyncStream<TimeInterval> = { AsyncStream { $0.finish() } }
 }
 
-// MARK: - TCA bridge
-//
-// Kept separate so #20 can delete this whole extension in one cut, leaving `live`
-// and `test` — which reference no TCA — exactly as they are.
-extension AudioPlayerClient: DependencyKey {
-    static var liveValue: AudioPlayerClient { .live }
-    static var testValue: AudioPlayerClient { .test }
-}
-
-extension DependencyValues {
-    var audioPlayer: AudioPlayerClient {
-        get { self[AudioPlayerClient.self] }
-        set { self[AudioPlayerClient.self] = newValue }
-    }
-}
 
 extension AudioPlayerClient {
     static func makeLive() -> AudioPlayerClient {
@@ -94,7 +77,6 @@ extension AudioPlayerClient {
 
     static let live: AudioPlayerClient = makeLive()
 
-    static let test = Self()
 }
 
 // ...
