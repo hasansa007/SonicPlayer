@@ -187,107 +187,9 @@ enum ScreenshotDemoData {
     ]
 
     // MARK: - State Builders
-
-    static func buildAppState(for screen: ScreenshotMode.Screen) -> AppFeature.State {
-        var state = AppFeature.State()
-        // Onboarding is skipped in screenshot mode by OnboardingViewModel.ifNeeded()
-
-        switch screen {
-        case .home:
-            populateHome(&state)
-
-        case .homeWithMiniPlayer:
-            populateHome(&state)
-
-        case .collections:
-            populateHome(&state)
-            populateCollectionsBrowser(&state)
-
-        case .player:
-            populateHome(&state)
-
-        case .recording, .editRecording:
-            // Recording/edit states are handled via sheets after launch
-            populateHome(&state)
-        }
-
-        return state
-    }
-
-    // MARK: - State Population
-
-    private static func populateHome(_ state: inout AppFeature.State) {
-        // Build filesystem items from collections + recent files
-        let folderItems: [FileSystemItem] = collections.map { .folder($0) }
-        let fileItems: [FileSystemItem] = recentFiles.prefix(5).map { .file($0) }
-        state.filesRoot.items = folderItems + fileItems
-
-        // Build collection cards
-        var cards: IdentifiedArrayOf<CollectionItemCardFeature.State> = []
-        for collection in collections {
-            cards.append(CollectionItemCardFeature.State(folder: collection))
-        }
-        state.filesRoot.collectionCards = cards
-
-        // Build file rows
-        var rows: IdentifiedArrayOf<FileRowFeature.State> = []
-        for file in recentFiles.prefix(5) {
-            var row = FileRowFeature.State(file: file)
-            row.creationDate = file.creationDate
-            rows.append(row)
-        }
-        state.filesRoot.fileRows = rows
-    }
-
-    private static func populateCollectionsBrowser(_ state: inout AppFeature.State) {
-        // Push a collections view onto the navigation stack showing "Podcasts" folder
-        var collectionsState = CollectionsFeature.State(
-            currentDirectory: documentsURL.appendingPathComponent("Podcasts")
-        )
-
-        // Nested subfolders
-        let subCollections: [CollectionItem] = [
-            CollectionItem(
-                id: documentsURL.appendingPathComponent("Podcasts/Favorites"),
-                url: documentsURL.appendingPathComponent("Podcasts/Favorites"),
-                name: "Favorites",
-                creationDate: Date().addingTimeInterval(-86400 * 10),
-                itemCount: 3,
-                subfolderCount: 0,
-                totalDuration: 5400
-            ),
-            CollectionItem(
-                id: documentsURL.appendingPathComponent("Podcasts/Archive"),
-                url: documentsURL.appendingPathComponent("Podcasts/Archive"),
-                name: "Archive",
-                creationDate: Date().addingTimeInterval(-86400 * 20),
-                itemCount: 15,
-                subfolderCount: 0,
-                totalDuration: 28800
-            ),
-        ]
-
-        let folderItems: [FileSystemItem] = subCollections.map { .folder($0) }
-        let fileItems: [FileSystemItem] = collectionFiles.map { .file($0) }
-        collectionsState.items = folderItems + fileItems
-
-        // Build child states
-        var cards: IdentifiedArrayOf<CollectionItemCardFeature.State> = []
-        for sub in subCollections {
-            cards.append(CollectionItemCardFeature.State(folder: sub))
-        }
-        collectionsState.collectionCards = cards
-
-        var rows: IdentifiedArrayOf<FileRowFeature.State> = []
-        for file in collectionFiles {
-            var row = FileRowFeature.State(file: file)
-            row.creationDate = file.creationDate
-            rows.append(row)
-        }
-        collectionsState.fileRows = rows
-
-        state.filesPath.append(collectionsState)
-    }
+    //
+    // `buildAppState` is gone with #18: `AppFeature.State` is three sheet flags now, and every
+    // screen's demo data lives on a view model. `AppView` calls `seedViewModels` instead.
 
 }
 
@@ -304,9 +206,11 @@ extension ScreenshotDemoData {
     static func seedViewModels(
         player: PlayerViewModel,
         home: HomeViewModel,
+        filesRoot: CollectionsViewModel,
         for screen: ScreenshotMode.Screen
     ) {
         home.recentFiles = recentFiles
+        filesRoot.seed(items: collections.map { .folder($0) } + recentFiles.prefix(5).map { .file($0) })
 
         switch screen {
         case .homeWithMiniPlayer:

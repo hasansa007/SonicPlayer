@@ -1,16 +1,47 @@
-import ComposableArchitecture
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// One navigation depth of the file browser.
+///
+/// Owns its `CollectionsViewModel` as `@State` so the model's lifetime follows the screen's, and
+/// takes its out-edges as closures wired by whoever pushed it. That is what replaced
+/// `StackState` + `AppFeature` reaching into arbitrary stack depth by element id (#18): the depth
+/// that raises an event is the only thing that knows its own file list, so it passes it out.
+///
+/// **Selection used to live in three places.** This view kept `isSelecting` /
+/// `selectedCollectionIds` / `selectedFileIds`, the reducer kept `isSelectionMode` /
+/// `selectedItems`, and each row reducer kept its own `isSelected` — with a `selectItemsInStore()`
+/// translating between the first two on every action. The row mirrors went with the row reducers
+/// and the local copies went with them; `viewModel.selectedItems` is now the only one.
 struct CollectionsView: View {
-    @Bindable var store: StoreOf<CollectionsFeature>
-    @State private var isSelecting = false
-    @State private var selectedCollectionIds: Set<URL> = []
-    @State private var selectedFileIds: Set<UUID> = []
+
+    @Bindable private var viewModel: CollectionsViewModel
     @State private var shareItem: ShareItem?
     @State private var showingDocumentPicker = false
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    init(
+        directory: URL?,
+        fileManager: FileManagerClient = .live,
+        onCollectionTapped: @escaping (CollectionItem) -> Void,
+        onPlay: @escaping (AudioFile, [AudioFile], PlaylistSource?) -> Void,
+        onWillRemoveItems: @escaping (Set<FileSystemItem>) -> Void = { _ in },
+        onItemsLoaded: @escaping () -> Void = {}
+    ) {
+        let model = CollectionsViewModel(currentDirectory: directory, fileManager: fileManager)
+        model.onCollectionTapped = onCollectionTapped
+        model.onPlay = onPlay
+        model.onWillRemoveItems = onWillRemoveItems
+        model.onItemsLoaded = onItemsLoaded
+        _viewModel = Bindable(wrappedValue: model)
+    }
+
+    /// For a model built and wired elsewhere — the root browser, which the composition root holds
+    /// so Home's swipe actions can reach it.
+    init(viewModel: CollectionsViewModel) {
+        _viewModel = Bindable(wrappedValue: viewModel)
+    }
 
     private static let gradients: [[Color]] = [
         [Color(hex: "1a3a5a"), Color(hex: "1B5B7E")],
@@ -28,9 +59,9 @@ struct CollectionsView: View {
         ZStack {
             Color.sonicBackground.ignoresSafeArea()
 
-            if store.isLoading && store.items.isEmpty {
+            if viewModel.isLoading && viewModel.items.isEmpty {
                 ProgressView().tint(.sonicPrimary)
-            } else if store.items.isEmpty {
+            } else if viewModel.items.isEmpty {
                 EmptyStateView(
                     icon: "folder.badge.questionmark",
                     title: "Collection is Empty",
@@ -44,51 +75,46 @@ struct CollectionsView: View {
         }
         .toolbar { toolbarContent }
         .searchable(
-            text: Binding(
-                get: { store.searchText },
-                set: { store.send(.setSearchText($0)) }
-            ),
+            text: $viewModel.searchText,
             placement: .navigationBarDrawer(displayMode: .always),
             prompt: "Search files..."
         )
-        .alert($store.scope(state: \.alert, action: \.alert))
+        .alert("Delete \(viewModel.pendingDeleteCount) \(viewModel.pendingDeleteCount == 1 ? "item" : "items")?",
+               isPresented: $viewModel.isConfirmingDelete) {
+            Button("Delete", role: .destructive) { viewModel.confirmDelete() }
+            Button("Cancel", role: .cancel) {}
+        }
         .alert("New Collection", isPresented: Binding(
-            get: { store.isCreatingCollection },
-            set: { if !$0 { store.send(.cancelNameInput) } }
+            get: { viewModel.isCreatingCollection },
+            set: { if !$0 { viewModel.cancelNameInput() } }
         )) {
-            TextField("Name", text: Binding(
-                get: { store.inputText },
-                set: { store.send(.setInputText($0)) }
-            ))
-            Button("Create") { store.send(.confirmNameInput) }
-            Button("Cancel", role: .cancel) { store.send(.cancelNameInput) }
+            TextField("Name", text: $viewModel.inputText)
+            Button("Create") { viewModel.confirmNameInput() }
+            Button("Cancel", role: .cancel) { viewModel.cancelNameInput() }
         }
         .alert("Rename", isPresented: Binding(
-            get: { store.renamingItem != nil },
-            set: { if !$0 { store.send(.cancelNameInput) } }
+            get: { viewModel.renamingItem != nil },
+            set: { if !$0 { viewModel.cancelNameInput() } }
         )) {
-            TextField("Name", text: Binding(
-                get: { store.inputText },
-                set: { store.send(.setInputText($0)) }
-            ))
-            Button("Rename") { store.send(.confirmNameInput) }
-            Button("Cancel", role: .cancel) { store.send(.cancelNameInput) }
+            TextField("Name", text: $viewModel.inputText)
+            Button("Rename") { viewModel.confirmNameInput() }
+            Button("Cancel", role: .cancel) { viewModel.cancelNameInput() }
         }
         .sheet(isPresented: Binding(
-            get: { store.isShowingCollectionPicker },
-            set: { if !$0 { store.send(.cancelMove) } }
+            get: { viewModel.isShowingCollectionPicker },
+            set: { if !$0 { viewModel.cancelMove() } }
         )) {
             InAppCollectionPicker(
-                collections: store.availableCollections,
-                onPick: { url in store.send(.moveToDestination(url)) },
-                onCancel: { store.send(.cancelMove) }
+                collections: viewModel.availableCollections,
+                onPick: { viewModel.moveToDestination($0) },
+                onCancel: { viewModel.cancelMove() }
             )
         }
-        .sheet(item: Binding(
-            get: { store.audioToEdit },
-            set: { if $0 == nil { store.send(.editAudioDismissed) } }
-        )) { file in
-            EditRecordingView(recording: file) { store.send(.editAudioDismissed) }
+        .sheet(item: $viewModel.audioToEdit) { file in
+            EditRecordingView(recording: file) {
+                viewModel.audioToEdit = nil
+                viewModel.refreshFiles()
+            }
         }
         .sheet(isPresented: $showingDocumentPicker) {
             DocumentPicker(
@@ -96,30 +122,28 @@ struct CollectionsView: View {
                 asCopy: false,
                 allowsMultipleSelection: true
             ) { urls in
-                store.send(.importFiles(urls))
+                viewModel.importFiles(urls)
             }
         }
         .sheet(item: $shareItem) { item in
             ActivityView(items: [item.url])
         }
-        .onAppear {
-            store.send(.onAppear)
-        }
+        .onAppear { viewModel.onAppear() }
     }
 
     // MARK: - Content List
 
     private var contentList: some View {
         List {
-            // Collections Grid
-            if !store.filteredCollectionCards.isEmpty {
+            if !viewModel.filteredFolders.isEmpty {
                 Section {
                     LazyVGrid(
-                        columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: horizontalSizeClass == .regular ? 4 : 2),
+                        columns: Array(repeating: GridItem(.flexible(), spacing: 12),
+                                       count: horizontalSizeClass == .regular ? 4 : 2),
                         spacing: 12
                     ) {
-                        ForEach(Array(store.filteredCollectionCards.enumerated()), id: \.element.id) { index, card in
-                            collectionCard(folder: card.folder, index: index, cardId: card.id)
+                        ForEach(Array(viewModel.filteredFolders.enumerated()), id: \.element.id) { index, folder in
+                            collectionCard(folder: folder, index: index)
                         }
                     }
                 }
@@ -128,10 +152,9 @@ struct CollectionsView: View {
                 .listRowSeparator(.hidden)
             }
 
-            // Play All button
-            if !store.filteredFileRows.isEmpty && store.currentDirectory != nil {
+            if !viewModel.filteredFiles.isEmpty && viewModel.currentDirectory != nil {
                 Button {
-                    store.send(.playAllTapped)
+                    viewModel.playAllTapped()
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "play.fill")
@@ -150,8 +173,7 @@ struct CollectionsView: View {
                 .listRowSeparator(.hidden)
             }
 
-            // Files Section
-            if !store.filteredFileRows.isEmpty {
+            if !viewModel.filteredFiles.isEmpty {
                 HStack {
                     Spacer()
                     HStack(spacing: 3) {
@@ -166,70 +188,69 @@ struct CollectionsView: View {
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
 
-                ForEach(store.scope(state: \.filteredFileRows, action: \.fileRows)) { rowStore in
-                    MediaFileRowView(
-                        file: rowStore.file,
-                        showsCollectionName: false,
-                        isSelecting: isSelecting,
-                        isSelected: selectedFileIds.contains(rowStore.file.id),
-                        onTap: {
-                            if isSelecting {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    if selectedFileIds.contains(rowStore.file.id) {
-                                        selectedFileIds.remove(rowStore.file.id)
-                                    } else {
-                                        selectedFileIds.insert(rowStore.file.id)
-                                    }
-                                }
-                            } else {
-                                rowStore.send(.tapped)
-                            }
-                        }
-                    )
-                        .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                rowStore.send(.deleteTapped)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                            Button {
-                                rowStore.send(.renameTapped)
-                            } label: {
-                                Label("Rename", systemImage: "pencil")
-                            }
-                            .tint(.sonicPrimary)
-                            Button {
-                                rowStore.send(.moveTapped)
-                            } label: {
-                                Label("Move", systemImage: "folder")
-                            }
-                            .tint(.orange)
-                        }
-                        .swipeActions(edge: .leading) {
-                            Button {
-                                rowStore.send(.editTapped)
-                            } label: {
-                                Label("Edit", systemImage: "waveform.and.magnifyingglass")
-                            }
-                            .tint(.blue)
-                            Button {
-                                shareItem = ShareItem(url: rowStore.file.url)
-                            } label: {
-                                Label("Share", systemImage: "square.and.arrow.up")
-                            }
-                            .tint(.gray)
-                        }
+                ForEach(viewModel.filteredFiles) { file in
+                    fileRow(file)
                 }
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color.sonicBackground)
-        .refreshable {
-            await store.send(.refreshFiles).finish()
+        .refreshable { viewModel.refreshFiles() }
+    }
+
+    private func fileRow(_ file: AudioFile) -> some View {
+        MediaFileRowView(
+            file: file,
+            showsCollectionName: false,
+            isSelecting: viewModel.isSelectionMode,
+            isSelected: viewModel.isSelected(.file(file)),
+            onTap: {
+                if viewModel.isSelectionMode {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        viewModel.toggleSelection(.file(file))
+                    }
+                } else {
+                    viewModel.fileTapped(file)
+                }
+            }
+        )
+        .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                viewModel.select(.file(file))
+                viewModel.deleteSelectedTapped()
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            Button {
+                viewModel.renameItemTapped(.file(file))
+            } label: {
+                Label("Rename", systemImage: "pencil")
+            }
+            .tint(.sonicPrimary)
+            Button {
+                viewModel.moveItemTapped(.file(file))
+            } label: {
+                Label("Move", systemImage: "folder")
+            }
+            .tint(.orange)
+        }
+        .swipeActions(edge: .leading) {
+            Button {
+                viewModel.audioToEdit = file
+            } label: {
+                Label("Edit", systemImage: "waveform.and.magnifyingglass")
+            }
+            .tint(.blue)
+            Button {
+                shareItem = ShareItem(url: file.url)
+            } label: {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+            .tint(.gray)
         }
     }
 
@@ -238,35 +259,26 @@ struct CollectionsView: View {
     @ToolbarContentBuilder
     var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
-            if isSelecting {
+            if viewModel.isSelectionMode {
                 HStack(spacing: 16) {
-                    if !selectedCollectionIds.isEmpty || !selectedFileIds.isEmpty {
+                    if !viewModel.selectedItems.isEmpty {
                         Menu {
                             Button {
-                                selectItemsInStore()
-                                store.send(.moveSelectedTapped)
-                                clearSelection()
+                                viewModel.moveSelectedTapped()
                             } label: {
                                 Label("Move", systemImage: "folder")
                             }
 
-                            if selectedCollectionIds.count + selectedFileIds.count == 1 {
+                            if viewModel.selectedItems.count == 1, let only = viewModel.selectedItems.first {
                                 Button {
-                                    if let id = selectedCollectionIds.first {
-                                        store.send(.collectionCards(.element(id: id, action: .renameTapped)))
-                                    } else if let id = selectedFileIds.first {
-                                        store.send(.fileRows(.element(id: id, action: .renameTapped)))
-                                    }
-                                    clearSelection()
+                                    viewModel.renameItemTapped(only)
                                 } label: {
                                     Label("Rename", systemImage: "pencil")
                                 }
                             }
 
                             Button(role: .destructive) {
-                                selectItemsInStore()
-                                store.send(.deleteSelectedTapped)
-                                clearSelection()
+                                viewModel.deleteSelectedTapped()
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
@@ -277,7 +289,9 @@ struct CollectionsView: View {
                     }
 
                     Button("Done") {
-                        clearSelection()
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.toggleSelectionMode()
+                        }
                     }
                     .fontWeight(.semibold)
                     .foregroundColor(.sonicPrimary)
@@ -294,14 +308,14 @@ struct CollectionsView: View {
                     Divider().frame(height: 20)
 
                     Button {
-                        store.send(.moveSelectedTapped)
+                        viewModel.moveSelectedTapped()
                     } label: {
                         Image(systemName: "folder.badge.arrow.up")
                             .foregroundColor(.sonicPrimary)
                     }
 
                     Button {
-                        store.send(.createCollectionTapped)
+                        viewModel.createCollectionTapped()
                     } label: {
                         Image(systemName: "folder.badge.plus")
                             .foregroundColor(.sonicPrimary)
@@ -311,7 +325,7 @@ struct CollectionsView: View {
 
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
-                            isSelecting = true
+                            viewModel.toggleSelectionMode()
                         }
                     } label: {
                         Image(systemName: "checkmark.circle")
@@ -324,22 +338,19 @@ struct CollectionsView: View {
 
     // MARK: - Collection Card
 
-    func collectionCard(folder: CollectionItem, index: Int, cardId: URL) -> some View {
+    func collectionCard(folder: CollectionItem, index: Int) -> some View {
         let colors = Self.gradients[index % Self.gradients.count]
         let icon = Self.icons[index % Self.icons.count]
-        let isSelected = selectedCollectionIds.contains(cardId)
+        let isSelected = viewModel.isSelected(.folder(folder))
+        let isSelecting = viewModel.isSelectionMode
 
         return Button {
             if isSelecting {
                 withAnimation(.easeInOut(duration: 0.15)) {
-                    if isSelected {
-                        selectedCollectionIds.remove(cardId)
-                    } else {
-                        selectedCollectionIds.insert(cardId)
-                    }
+                    viewModel.toggleSelection(.folder(folder))
                 }
             } else {
-                store.send(.collectionCards(.element(id: cardId, action: .tapped)))
+                viewModel.collectionTapped(folder)
             }
         } label: {
             ZStack(alignment: .topLeading) {
@@ -408,39 +419,16 @@ struct CollectionsView: View {
         .contextMenu {
             if !isSelecting {
                 Button {
-                    store.send(.collectionCards(.element(id: cardId, action: .moveTapped)))
+                    viewModel.moveItemTapped(.folder(folder))
                 } label: { Label("Move", systemImage: "folder") }
                 Button {
-                    store.send(.collectionCards(.element(id: cardId, action: .renameTapped)))
+                    viewModel.renameItemTapped(.folder(folder))
                 } label: { Label("Rename", systemImage: "pencil") }
                 Button(role: .destructive) {
-                    store.send(.collectionCards(.element(id: cardId, action: .deleteTapped)))
+                    viewModel.select(.folder(folder))
+                    viewModel.deleteSelectedTapped()
                 } label: { Label("Delete", systemImage: "trash") }
             }
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func selectItemsInStore() {
-        store.send(.clearSelection)
-        for id in selectedCollectionIds {
-            if let card = store.collectionCards[id: id] {
-                store.send(.toggleSelection(.folder(card.folder)))
-            }
-        }
-        for id in selectedFileIds {
-            if let row = store.fileRows[id: id] {
-                store.send(.toggleSelection(.file(row.file)))
-            }
-        }
-    }
-
-    private func clearSelection() {
-        withAnimation(.easeInOut(duration: 0.2)) {
-            isSelecting = false
-            selectedCollectionIds.removeAll()
-            selectedFileIds.removeAll()
         }
     }
 }
