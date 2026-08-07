@@ -392,9 +392,16 @@ final class PlayerViewModel {
     /// the recents list refresh in the same order the reducer's `.refreshFiles` did.
     func openFromFiles(_ url: URL, onImported: @escaping @MainActor () -> Void = {}) {
         didOpenExplicitly = true
+        let documentsDirectory = fileManager.documentsDirectory()
         Task { [weak self, fileManager] in
             do {
-                let imported = try OpenInImport.run(url: url, into: fileManager.documentsDirectory())
+                // Detached because the copy must not run on the main actor: an audiobook-sized
+                // file would freeze the UI for the length of the write. `Effect.run` gave this
+                // for free — a bare `Task` inside a `@MainActor` type inherits the actor and
+                // would not.
+                let imported = try await Task.detached {
+                    try OpenInImport.run(url: url, into: documentsDirectory)
+                }.value
                 onImported()
                 let file = try await fileManager.getMetadata(imported)
                 self?.loadTrack(file, queue: [file], source: .singleFile)
