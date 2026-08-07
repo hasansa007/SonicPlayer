@@ -6,12 +6,7 @@ import UIKit
 struct SonicPlayerApp: App {
     @MainActor
     static let store: StoreOf<AppFeature> = {
-        if ScreenshotMode.isEnabled, let screen = ScreenshotMode.targetScreen {
-            return Store(initialState: ScreenshotDemoData.buildAppState(for: screen)) {
-                AppFeature()
-            }
-        }
-        return Store(initialState: AppFeature.State()) {
+        Store(initialState: AppFeature.State()) {
             AppFeature()
         }
     }()

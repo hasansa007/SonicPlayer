@@ -17,8 +17,14 @@ struct AppView: View {
     // is what let `HomeFeature`'s three mirrored playback properties be deleted rather than ported
     // — so they are built together here, not independently.
     @State private var player: PlayerViewModel
-    @State private var home: HomeViewModel
+    @State var home: HomeViewModel
     @State private var recording = RecordingViewModel()
+
+    // The root file browser, and the navigation path below it (#18). The root model is held here
+    // rather than inside a CollectionsView because Home's swipe actions act on it — Home's UI is
+    // inlined into this file and has no browser screen of its own to talk to.
+    @State var filesRoot = CollectionsViewModel(currentDirectory: nil)
+    @State var path: [URL] = []
 
     init(store: StoreOf<AppFeature>) {
         self.store = store
@@ -30,7 +36,7 @@ struct AppView: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             // Main content
-            NavigationStack(path: $store.scope(state: \.filesPath, action: \.filesPath)) {
+            NavigationStack(path: $path) {
                 homeRootContent
                     .navigationTitle("Home")
                     .navigationBarTitleDisplayMode(.large)
@@ -47,25 +53,35 @@ struct AppView: View {
                     .navigationDestination(isPresented: isSettingsPresented) {
                         SettingsView(viewModel: settingsViewModel)
                     }
-                    .alert($store.scope(state: \.filesRoot.alert, action: \.filesRoot.alert))
-                    .alert("Rename", isPresented: isRenaming) {
-                        TextField("Name", text: renameText)
-                        Button("Rename") { store.send(.filesRoot(.confirmNameInput)) }
-                        Button("Cancel", role: .cancel) { store.send(.filesRoot(.cancelNameInput)) }
+                    .alert("Delete \(filesRoot.pendingDeleteCount) \(filesRoot.pendingDeleteCount == 1 ? "item" : "items")?",
+                           isPresented: $filesRoot.isConfirmingDelete) {
+                        Button("Delete", role: .destructive) { filesRoot.confirmDelete() }
+                        Button("Cancel", role: .cancel) {}
                     }
-                    .sheet(item: Binding(
-                        get: { store.filesRoot.audioToEdit },
-                        set: { if $0 == nil { store.send(.filesRoot(.editAudioDismissed)) } }
-                    )) { file in
+                    .alert("New Collection", isPresented: Binding(
+                        get: { filesRoot.isCreatingCollection },
+                        set: { if !$0 { filesRoot.cancelNameInput() } }
+                    )) {
+                        TextField("Name", text: $filesRoot.inputText)
+                        Button("Create") { filesRoot.confirmNameInput() }
+                        Button("Cancel", role: .cancel) { filesRoot.cancelNameInput() }
+                    }
+                    .alert("Rename", isPresented: isRenaming) {
+                        TextField("Name", text: $filesRoot.inputText)
+                        Button("Rename") { filesRoot.confirmNameInput() }
+                        Button("Cancel", role: .cancel) { filesRoot.cancelNameInput() }
+                    }
+                    .sheet(item: $filesRoot.audioToEdit) { file in
                         EditRecordingView(recording: file) {
-                            store.send(.filesRoot(.editAudioDismissed))
+                            filesRoot.audioToEdit = nil
+                            filesRoot.refreshFiles()
                         }
                     }
                     .sheet(isPresented: isCollectionPickerPresented) {
                         InAppCollectionPicker(
-                            collections: store.filesRoot.availableCollections,
-                            onPick: { url in store.send(.filesRoot(.moveToDestination(url))) },
-                            onCancel: { store.send(.filesRoot(.cancelMove)) }
+                            collections: filesRoot.availableCollections,
+                            onPick: { filesRoot.moveToDestination($0) },
+                            onCancel: { filesRoot.cancelMove() }
                         )
                     }
                     .sheet(item: $shareItem) { item in
@@ -73,14 +89,24 @@ struct AppView: View {
                     }
                     .onAppear {
                         if !ScreenshotMode.isEnabled {
-                            store.send(.filesRoot(.onAppear))
+                            filesRoot.onAppear()
                             home.loadRecentFiles()
                         }
                     }
-            } destination: { collectionsStore in
-                CollectionsView(store: collectionsStore)
-                    .navigationTitle(collectionsStore.currentDirectory?.lastPathComponent ?? "Collections")
-                    .navigationBarTitleDisplayMode(.large)
+                    .navigationDestination(for: URL.self) { folderURL in
+                        CollectionsView(
+                            directory: folderURL,
+                            onCollectionTapped: { path.append($0.url) },
+                            onPlay: { file, queue, source in
+                                player.loadTrack(file, queue: queue, source: source)
+                            },
+                            onWillRemoveItems: { items in
+                                player.clearSessionIfAffected(by: items.map(\.url))
+                            }
+                        )
+                        .navigationTitle(folderURL.lastPathComponent)
+                        .navigationBarTitleDisplayMode(.large)
+                    }
             }
             .preferredColorScheme(settingsViewModel.colorScheme.colorScheme)
 
@@ -95,7 +121,7 @@ struct AppView: View {
             }
 
             // Record FAB (home screen only, not on empty state)
-            if !store.isSettingsSheetPresented && store.filesPath.isEmpty && !(store.filesRoot.items.isEmpty && home.recentFiles.isEmpty) {
+            if !store.isSettingsSheetPresented && path.isEmpty && !(filesRoot.items.isEmpty && home.recentFiles.isEmpty) {
                 VStack {
                     Spacer()
                     HStack {
@@ -122,23 +148,19 @@ struct AppView: View {
         }
         .sheet(isPresented: isImportSheetPresented) {
             DocumentPicker { urls in
-                store.send(.importFiles(urls))
+                store.send(.dismissImportSheet)
+                filesRoot.importFiles(urls)
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
             player.scenePhaseChanged(newPhase)
         }
-        .onChange(of: store.commands) { _, commands in
-            guard !commands.isEmpty else { return }
-            commands.forEach(apply)
-            store.send(.commandsHandled)
-        }
         .onOpenURL { url in
-            // Straight to the player rather than through the store: it owns playback, and it is
-            // the only place that can make the import outrank the session restore that runs
-            // alongside it on a launch started BY this open (#33).
+            // Straight to the player: it owns playback, and it is the only place that can make
+            // the import outrank the session restore that runs alongside it on a launch started
+            // BY this open (#33).
             player.openFromFiles(url) {
-                store.send(.filesRoot(.refreshFiles))
+                filesRoot.refreshFiles()
             }
         }
         .alert("Action Failed", isPresented: Binding(
@@ -153,7 +175,7 @@ struct AppView: View {
             wireViewModels()
             if ScreenshotMode.isEnabled {
                 if let screen = ScreenshotMode.targetScreen {
-                    ScreenshotDemoData.seedViewModels(player: player, home: home, for: screen)
+                    ScreenshotDemoData.seedViewModels(player: player, home: home, filesRoot: filesRoot, for: screen)
                 }
                 // In screenshot mode, show recording sheet if needed
                 if ScreenshotMode.targetScreen == .recording || ScreenshotMode.targetScreen == .editRecording {
@@ -195,31 +217,36 @@ private extension AppView {
         // Home's former `.none // Handled by parent` cases. Each needs reducer state — the file
         // browser's selection, the navigation stack, a sheet flag — so each lands back on the
         // store rather than being reimplemented on the view model.
+        // Home's former `.none // Handled by parent` cases. These used to be store actions that
+        // poked `filesRoot` state; they are method calls on the root browser now.
         home.onImportTapped = { store.send(.importTapped) }
-        home.onNewCollectionTapped = { store.send(.filesRoot(.createCollectionTapped)) }
-        home.onViewAllCollectionsTapped = { store.send(.viewAllCollectionsTapped) }
-        home.onRenameFile = { store.send(.filesRoot(.renameItemTapped(.file($0)))) }
-        home.onDeleteFile = { store.send(.deleteRecentFile($0)) }
-        home.onEditFile = { store.send(.editRecentFile($0)) }
-        home.onMoveFile = { store.send(.moveRecentFile($0)) }
+        home.onNewCollectionTapped = { filesRoot.createCollectionTapped() }
+        home.onViewAllCollectionsTapped = { path.append(filesRoot.documentsDirectoryURL ?? URL(fileURLWithPath: NSHomeDirectory())) }
+        home.onRenameFile = { filesRoot.renameItemTapped(.file($0)) }
+        home.onDeleteFile = {
+            filesRoot.select(.file($0))
+            filesRoot.deleteSelectedTapped()
+        }
+        home.onEditFile = { filesRoot.audioToEdit = $0 }
+        home.onMoveFile = { filesRoot.presentPicker(moving: [.file($0)]) }
 
         // Formerly AppFeature observing `.recording(.recordingSaved)` / `.discardRecording`.
-        recording.onFinished = { store.send(.dismissRecordingSheet) }
-    }
-
-    /// Drains `AppFeature.State.commands`. Temporary — see the doc comment there; #19 replaces the
-    /// channel with a coordinator that holds the view models directly.
-    func apply(_ command: AppFeature.AppCommand) {
-        switch command {
-        case let .play(file, queue, source):
-            player.loadTrack(file, queue: queue, source: source)
-        case .pauseIfPlaying:
-            player.pauseIfPlaying()
-        case let .clearSessionIfAffected(urls):
-            player.clearSessionIfAffected(by: urls)
-        case .refreshRecents:
+        recording.onFinished = {
+            store.send(.dismissRecordingSheet)
+            filesRoot.refreshFiles()
             home.loadRecentFiles()
         }
+
+        // The root browser's out-edges. These are what the AppCommand channel used to carry.
+        filesRoot.onCollectionTapped = { path.append($0.url) }
+        filesRoot.onPlay = { file, queue, source in
+            player.loadTrack(file, queue: queue, source: source)
+        }
+        filesRoot.onWillRemoveItems = { items in
+            player.clearSessionIfAffected(by: items.map(\.url))
+        }
+        // Any reload of the root browser refreshes Home's recents, which are drawn from it.
+        filesRoot.onItemsLoaded = { home.loadRecentFiles() }
     }
 
     var isRecordingSheetPresented: Binding<Bool> {
@@ -236,22 +263,15 @@ private extension AppView {
 
     var isRenaming: Binding<Bool> {
         Binding(
-            get: { store.filesRoot.renamingItem != nil },
-            set: { if !$0 { store.send(.filesRoot(.cancelNameInput)) } }
-        )
-    }
-
-    var renameText: Binding<String> {
-        Binding(
-            get: { store.filesRoot.inputText },
-            set: { store.send(.filesRoot(.setInputText($0))) }
+            get: { filesRoot.renamingItem != nil },
+            set: { if !$0 { filesRoot.cancelNameInput() } }
         )
     }
 
     var isCollectionPickerPresented: Binding<Bool> {
         Binding(
-            get: { store.filesRoot.isShowingCollectionPicker },
-            set: { if !$0 { store.send(.filesRoot(.cancelMove)) } }
+            get: { filesRoot.isShowingCollectionPicker },
+            set: { if !$0 { filesRoot.cancelMove() } }
         )
     }
 
@@ -279,10 +299,10 @@ private extension AppView {
         ZStack {
             Color.sonicBackground.ignoresSafeArea()
 
-            if store.filesRoot.isLoading && store.filesRoot.items.isEmpty {
+            if filesRoot.isLoading && filesRoot.items.isEmpty {
                 ProgressView()
                     .tint(.sonicPrimary)
-            } else if store.filesRoot.items.isEmpty && home.recentFiles.isEmpty {
+            } else if filesRoot.items.isEmpty && home.recentFiles.isEmpty {
                 // Empty state
                 VStack(spacing: 20) {
                     Spacer()
@@ -345,7 +365,7 @@ private extension AppView {
                     .padding(.bottom, player.shouldShowMiniPlayer ? 80 : 40)
                 }
                 .refreshable {
-                    await store.send(.filesRoot(.refreshFiles)).finish()
+                    filesRoot.refreshFiles()
                     home.loadRecentFiles()
                 }
             }

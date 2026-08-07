@@ -91,7 +91,7 @@ Note also that this codebase is **async/await throughout**, not Combine.
 - **Models/** - Plain data types (`AudioFile`, `FileSystemItem`, `PlaybackSpeed`)
 - **Domain/** - Pure decision logic, Foundation only, no TCA. Extracted from reducers so its tests survive the TCA→MVVM migration unchanged (#11). Add logic here rather than inlining it in a reducer.
 - **Utilities/** - Shared UI components and helpers
-- **App/** - Root `AppFeature` composes all child reducers; `AppView` is a single screen with no tab bar. Player, recording and import are presented as **sheets** over Home; settings is **pushed** via `.navigationDestination` (note the state flag is still named `isSettingsSheetPresented`)
+- **App/** - `AppView` is the composition root and owns every view model as `@State`; `AppFeature` is three sheet flags awaiting deletion in #19. `AppView` is a single screen with no tab bar. Player, recording and import are presented as **sheets** over Home; settings is **pushed** via `.navigationDestination` (note the state flag is still named `isSettingsSheetPresented`)
 
 ### Feature modules
 
@@ -101,26 +101,28 @@ Migration status per #5. Reducers still compose into `AppFeature`; view models a
 | Feature | Type | Status | Purpose |
 |---------|------|--------|---------|
 | Home | `HomeViewModel` | **migrated** (#16) | Folder suggestions, recently added |
-| Files | `CollectionsFeature` | reducer | File/folder browser with navigation stack |
+| Files | `CollectionsViewModel` | **migrated** (#18) | File/folder browser, one model per depth |
 | Player | `PlayerViewModel` | **migrated** (#15) | Playback engine, queue, session persistence |
 | Recording | `RecordingViewModel` | **migrated** (#17) | Audio capture, and the editor via `EditRecordingViewModel` |
 | Settings | `SettingsViewModel` | **migrated** (#13) | Preferences via UserDefaults |
 | Onboarding | `OnboardingViewModel` | **migrated** (#14) | First-launch carousel |
 
-Cross-feature communication out of a migrated feature travels through a **closure wired at the
-composition root**, never by reading another feature's state — the shape `willRemoveItems` uses in
-`CollectionsFeature` and that #19 generalises. See `AppView.wireViewModels()`.
+Cross-feature communication travels through a **closure wired at the composition root**, never by
+reading another feature's state. `CollectionsViewModel.onWillRemoveItems` is the canonical shape,
+and it is that shape for a reason: the items **travel in the call** rather than being read back,
+because the selection is cleared before the removal runs (#22). See `AppView.wireViewModels()`.
 
 Not everything is in that helper: `.onOpenURL` calls `player.openFromFiles(_:onImported:)` and
 passes its callback inline (#33). Same shape and same place, but a reader who only greps
 `wireViewModels()` will not find it.
 
-**`AppFeature.State.commands` runs the other direction and is temporary.** A few reducer cases
-still need to reach the player or Home — playing a tapped file needs the queue, which is computed
-from `filesRoot.items` and exists only in the store. A reducer cannot call a reference type, so it
-appends an `AppCommand` and `AppView` drains the array in `.onChange`, then sends
-`.commandsHandled`. #19 turns `AppFeature` into a coordinator that holds the view models directly
-and deletes the channel — do not build on it.
+**The `AppCommand` channel is gone (#18).** It existed for one reason: playing a tapped file
+needed the queue, which was computed from `filesRoot.items` and lived only in the store.
+`CollectionsViewModel` passes its own file list out through `onPlay`, so there was nothing left to
+carry. If you find a reference to it, it is stale.
+
+What remains of `AppFeature` is three sheet flags. #19 deletes it; the only reason it survives is
+that Quick Actions arrive through `AppDelegate`, which holds the store.
 
 ### Key patterns
 - `@Reducer` macro with `@ObservableState`
@@ -135,7 +137,10 @@ and deletes the channel — do not build on it.
   loop is a hand-written `Task.sleep`. Extract the **cadence** as a constant and test that; the
   sleep around it is glue and is deliberately untested (#17)
 - `@AppStorage` for user preferences
-- `StackState`/`StackAction` for push navigation
+- **`NavigationStack(path:)` over a plain `[URL]`** for push navigation. `StackState`/`StackAction`
+  are gone (#18): each depth is a `CollectionsViewModel` owned by its own screen as `@State`, with
+  its callbacks wired at construction. The depth that raises an event passes its own data out —
+  which is what removed the parent reaching into arbitrary stack depth by element id
 - Manual `Equatable` conformance where needed (e.g., ignoring artwork cache)
 
 ## Coding Conventions
@@ -163,7 +168,7 @@ SonicPlayer/
   Features/      # Home/, Player/, Files/, Recording/, Settings/
   Clients/       # AudioPlayerClient, AudioRecorderClient, FileManagerClient, ArtworkClient, AudioTrimmerClient
   Models/        # AudioFile, FileSystemItem, PlaybackSpeed
-  Domain/        # QueueMath, PathMatching, UniqueNameResolver, SessionCodec, SessionRestorePolicy, RecordingFilename, PlaybackSession, ScrubClamp, SelectionSet
+  Domain/        # QueueMath, PathMatching, UniqueNameResolver, SessionCodec, SessionRestorePolicy, RecordingFilename, PlaybackSession, ScrubClamp, SelectionSet, ImportFilter
   Utilities/     # ColorPalette, Theme, WaveformView, EmptyStateView, ShareSheet, etc.
   Resources/     # Assets.xcassets, Localizable.xcstrings, Quickstart.json, Info.plist
 ```
