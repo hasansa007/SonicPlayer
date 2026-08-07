@@ -1,8 +1,11 @@
-import ComposableArchitecture
 import SwiftUI
 
 struct RecordingView: View {
-    @Bindable var store: StoreOf<RecordingFeature>
+
+    /// The inline editor UI here is hand-built rather than reusing `EditRecordingView` — that was
+    /// true before #17 and is preserved. It reads `viewModel.inlineEdit`, the *same*
+    /// `EditRecordingViewModel` the Files browser presents as a sheet.
+    @Bindable var viewModel: RecordingViewModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var waveformSamples: [Float] = []
@@ -12,22 +15,22 @@ struct RecordingView: View {
             ZStack {
                 Color.sonicBackground.ignoresSafeArea()
 
-                if store.isRecording {
+                if viewModel.isRecording {
                     recordingInterface
-                } else if store.isSaveFlowPresented {
+                } else if viewModel.isSaveFlowPresented {
                     saveEditInterface
                 } else {
                     preRecordingInterface
                 }
             }
-            .navigationTitle(store.isRecording ? "Recording" : (store.isSaveFlowPresented ? "" : "New Recording"))
+            .navigationTitle(viewModel.isRecording ? "Recording" : (viewModel.isSaveFlowPresented ? "" : "New Recording"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    if store.isSaveFlowPresented {
+                    if viewModel.isSaveFlowPresented {
                         TextField("Recording name", text: Binding(
-                            get: { store.saveFileName },
-                            set: { store.send(.setSaveFileName($0)) }
+                            get: { viewModel.saveFileName },
+                            set: { viewModel.setSaveFileName($0) }
                         ))
                         .font(.subheadline)
                         .fontWeight(.semibold)
@@ -41,9 +44,9 @@ struct RecordingView: View {
                     }
                 }
                 ToolbarItem(placement: .cancellationAction) {
-                    if !store.isRecording {
+                    if !viewModel.isRecording {
                         Button {
-                            store.send(.discardRecording)
+                            viewModel.discardRecording()
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.body)
@@ -53,25 +56,25 @@ struct RecordingView: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    if store.isSaveFlowPresented {
-                        if let inlineEdit = store.inlineEdit, inlineEdit.isTrimming {
+                    if viewModel.isSaveFlowPresented {
+                        if let inlineEdit = viewModel.inlineEdit, inlineEdit.isTrimming {
                             HStack(spacing: 16) {
                                 Button {
-                                    store.send(.inlineEdit(.deleteRangeTapped))
+                                    viewModel.inlineEdit?.deleteRangeTapped()
                                 } label: {
                                     Image(systemName: "trash")
                                         .foregroundColor(.red)
                                 }
 
                                 Button {
-                                    store.send(.inlineEdit(.cancelTrim))
+                                    viewModel.inlineEdit?.cancelTrim()
                                 } label: {
                                     Image(systemName: "xmark")
                                         .foregroundColor(.sonicTextSecondary)
                                 }
 
                                 Button {
-                                    store.send(.inlineEdit(.applyTrim))
+                                    viewModel.inlineEdit?.applyTrim()
                                 } label: {
                                     Image(systemName: "checkmark")
                                         .fontWeight(.semibold)
@@ -80,9 +83,9 @@ struct RecordingView: View {
                             }
                         } else {
                             HStack(spacing: 16) {
-                                if store.inlineEdit != nil {
+                                if viewModel.inlineEdit != nil {
                                     Button {
-                                        store.send(.inlineEdit(.trimTapped))
+                                        viewModel.inlineEdit?.trimTapped()
                                     } label: {
                                         Image(systemName: "pencil")
                                             .foregroundColor(.sonicPrimary)
@@ -90,7 +93,7 @@ struct RecordingView: View {
                                 }
 
                                 Button {
-                                    store.send(.saveRecording)
+                                    viewModel.saveRecording()
                                 } label: {
                                     Image(systemName: "checkmark")
                                         .fontWeight(.semibold)
@@ -102,27 +105,27 @@ struct RecordingView: View {
                 }
             }
         }
-        .alert("Microphone Permission Required", isPresented: $store.showPermissionAlert.sending(\.setShowPermissionAlert)) {
+        .alert("Microphone Permission Required", isPresented: $viewModel.showPermissionAlert) {
             Button("Allow Microphone") {
-                store.send(.requestPermissions)
+                viewModel.requestPermissions()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Sonic Player needs access to your microphone to record audio.")
         }
         .alert("Action Failed", isPresented: Binding(
-            get: { store.inlineEdit?.trimError != nil },
-            set: { if !$0 { store.send(.inlineEdit(.cancelTrim)) } }
+            get: { viewModel.inlineEdit?.trimError != nil },
+            set: { if !$0 { viewModel.inlineEdit?.cancelTrim() } }
         )) {
-            Button("OK", role: .cancel) { store.send(.inlineEdit(.cancelTrim)) }
+            Button("OK", role: .cancel) { viewModel.inlineEdit?.cancelTrim() }
         } message: {
-            if let error = store.inlineEdit?.trimError { Text(error) }
+            if let error = viewModel.inlineEdit?.trimError { Text(error) }
         }
         .onAppear {
-            store.send(.onAppear)
+            viewModel.onAppear()
             loadWaveformIfNeeded()
         }
-        .onChange(of: store.inlineEdit?.recording.url) { _, _ in
+        .onChange(of: viewModel.inlineEdit?.recording.url) { _, _ in
             waveformSamples = []
             loadWaveformIfNeeded()
         }
@@ -143,7 +146,7 @@ struct RecordingView: View {
                 .foregroundColor(.sonicTextSecondary)
 
             Button {
-                store.send(.startRecordingTapped)
+                viewModel.startRecordingTapped()
             } label: {
                 ZStack {
                     Circle()
@@ -174,19 +177,19 @@ struct RecordingView: View {
         VStack(spacing: 24) {
             Spacer()
 
-            Text(formatTime(store.recordingTime))
+            Text(formatTime(viewModel.recordingTime))
                 .font(.system(size: 48, weight: .light, design: .rounded))
                 .foregroundColor(.sonicTextPrimary)
                 .monospacedDigit()
 
-            RecordingWaveformView(peakLevel: store.peakLevel)
+            RecordingWaveformView(peakLevel: viewModel.peakLevel)
                 .frame(height: 80)
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 20)
 
             // Stop button
             Button {
-                store.send(.stopRecordingTapped)
+                viewModel.stopRecordingTapped()
             } label: {
                 ZStack {
                     Circle()
@@ -209,7 +212,7 @@ struct RecordingView: View {
 
     private var saveEditInterface: some View {
         Group {
-            if let inlineEdit = store.inlineEdit {
+            if let inlineEdit = viewModel.inlineEdit {
                 if verticalSizeClass == .compact {
                     landscapeEditLayout(inlineEdit)
                 } else {
@@ -227,7 +230,7 @@ struct RecordingView: View {
             }
         }
         .overlay {
-            if store.inlineEdit?.isTrimming_InProgress == true {
+            if viewModel.inlineEdit?.isTrimming_InProgress == true {
                 ZStack {
                     Color.black.opacity(0.7).ignoresSafeArea()
                     VStack(spacing: 20) {
@@ -241,7 +244,7 @@ struct RecordingView: View {
 
     // MARK: - Portrait Layout
 
-    private func portraitEditLayout(_ inlineEdit: EditRecordingFeature.State) -> some View {
+    private func portraitEditLayout(_ inlineEdit: EditRecordingViewModel) -> some View {
         VStack(spacing: 28) {
             inlineWaveformArea(inlineEdit)
                 .padding(.horizontal, 20)
@@ -264,7 +267,7 @@ struct RecordingView: View {
 
     // MARK: - Landscape Layout
 
-    private func landscapeEditLayout(_ inlineEdit: EditRecordingFeature.State) -> some View {
+    private func landscapeEditLayout(_ inlineEdit: EditRecordingViewModel) -> some View {
         VStack(spacing: 12) {
             inlineWaveformArea(inlineEdit)
                 .padding(.horizontal, 20)
@@ -312,7 +315,7 @@ struct RecordingView: View {
     }
 
     private func loadWaveformIfNeeded() {
-        guard waveformSamples.isEmpty, let url = store.inlineEdit?.recording.url else { return }
+        guard waveformSamples.isEmpty, let url = viewModel.inlineEdit?.recording.url else { return }
         Task {
             let samples = await AudioWaveformExtractor.extract(url: url, sampleCount: 60)
             await MainActor.run {
@@ -323,7 +326,7 @@ struct RecordingView: View {
 
     // MARK: - Inline Waveform
 
-    private func inlineWaveformArea(_ editState: EditRecordingFeature.State) -> some View {
+    private func inlineWaveformArea(_ editState: EditRecordingViewModel) -> some View {
         VStack(spacing: 8) {
             ZStack {
                 if editState.isTrimming {
@@ -362,7 +365,7 @@ struct RecordingView: View {
         }
     }
 
-    private func inlinePlaybackWaveform(_ editState: EditRecordingFeature.State) -> some View {
+    private func inlinePlaybackWaveform(_ editState: EditRecordingViewModel) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.sonicPrimary.opacity(0.06))
@@ -385,14 +388,14 @@ struct RecordingView: View {
                             .onChanged { value in
                                 let progress = min(max(0, value.location.x / geo.size.width), 1)
                                 let time = progress * editState.recording.duration
-                                store.send(.inlineEdit(.playbackTimeUpdated(time)))
+                                viewModel.inlineEdit?.scrub(to: time)
                             }
                     )
             }
         }
     }
 
-    private func inlineTrimWaveform(_ editState: EditRecordingFeature.State) -> some View {
+    private func inlineTrimWaveform(_ editState: EditRecordingViewModel) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.sonicPrimary.opacity(0.06))
@@ -429,7 +432,7 @@ struct RecordingView: View {
                         DragGesture()
                             .onChanged { value in
                                 let newStart = (value.location.x / totalWidth) * editState.recording.duration
-                                store.send(.inlineEdit(.trimStartChanged(max(0, min(newStart, editState.trimEnd - 1)))))
+                                viewModel.inlineEdit?.trimStartChanged(max(0, min(newStart, editState.trimEnd - 1)))
                             }
                     )
 
@@ -442,7 +445,7 @@ struct RecordingView: View {
                         DragGesture()
                             .onChanged { value in
                                 let newEnd = (value.location.x / totalWidth) * editState.recording.duration
-                                store.send(.inlineEdit(.trimEndChanged(max(editState.trimStart + 1, min(newEnd, editState.recording.duration)))))
+                                viewModel.inlineEdit?.trimEndChanged(max(editState.trimStart + 1, min(newEnd, editState.recording.duration)))
                             }
                     )
 
@@ -459,28 +462,28 @@ struct RecordingView: View {
 
     private var inlinePlaybackControls: some View {
         HStack(spacing: 44) {
-            Button { store.send(.inlineEdit(.skipBackward)) } label: {
+            Button { viewModel.inlineEdit?.skipBackward() } label: {
                 Image(systemName: "gobackward.15")
                     .font(.title)
                     .foregroundColor(.sonicTextPrimary)
                     .frame(width: 56, height: 56)
             }
 
-            Button { store.send(.inlineEdit(.playPauseTapped)) } label: {
+            Button { viewModel.inlineEdit?.playPauseTapped() } label: {
                 ZStack {
                     Circle()
                         .fill(Color.sonicPrimary)
                         .frame(width: 72, height: 72)
                         .shadow(color: Color.sonicPrimary.opacity(0.35), radius: 12, x: 0, y: 6)
 
-                    Image(systemName: store.inlineEdit?.isPlaying == true ? "pause.fill" : "play.fill")
+                    Image(systemName: viewModel.inlineEdit?.isPlaying == true ? "pause.fill" : "play.fill")
                         .font(.title)
                         .foregroundColor(.white)
-                        .offset(x: store.inlineEdit?.isPlaying == true ? 0 : 2)
+                        .offset(x: viewModel.inlineEdit?.isPlaying == true ? 0 : 2)
                 }
             }
 
-            Button { store.send(.inlineEdit(.skipForward)) } label: {
+            Button { viewModel.inlineEdit?.skipForward() } label: {
                 Image(systemName: "goforward.15")
                     .font(.title)
                     .foregroundColor(.sonicTextPrimary)

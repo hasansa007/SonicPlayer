@@ -84,8 +84,11 @@ struct CollectionsView: View {
                 onCancel: { store.send(.cancelMove) }
             )
         }
-        .sheet(item: $store.scope(state: \.editAudio, action: \.editAudio)) { editStore in
-            EditRecordingView(store: editStore)
+        .sheet(item: Binding(
+            get: { store.audioToEdit },
+            set: { if $0 == nil { store.send(.editAudioDismissed) } }
+        )) { file in
+            EditRecordingView(recording: file) { store.send(.editAudioDismissed) }
         }
         .sheet(isPresented: $showingDocumentPicker) {
             DocumentPicker(

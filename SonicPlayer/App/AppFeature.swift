@@ -10,8 +10,6 @@ struct AppFeature {
         var filesPath = StackState<CollectionsFeature.State>()
         var filesRoot = CollectionsFeature.State(currentDirectory: nil)
 
-        var recording = RecordingFeature.State()
-
         // Sheets
         var isRecordingSheetPresented: Bool = false
         var isSettingsSheetPresented: Bool = false
@@ -30,7 +28,6 @@ struct AppFeature {
 
         static func == (lhs: State, rhs: State) -> Bool {
             lhs.filesPath == rhs.filesPath &&
-            lhs.recording == rhs.recording &&
             lhs.isRecordingSheetPresented == rhs.isRecordingSheetPresented &&
             lhs.isSettingsSheetPresented == rhs.isSettingsSheetPresented &&
             lhs.isImportSheetPresented == rhs.isImportSheetPresented &&
@@ -53,8 +50,6 @@ struct AppFeature {
         // File browser
         case filesPath(StackAction<CollectionsFeature.State, CollectionsFeature.Action>)
         case filesRoot(CollectionsFeature.Action)
-
-        case recording(RecordingFeature.Action)
 
         // Sheets
         case recordButtonTapped
@@ -87,10 +82,6 @@ struct AppFeature {
             CollectionsFeature()
         }
 
-        Scope(state: \.recording, action: \.recording) {
-            RecordingFeature()
-        }
-
         Reduce { state, action in
             switch action {
 
@@ -105,7 +96,7 @@ struct AppFeature {
                 return .send(.filesRoot(.deleteSelectedTapped))
 
             case let .editRecentFile(file):
-                state.filesRoot.editAudio = EditRecordingFeature.State(recording: file)
+                state.filesRoot.audioToEdit = file
                 return .none
 
             case let .moveRecentFile(file):
@@ -118,7 +109,7 @@ struct AppFeature {
                 return .none
 
             // Refresh home after edit view dismissal, so recents reflect any saved changes
-            case .filesRoot(.editAudio(.dismiss)):
+            case .filesRoot(.editAudioDismissed):
                 state.commands.append(.refreshRecents)
                 return .send(.filesRoot(.refreshFiles))
 
@@ -165,16 +156,12 @@ struct AppFeature {
                 state.isRecordingSheetPresented = true
                 return .none
 
+            // Sent both when the sheet is dismissed and when the recorder finishes saving or
+            // discarding. Discarding an unsaved recording moved to `RecordingViewModel`, which is
+            // the only thing that can still see whether one is in progress.
             case .dismissRecordingSheet:
                 state.isRecordingSheetPresented = false
                 state.commands.append(.refreshRecents)
-                // Clean up any in-progress/unsaved recording
-                if state.recording.currentRecordingURL != nil {
-                    return .merge(
-                        .send(.recording(.discardRecording)),
-                        .send(.filesRoot(.refreshFiles))
-                    )
-                }
                 return .send(.filesRoot(.refreshFiles))
 
             case .settingsTapped:
@@ -183,15 +170,6 @@ struct AppFeature {
 
             case .dismissSettings:
                 state.isSettingsSheetPresented = false
-                return .none
-
-            case .recording(.recordingSaved):
-                state.isRecordingSheetPresented = false
-                state.commands.append(.refreshRecents)
-                return .send(.filesRoot(.refreshFiles))
-
-            case .recording(.discardRecording):
-                state.isRecordingSheetPresented = false
                 return .none
 
             case let .importFiles(urls):
@@ -255,7 +233,7 @@ struct AppFeature {
                 state.commands.removeAll()
                 return .none
 
-            case .filesRoot, .filesPath, .recording:
+            case .filesRoot, .filesPath:
                 return .none
             }
         }

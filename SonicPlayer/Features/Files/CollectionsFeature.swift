@@ -18,7 +18,10 @@ struct CollectionsFeature {
         var isSelectionMode = false
         var selectedItems: Set<FileSystemItem> = []
         @Presents var alert: AlertState<Action.Alert>?
-        @Presents var editAudio: EditRecordingFeature.State?
+        /// The file the editor is open on, or nil. Holds the **value**, not the editor's state:
+        /// `EditRecordingFeature` became a view model in #17, and a reducer's value-typed `State`
+        /// cannot store a reference. The view builds the model. Slice 9 (#18) collapses this seam.
+        var audioToEdit: AudioFile?
 
         // Input State
         var isCreatingCollection = false
@@ -108,7 +111,7 @@ struct CollectionsFeature {
         case cancelMove
         case alert(PresentationAction<Alert>)
         case playAllTapped
-        case editAudio(PresentationAction<EditRecordingFeature.Action>)
+        case editAudioDismissed
 
         enum Alert: Equatable {
             case confirmDelete
@@ -262,7 +265,7 @@ struct CollectionsFeature {
 
             case let .fileRows(.element(id: id, action: .editTapped)):
                 if let file = state.fileRows[id: id]?.file {
-                    state.editAudio = EditRecordingFeature.State(recording: file)
+                    state.audioToEdit = file
                 }
                 return .none
 
@@ -547,7 +550,10 @@ struct CollectionsFeature {
             case .alert:
                 return .none
 
-            case .editAudio:
+            case .editAudioDismissed:
+                // Clearing only. The refresh stays where it was — AppFeature, for the root
+                // browser — so the nested-stack path keeps behaving exactly as it did.
+                state.audioToEdit = nil
                 return .none
 
             case let .moveItemTapped(item):
@@ -617,9 +623,6 @@ struct CollectionsFeature {
             }
         }
         .ifLet(\.$alert, action: \.alert)
-        .ifLet(\.$editAudio, action: \.editAudio) {
-            EditRecordingFeature()
-        }
         .forEach(\.collectionCards, action: \.collectionCards) {
             CollectionItemCardFeature()
         }
