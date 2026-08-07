@@ -1,49 +1,31 @@
-import ComposableArchitecture
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// The root screen. It owns nothing but its own share sheet — every view model comes from
+/// `AppViewModel` in the environment, which is what replaced the root `Store` (#19).
 struct AppView: View {
-    @Bindable var store: StoreOf<AppFeature>
+    @Environment(AppViewModel.self) private var app
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @State private var shareItem: ShareItem?
 
-    // Settings and onboarding are @Observable view models rather than reducers (#13, #14).
-    // They live here because AppFeature's State is a value type and cannot hold a reference.
-    @State private var settingsViewModel: SettingsViewModel = SettingsViewModel()
-    @State private var onboardingViewModel: OnboardingViewModel? = OnboardingViewModel.ifNeeded()
-
-    // Player and Home join them (#15, #16). Home holds the *same* PlayerViewModel instance, which
-    // is what let `HomeFeature`'s three mirrored playback properties be deleted rather than ported
-    // — so they are built together here, not independently.
-    @State private var player: PlayerViewModel
-    @State var home: HomeViewModel
-    @State private var recording = RecordingViewModel()
-
-    // The root file browser, and the navigation path below it (#18). The root model is held here
-    // rather than inside a CollectionsView because Home's swipe actions act on it — Home's UI is
-    // inlined into this file and has no browser screen of its own to talk to.
-    @State var filesRoot = CollectionsViewModel(currentDirectory: nil)
-    @State var path: [URL] = []
-
-    init(store: StoreOf<AppFeature>) {
-        self.store = store
-        let player = PlayerViewModel()
-        _player = State(initialValue: player)
-        _home = State(initialValue: HomeViewModel(player: player))
-    }
-
     var body: some View {
-        ZStack(alignment: .bottom) {
+        // Local `@Bindable` shadows: the documented way to get bindings out of an @Observable
+        // held in the environment. `app` itself is not bindable from an @Environment property.
+        @Bindable var app = app
+        @Bindable var player = app.player
+        @Bindable var filesRoot = app.filesRoot
+
+        return ZStack(alignment: .bottom) {
             // Main content
-            NavigationStack(path: $path) {
+            NavigationStack(path: $app.path) {
                 homeRootContent
                     .navigationTitle("Home")
                     .navigationBarTitleDisplayMode(.large)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button {
-                                store.send(.settingsTapped)
+                                app.isSettingsPresented = true
                             } label: {
                                 Image(systemName: "gearshape.fill")
                                     .foregroundColor(.sonicTextSecondary)
@@ -51,7 +33,7 @@ struct AppView: View {
                         }
                     }
                     .navigationDestination(isPresented: isSettingsPresented) {
-                        SettingsView(viewModel: settingsViewModel)
+                        SettingsView(viewModel: app.settings)
                     }
                     .alert("Delete \(filesRoot.pendingDeleteCount) \(filesRoot.pendingDeleteCount == 1 ? "item" : "items")?",
                            isPresented: $filesRoot.isConfirmingDelete) {
@@ -96,7 +78,7 @@ struct AppView: View {
                     .navigationDestination(for: URL.self) { folderURL in
                         CollectionsView(
                             directory: folderURL,
-                            onCollectionTapped: { path.append($0.url) },
+                            onCollectionTapped: { app.path.append($0.url) },
                             onPlay: { file, queue, source in
                                 player.loadTrack(file, queue: queue, source: source)
                             },
@@ -108,7 +90,7 @@ struct AppView: View {
                         .navigationBarTitleDisplayMode(.large)
                     }
             }
-            .preferredColorScheme(settingsViewModel.colorScheme.colorScheme)
+            .preferredColorScheme(app.settings.colorScheme.colorScheme)
 
             // Mini Player (full-width bottom bar)
             if player.shouldShowMiniPlayer {
@@ -121,7 +103,7 @@ struct AppView: View {
             }
 
             // Record FAB (home screen only, not on empty state)
-            if !store.isSettingsSheetPresented && path.isEmpty && !(filesRoot.items.isEmpty && home.recentFiles.isEmpty) {
+            if !app.isSettingsPresented && app.path.isEmpty && !(filesRoot.items.isEmpty && home.recentFiles.isEmpty) {
                 VStack {
                     Spacer()
                     HStack {
@@ -141,14 +123,14 @@ struct AppView: View {
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: isRecordingSheetPresented) {
-            RecordingView(viewModel: recording)
+            RecordingView(viewModel: app.recording)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .interactiveDismissDisabled(true)
         }
         .sheet(isPresented: isImportSheetPresented) {
             DocumentPicker { urls in
-                store.send(.dismissImportSheet)
+                app.isImportSheetPresented = false
                 filesRoot.importFiles(urls)
             }
         }
@@ -156,12 +138,7 @@ struct AppView: View {
             player.scenePhaseChanged(newPhase)
         }
         .onOpenURL { url in
-            // Straight to the player: it owns playback, and it is the only place that can make
-            // the import outrank the session restore that runs alongside it on a launch started
-            // BY this open (#33).
-            player.openFromFiles(url) {
-                filesRoot.refreshFiles()
-            }
+            app.openedFromFiles(url)
         }
         .alert("Action Failed", isPresented: Binding(
             get: { player.openError != nil },
@@ -171,93 +148,39 @@ struct AppView: View {
         } message: {
             if let error = player.openError { Text(error) }
         }
-        .onAppear {
-            wireViewModels()
-            if ScreenshotMode.isEnabled {
-                if let screen = ScreenshotMode.targetScreen {
-                    ScreenshotDemoData.seedViewModels(player: player, home: home, filesRoot: filesRoot, for: screen)
-                }
-                // In screenshot mode, show recording sheet if needed
-                if ScreenshotMode.targetScreen == .recording || ScreenshotMode.targetScreen == .editRecording {
-                    store.send(.recordButtonTapped)
-                }
-            } else {
-                player.restoreSession()
-            }
-        }
+        // Wiring used to happen here too. It is construction work now — `AppViewModel.init` —
+        // so this only carries what genuinely belongs to appearing.
+        .onAppear { app.onAppear() }
         .fullScreenCover(isPresented: Binding(
-            get: { onboardingViewModel != nil },
+            get: { app.onboarding != nil },
             set: { _ in }
         )) {
-            if let onboardingViewModel {
-                OnboardingView(viewModel: onboardingViewModel)
+            if let onboarding = app.onboarding {
+                OnboardingView(viewModel: onboarding)
             }
         }
     }
+}
+
+// MARK: - Children
+//
+// Read-only pass-throughs to the coordinator. `home` and `filesRoot` are internal because
+// `CollectionsSection` is an extension on this type in another file.
+
+extension AppView {
+    var player: PlayerViewModel { app.player }
+    var home: HomeViewModel { app.home }
+    var filesRoot: CollectionsViewModel { app.filesRoot }
 }
 
 // MARK: - Private
 
 private extension AppView {
 
-    /// Replaces the cross-feature action taps AppFeature used to carry: settings changes
-    /// reaching the player, and onboarding completion clearing itself.
-    func wireViewModels() {
-        settingsViewModel.onDefaultPlaybackSpeedChanged = { [player] speed in
-            player.setPlaybackSpeed(speed)
-        }
-        settingsViewModel.onDefaultSkipDurationChanged = { [player] duration in
-            player.setSkipDuration(duration)
-        }
-        onboardingViewModel?.onGetStarted = {
-            OnboardingViewModel.markSeen()
-            onboardingViewModel = nil
-        }
-
-        // Home's former `.none // Handled by parent` cases. Each needs reducer state — the file
-        // browser's selection, the navigation stack, a sheet flag — so each lands back on the
-        // store rather than being reimplemented on the view model.
-        // Home's former `.none // Handled by parent` cases. These used to be store actions that
-        // poked `filesRoot` state; they are method calls on the root browser now.
-        home.onImportTapped = { store.send(.importTapped) }
-        home.onNewCollectionTapped = { filesRoot.createCollectionTapped() }
-        home.onViewAllCollectionsTapped = { path.append(filesRoot.documentsDirectoryURL ?? URL(fileURLWithPath: NSHomeDirectory())) }
-        home.onRenameFile = { filesRoot.renameItemTapped(.file($0)) }
-        home.onDeleteFile = {
-            filesRoot.select(.file($0))
-            filesRoot.deleteSelectedTapped()
-        }
-        home.onEditFile = { filesRoot.audioToEdit = $0 }
-        home.onMoveFile = { filesRoot.presentPicker(moving: [.file($0)]) }
-
-        // Formerly AppFeature observing `.recording(.recordingSaved)` / `.discardRecording`.
-        recording.onFinished = {
-            store.send(.dismissRecordingSheet)
-            filesRoot.refreshFiles()
-            home.loadRecentFiles()
-        }
-
-        // The root browser's out-edges. These are what the AppCommand channel used to carry.
-        filesRoot.onCollectionTapped = { path.append($0.url) }
-        filesRoot.onPlay = { file, queue, source in
-            player.loadTrack(file, queue: queue, source: source)
-        }
-        filesRoot.onWillRemoveItems = { items in
-            player.clearSessionIfAffected(by: items.map(\.url))
-        }
-        // Any reload of the root browser refreshes Home's recents, which are drawn from it.
-        filesRoot.onItemsLoaded = { home.loadRecentFiles() }
-    }
-
     var isRecordingSheetPresented: Binding<Bool> {
         Binding(
-            get: { store.isRecordingSheetPresented },
-            set: {
-                if !$0 {
-                    recording.discardIfUnsaved()
-                    store.send(.dismissRecordingSheet)
-                }
-            }
+            get: { app.isRecordingSheetPresented },
+            set: { if !$0 { app.dismissRecordingSheet() } }
         )
     }
 
@@ -277,15 +200,15 @@ private extension AppView {
 
     var isSettingsPresented: Binding<Bool> {
         Binding(
-            get: { store.isSettingsSheetPresented },
-            set: { if !$0 { store.send(.dismissSettings) } }
+            get: { app.isSettingsPresented },
+            set: { if !$0 { app.isSettingsPresented = false } }
         )
     }
 
     var isImportSheetPresented: Binding<Bool> {
         Binding(
-            get: { store.isImportSheetPresented },
-            set: { if !$0 { store.send(.dismissImportSheet) } }
+            get: { app.isImportSheetPresented },
+            set: { if !$0 { app.isImportSheetPresented = false } }
         )
     }
 
@@ -325,7 +248,7 @@ private extension AppView {
 
                     HStack(spacing: 12) {
                         Button {
-                            store.send(.recordButtonTapped)
+                            app.isRecordingSheetPresented = true
                         } label: {
                             Label("Record", systemImage: "mic.fill")
                                 .font(.subheadline)
@@ -446,7 +369,7 @@ private extension AppView {
 
     var recordFAB: some View {
         Button {
-            store.send(.recordButtonTapped)
+            app.isRecordingSheetPresented = true
         } label: {
             ZStack {
                 Circle()

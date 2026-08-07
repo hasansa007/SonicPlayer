@@ -22,7 +22,6 @@
 		86A1B3002F1B4A0100A1BEEF /* FileItemRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A1B3012F1B4A0100A1BEEF /* FileItemRow.swift */; };
 		86A1B7012F1C500000A1BEEF /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A1B7002F1C500000A1BEEF /* EmptyStateView.swift */; };
 		A1000001000000000000001 /* SonicPlayerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000001 /* SonicPlayerApp.swift */; };
-		A1000003000000000000001 /* AppFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000004000000000000001 /* AppFeature.swift */; };
 		A1000005000000000000001 /* AppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000006000000000000001 /* AppView.swift */; };
 		A1000009000000000000001 /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010000000000000001 /* PlayerView.swift */; };
 		A1000010000000000000002 /* MiniPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010000000000000003 /* MiniPlayerView.swift */; };
@@ -37,6 +36,7 @@
 		A1000031000000000000001 /* ColorPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000032000000000000001 /* ColorPalette.swift */; };
 		A1000033000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000034000000000000001 /* Assets.xcassets */; };
 		A1000035000000000000001 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A1000036000000000000001 /* ComposableArchitecture */; };
+		A1000097000000000000001 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000096000000000000001 /* AppViewModel.swift */; };
 		A2000001000000000000001 /* CollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000002000000000000001 /* CollectionsView.swift */; };
 		A3000009000000000000001 /* CollectionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000010000000000000001 /* CollectionsSection.swift */; };
 		A4000009000000000000002 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4000010000000000000002 /* OnboardingView.swift */; };
@@ -55,6 +55,7 @@
 		A9000007000000000000001 /* RecordingFilename.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000016000000000000001 /* RecordingFilename.swift */; };
 		A9000008000000000000001 /* ScrubClamp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000017000000000000001 /* ScrubClamp.swift */; };
 		A9000009000000000000001 /* SelectionSet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000018000000000000001 /* SelectionSet.swift */; };
+		A9000095000000000000001 /* QuickAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000094000000000000001 /* QuickAction.swift */; };
 		AA000001000000000000001 /* SettingsDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000010000000000000001 /* SettingsDefaults.swift */; };
 		AA000002000000000000001 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000011000000000000001 /* SettingsViewModel.swift */; };
 		AA000003000000000000001 /* OnboardingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000012000000000000001 /* OnboardingViewModel.swift */; };
@@ -95,7 +96,6 @@
 		86A1B7002F1C500000A1BEEF /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		9FD073A130248C9F0007DEBD /* SonicPlayerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SonicPlayerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000002000000000000001 /* SonicPlayerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonicPlayerApp.swift; sourceTree = "<group>"; };
-		A1000004000000000000001 /* AppFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFeature.swift; sourceTree = "<group>"; };
 		A1000006000000000000001 /* AppView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppView.swift; sourceTree = "<group>"; };
 		A1000010000000000000001 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		A1000010000000000000003 /* MiniPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerView.swift; sourceTree = "<group>"; };
@@ -112,6 +112,7 @@
 		A1000037000000000000001 /* SonicPlayer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SonicPlayer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000038000000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1000039000000000000002 /* SonicPlayer.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SonicPlayer.entitlements; sourceTree = "<group>"; };
+		A1000096000000000000001 /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
 		A2000002000000000000001 /* CollectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsView.swift; sourceTree = "<group>"; };
 		A3000010000000000000001 /* CollectionsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsSection.swift; sourceTree = "<group>"; };
 		A4000010000000000000002 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
@@ -130,6 +131,7 @@
 		A9000016000000000000001 /* RecordingFilename.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingFilename.swift; sourceTree = "<group>"; };
 		A9000017000000000000001 /* ScrubClamp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrubClamp.swift; sourceTree = "<group>"; };
 		A9000018000000000000001 /* SelectionSet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionSet.swift; sourceTree = "<group>"; };
+		A9000094000000000000001 /* QuickAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickAction.swift; sourceTree = "<group>"; };
 		AA000010000000000000001 /* SettingsDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDefaults.swift; sourceTree = "<group>"; };
 		AA000011000000000000001 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
 		AA000012000000000000001 /* OnboardingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingViewModel.swift; sourceTree = "<group>"; };
@@ -223,8 +225,8 @@
 			isa = PBXGroup;
 			children = (
 				A1000002000000000000001 /* SonicPlayerApp.swift */,
-				A1000004000000000000001 /* AppFeature.swift */,
 				A1000006000000000000001 /* AppView.swift */,
+				A1000096000000000000001 /* AppViewModel.swift */,
 				AA000012000000000000001 /* OnboardingViewModel.swift */,
 				A4000010000000000000002 /* OnboardingView.swift */,
 				A3000010000000000000001 /* CollectionsSection.swift */,
@@ -343,6 +345,7 @@
 				A9000011000000000000001 /* PathMatching.swift */,
 				A9000017000000000000001 /* ScrubClamp.swift */,
 				A9000018000000000000001 /* SelectionSet.swift */,
+				A9000094000000000000001 /* QuickAction.swift */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -475,8 +478,8 @@
 			files = (
 				8629C2AB2EEBB9710052A74B /* Theme.swift in Sources */,
 				A1000001000000000000001 /* SonicPlayerApp.swift in Sources */,
-				A1000003000000000000001 /* AppFeature.swift in Sources */,
 				A1000005000000000000001 /* AppView.swift in Sources */,
+				A1000097000000000000001 /* AppViewModel.swift in Sources */,
 				A4000009000000000000002 /* OnboardingView.swift in Sources */,
 				A3000009000000000000001 /* CollectionsSection.swift in Sources */,
 				A5000001000000000000001 /* ScreenshotMode.swift in Sources */,
@@ -526,6 +529,7 @@
 				A9000002000000000000001 /* PathMatching.swift in Sources */,
 				A9000008000000000000001 /* ScrubClamp.swift in Sources */,
 				A9000009000000000000001 /* SelectionSet.swift in Sources */,
+				A9000095000000000000001 /* QuickAction.swift in Sources */,
 				86662FEC2EF7EAC1000577F1 /* AudioRecorderClient.swift in Sources */,
 				86662FED2EF7EAC1000577F1 /* AudioTrimmerClient.swift in Sources */,
 				8690789B2EEC9F8D005620F9 /* ArtworkClient.swift in Sources */,
