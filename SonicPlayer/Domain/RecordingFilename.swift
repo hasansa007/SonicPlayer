@@ -15,16 +15,29 @@ enum RecordingFilename {
 
     /// e.g. `Recording 2026-08-06 14.14.57.m4a`
     ///
-    /// `locale` defaults to `.current`, matching the bare `DateFormatter` this replaced — tests
-    /// pass `en_US_POSIX` for determinism. Do **not** hardcode POSIX here: on a device using a
-    /// non-Western numbering system (this app ships ar, bn and hi) the current behaviour renders
-    /// the digits in that system, and #11 is behaviour-preserving. See #23 for why that is worth
-    /// changing deliberately rather than as a side effect of an extraction.
+    /// **A filename is data, not UI, so it does not follow the device (#23).** `locale` and
+    /// `calendar` default to POSIX and Gregorian rather than `.current`, which is Apple's
+    /// documented remedy (QA1480) for a formatter driven by a fixed `dateFormat`. Following the
+    /// device broke two ways:
+    ///
+    /// - **Digits.** This app ships `ar`, `bn` and `hi`; a device using a non-Western numbering
+    ///   system produced `Recording ٢٠٢٦-٠٨-٠٦ ١٤.١٤.٥٧.m4a`, which sorts unpredictably and
+    ///   round-trips through share sheets and desktop sync by luck.
+    /// - **Collisions.** `DateFormatter` may honour the user's 24-Hour Time setting over the
+    ///   pattern, so `HH` could render 12-hour: 14:14:57 and 02:14:57 both became `02.14.57`, and
+    ///   the second take was silently deduped to `... 2.m4a` as though it were a duplicate.
+    ///
+    /// A non-Gregorian device calendar was the same class of bug and worse — a Hijri device would
+    /// have written year 1447. Both parameters stay injectable; only the defaults changed.
+    ///
+    /// Existing recordings keep the names they were written with, so a device that has been
+    /// recording in Arabic-Indic digits ends up with a mixed library. Accepted deliberately:
+    /// renaming a user's files to tidy a format is more intrusive than the inconsistency.
     static func make(
         at date: Date,
-        calendar: Calendar = .current,
+        calendar: Calendar = Calendar(identifier: .gregorian),
         timeZone: TimeZone = .current,
-        locale: Locale = .current
+        locale: Locale = Locale(identifier: "en_US_POSIX")
     ) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = dateFormat
