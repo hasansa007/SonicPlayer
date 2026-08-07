@@ -139,6 +139,9 @@ Three differences from XCTest that bite when writing new tests:
 
 ## Release
 
+Summarised here for context; **`docs/deploy-and-staging.md` is authoritative** and wins if these
+two ever disagree.
+
 Pushing to `main` triggers `.github/workflows/distribute.yml`, which archives, signs and uploads
 to TestFlight. **The merge is the release** — there is no separate promotion step.
 
@@ -156,6 +159,12 @@ To prove a pipeline change without shipping, run the workflow manually from the 
 
 ## Git Workflow
 
-- **main** - stable branch
-- **feat** - active feature development branch
-- PRs from `feat` into `main`
+**`docs/deploy-and-staging.md` is the authority — read it before merging anything.**
+
+- **`gh-<issue>-<slug>`** — feature branches. PR into `feat`, never into `main`
+- **`feat`** — **pre prod**. Integrated but not shipped
+- **`main`** — **prod**. Pushing here uploads to TestFlight; the merge *is* the release
+
+`feat` is a pre-prod branch with a feature-branch name, so tooling that guesses the branch model
+from names (`staging` → `develop` → `main`) resolves pre prod to `main` — the branch that ships.
+The runbook exists to outrank that guess.
