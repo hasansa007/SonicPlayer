@@ -2,7 +2,7 @@ import AVFoundation
 import CryptoKit
 import Foundation
 
-struct FileManagerClient {
+struct FileManagerClient: Sendable {
     var listItems: @Sendable (URL?) async throws -> [FileSystemItem]
     var createCollection: @Sendable (String, URL?) async throws -> Void
     var createCollectionForImport: @Sendable () async throws -> URL
