@@ -83,17 +83,24 @@ final class PlayerViewModel {
     private let audioPlayer: AudioPlayerClient
     private let fileManager: FileManagerClient
     private let artworkClient: ArtworkClient
+    private let repository: PlaybackRepository
 
     init(
         audioPlayer: AudioPlayerClient = .live,
         fileManager: FileManagerClient = .live,
         artworkClient: ArtworkClient = .live,
-        sessionStore: SessionStore = SessionStore()
+        sessionStore: SessionStore = SessionStore(),
+        repository: PlaybackRepository? = nil
     ) {
         self.audioPlayer = audioPlayer
         self.fileManager = fileManager
         self.artworkClient = artworkClient
         self.sessionStore = sessionStore
+        // Defaulted from `fileManager` rather than from `.live`, so a caller that substitutes the
+        // client gets a repository built on that substitute. Defaulting to `.live` here would let
+        // a test pass a stub client and still hit the real filesystem, which is the failure this
+        // whole change exists to remove.
+        self.repository = repository ?? LivePlaybackRepository(files: fileManager)
         self.session = sessionStore.load()
 
         playbackSpeed = UserDefaults.standard.savedPlaybackSpeed
@@ -428,36 +435,27 @@ final class PlayerViewModel {
         guard !didOpenExplicitly else { return }
 
         let saved = session
-        Task { [weak self, fileManager] in
-            let currentURL = URL(fileURLWithPath: saved.fileURL)
-            guard
-                FileManager.default.fileExists(atPath: currentURL.path),
-                let currentFile = try? await fileManager.getMetadata(currentURL)
-            else {
+        Task { [weak self, repository] in
+            // Resolution — which files still exist, and which index the track sits at — is the
+            // repository's job now (#44). It used to be inline here, reaching `FileManager`
+            // directly while this type held an injected client, so no test could drive it.
+            guard let resolved = await repository.restore(saved) else {
                 await MainActor.run { self?.clearSession() }
                 return
             }
 
-            var queueFiles: [AudioFile] = []
-            for urlString in saved.queue.map(\.fileURL) {
-                let url = URL(fileURLWithPath: urlString)
-                if FileManager.default.fileExists(atPath: url.path),
-                   let file = try? await fileManager.getMetadata(url) {
-                    queueFiles.append(file)
-                }
-            }
-            let index = queueFiles.firstIndex(of: currentFile) ?? 0
-
-            // Re-checked after the awaits above: an open can arrive while the metadata is
-            // loading, and `restoreWithRetry` drives the shared player, so landing late would
+            // Re-checked after the await above: an open can arrive while the repository is
+            // resolving, and `restoreWithRetry` drives the shared player, so landing late would
             // replace the opened track *and* pause it.
             let claimed = await MainActor.run { [weak self] in
                 guard let self, !self.didOpenExplicitly else { return false }
-                self.sessionLoaded(track: currentFile, queue: queueFiles, index: index)
+                self.sessionLoaded(
+                    track: resolved.track, queue: resolved.queue, index: resolved.index
+                )
                 return true
             }
             guard claimed else { return }
-            await self?.restoreWithRetry(track: currentFile, time: saved.currentTime)
+            await self?.restoreWithRetry(track: resolved.track, time: saved.currentTime)
         }
     }
 
