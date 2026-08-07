@@ -52,8 +52,14 @@ New features go the migrated way — do not add reducers to a codebase that is r
 
 ### Recording Feature
 
+- `RecordingViewModel` and `EditRecordingViewModel` — migrated in #17; neither reducer exists
 - Audio recording uses `AudioRecorderClient` wrapping `AVAudioRecorder`
 - Trimming uses `AudioTrimmerClient`
+- **Editing is non-destructive until save.** The editor works on a temp copy in
+  `<tmp>/SonicPlayer/edit/`; only `saveChanges()` overwrites the original. Each trim replaces the
+  temp file and deletes the previous one
+- Stopping a recording must `await` the stop **before** tearing down the level meter — the reducer
+  used `.concatenate`, not `.merge`, and inverting the two lines fails silently
 - Recordings are stored in the app's documents directory
 - The `EditRecordingView` handles audio editing after capture
 

@@ -3,3 +3,7 @@
 .DS_Store
 /SonicPlayer.xcodeproj/xcuserdata/hsawaed.xcuserdatad/xcschemes/xcschememanagement.plist
 xcschememanagement.plist
+
+# Xcode per-user state — never shared
+xcuserdata/
+*.xcuserstate

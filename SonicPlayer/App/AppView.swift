@@ -18,6 +18,7 @@ struct AppView: View {
     // — so they are built together here, not independently.
     @State private var player: PlayerViewModel
     @State private var home: HomeViewModel
+    @State private var recording = RecordingViewModel()
 
     init(store: StoreOf<AppFeature>) {
         self.store = store
@@ -52,8 +53,13 @@ struct AppView: View {
                         Button("Rename") { store.send(.filesRoot(.confirmNameInput)) }
                         Button("Cancel", role: .cancel) { store.send(.filesRoot(.cancelNameInput)) }
                     }
-                    .sheet(item: $store.scope(state: \.filesRoot.editAudio, action: \.filesRoot.editAudio)) { editStore in
-                        EditRecordingView(store: editStore)
+                    .sheet(item: Binding(
+                        get: { store.filesRoot.audioToEdit },
+                        set: { if $0 == nil { store.send(.filesRoot(.editAudioDismissed)) } }
+                    )) { file in
+                        EditRecordingView(recording: file) {
+                            store.send(.filesRoot(.editAudioDismissed))
+                        }
                     }
                     .sheet(isPresented: isCollectionPickerPresented) {
                         InAppCollectionPicker(
@@ -109,7 +115,7 @@ struct AppView: View {
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: isRecordingSheetPresented) {
-            RecordingView(store: store.scope(state: \.recording, action: \.recording))
+            RecordingView(viewModel: recording)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .interactiveDismissDisabled(true)
@@ -183,6 +189,9 @@ private extension AppView {
         home.onDeleteFile = { store.send(.deleteRecentFile($0)) }
         home.onEditFile = { store.send(.editRecentFile($0)) }
         home.onMoveFile = { store.send(.moveRecentFile($0)) }
+
+        // Formerly AppFeature observing `.recording(.recordingSaved)` / `.discardRecording`.
+        recording.onFinished = { store.send(.dismissRecordingSheet) }
     }
 
     /// Drains `AppFeature.State.commands`. Temporary — see the doc comment there; #19 replaces the
@@ -203,7 +212,12 @@ private extension AppView {
     var isRecordingSheetPresented: Binding<Bool> {
         Binding(
             get: { store.isRecordingSheetPresented },
-            set: { if !$0 { store.send(.dismissRecordingSheet) } }
+            set: {
+                if !$0 {
+                    recording.discardIfUnsaved()
+                    store.send(.dismissRecordingSheet)
+                }
+            }
         )
     }
 

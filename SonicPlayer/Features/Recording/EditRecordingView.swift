@@ -1,11 +1,23 @@
-import ComposableArchitecture
 import SwiftUI
 
 struct EditRecordingView: View {
-    @Bindable var store: StoreOf<EditRecordingFeature>
+
+    /// Owns its view model rather than being handed one (#17).
+    ///
+    /// Both presenters — the Files browser and Home — hold only the `AudioFile`, because
+    /// `CollectionsFeature` is still a reducer and its value-typed `State` cannot store a
+    /// reference. Constructing here keeps the model's lifetime tied to the sheet's identity;
+    /// building it in the `.sheet` closure instead would make a new one on every body pass.
+    @State private var viewModel: EditRecordingViewModel
     @Environment(\.dismiss) var dismiss
     @State private var isRenaming = false
     @State private var renameText = ""
+
+    init(recording: AudioFile, onFinished: @escaping () -> Void = {}) {
+        let model = EditRecordingViewModel(recording: recording)
+        model.onFinished = onFinished
+        _viewModel = State(initialValue: model)
+    }
 
     var body: some View {
         NavigationStack {
@@ -20,7 +32,7 @@ struct EditRecordingView: View {
                         .padding(.horizontal, 20)
 
                     // Time
-                    Text(formatTime(store.currentTime))
+                    Text(formatTime(viewModel.currentTime))
                         .font(.system(size: 44, weight: .light, design: .rounded))
                         .foregroundColor(.white)
                         .monospacedDigit()
@@ -35,7 +47,7 @@ struct EditRecordingView: View {
                 }
 
                 // Trimming overlay
-                if store.isTrimming_InProgress {
+                if viewModel.isTrimming_InProgress {
                     Color.black.opacity(0.7).ignoresSafeArea()
                     VStack(spacing: 20) {
                         ProgressView().scaleEffect(1.5).tint(.white)
@@ -46,7 +58,7 @@ struct EditRecordingView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
-                        store.send(.discardChanges)
+                        viewModel.discardChanges()
                         dismiss()
                     } label: {
                         Image(systemName: "xmark")
@@ -55,17 +67,17 @@ struct EditRecordingView: View {
                     }
                 }
                 ToolbarItem(placement: .principal) {
-                    Text(store.recording.title)
+                    Text(viewModel.recording.title)
                         .font(.headline)
                         .foregroundColor(.white)
                         .lineLimit(1)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if store.isTrimming {
+                    if viewModel.isTrimming {
                         HStack(spacing: 12) {
                             // Apply trim (keep selected range)
                             Button {
-                                store.send(.applyTrim)
+                                viewModel.applyTrim()
                             } label: {
                                 HStack(spacing: 4) {
                                     Image(systemName: "scissors")
@@ -75,11 +87,11 @@ struct EditRecordingView: View {
                                 }
                                 .foregroundColor(.sonicPrimary)
                             }
-                            .disabled(store.isTrimming_InProgress)
+                            .disabled(viewModel.isTrimming_InProgress)
 
                             // Cancel trim
                             Button {
-                                store.send(.cancelTrim)
+                                viewModel.cancelTrim()
                             } label: {
                                 Text("Cancel")
                                     .font(.subheadline)
@@ -88,7 +100,7 @@ struct EditRecordingView: View {
 
                             // Delete selected range
                             Button {
-                                store.send(.deleteRangeTapped)
+                                viewModel.deleteRangeTapped()
                             } label: {
                                 HStack(spacing: 4) {
                                     Image(systemName: "trash")
@@ -98,14 +110,14 @@ struct EditRecordingView: View {
                                 }
                                 .foregroundColor(.red)
                             }
-                            .disabled(store.isTrimming_InProgress)
+                            .disabled(viewModel.isTrimming_InProgress)
                         }
                     } else {
                         HStack(spacing: 16) {
                             overflowMenu
 
                             Button {
-                                store.send(.saveChanges)
+                                viewModel.saveChanges()
                                 dismiss()
                             } label: {
                                 Image(systemName: "checkmark")
@@ -114,31 +126,31 @@ struct EditRecordingView: View {
                                     .frame(width: 32, height: 32)
                                     .background(Circle().fill(Color.sonicPrimary))
                             }
-                            .disabled(!store.hasEdits)
-                            .opacity(store.hasEdits ? 1.0 : 0.4)
+                            .disabled(!viewModel.hasEdits)
+                            .opacity(viewModel.hasEdits ? 1.0 : 0.4)
                         }
                     }
                 }
             }
         }
         .alert("Action Failed", isPresented: Binding(
-            get: { store.trimError != nil },
-            set: { if !$0 { store.send(.cancelTrim) } }
+            get: { viewModel.trimError != nil },
+            set: { if !$0 { viewModel.cancelTrim() } }
         )) {
-            Button("OK", role: .cancel) { store.send(.cancelTrim) }
+            Button("OK", role: .cancel) { viewModel.cancelTrim() }
         } message: {
-            if let error = store.trimError { Text(error) }
+            if let error = viewModel.trimError { Text(error) }
         }
         .alert("Rename", isPresented: $isRenaming) {
             TextField("Name", text: $renameText)
             Button("Save") {
                 let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !trimmed.isEmpty { store.send(.renameTapped(trimmed)) }
+                if !trimmed.isEmpty { viewModel.renameTapped(trimmed) }
             }
             Button("Cancel", role: .cancel) {}
         }
         .interactiveDismissDisabled()
-        .onAppear { store.send(.onAppear) }
+        .onAppear { viewModel.onAppear() }
     }
 
     // MARK: - Overflow Menu (⋯)
@@ -146,14 +158,14 @@ struct EditRecordingView: View {
     private var overflowMenu: some View {
         Menu {
             Button {
-                renameText = store.recording.title
+                renameText = viewModel.recording.title
                 isRenaming = true
             } label: {
                 Label("Rename", systemImage: "pencil")
             }
 
             Button {
-                store.send(.trimTapped)
+                viewModel.trimTapped()
             } label: {
                 Label("Select & Trim", systemImage: "scissors")
             }
@@ -169,7 +181,7 @@ struct EditRecordingView: View {
     private var waveformArea: some View {
         VStack(spacing: 8) {
             ZStack {
-                if store.isTrimming {
+                if viewModel.isTrimming {
                     trimWaveform
                 } else {
                     playbackWaveform
@@ -180,17 +192,17 @@ struct EditRecordingView: View {
 
             // Timeline
             HStack {
-                Text(formatTime(store.isTrimming ? store.trimStart : 0))
+                Text(formatTime(viewModel.isTrimming ? viewModel.trimStart : 0))
                     .font(.caption2).monospacedDigit()
                     .foregroundColor(.gray)
                 Spacer()
-                if store.isTrimming {
-                    Text("Duration: \(formatTime(store.trimEnd - store.trimStart))")
+                if viewModel.isTrimming {
+                    Text("Duration: \(formatTime(viewModel.trimEnd - viewModel.trimStart))")
                         .font(.caption2)
                         .foregroundColor(.sonicPrimary)
                 }
                 Spacer()
-                Text(formatTime(store.isTrimming ? store.trimEnd : store.recording.duration))
+                Text(formatTime(viewModel.isTrimming ? viewModel.trimEnd : viewModel.recording.duration))
                     .font(.caption2).monospacedDigit()
                     .foregroundColor(.gray)
             }
@@ -213,7 +225,7 @@ struct EditRecordingView: View {
 
             // Playback position
             GeometryReader { geo in
-                let progress = store.recording.duration > 0 ? store.currentTime / store.recording.duration : 0
+                let progress = viewModel.recording.duration > 0 ? viewModel.currentTime / viewModel.recording.duration : 0
                 Rectangle()
                     .fill(Color.sonicPrimary)
                     .frame(width: 2)
@@ -227,8 +239,8 @@ struct EditRecordingView: View {
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
                                 let progress = min(max(0, value.location.x / geo.size.width), 1)
-                                let time = progress * store.recording.duration
-                                store.send(.playbackTimeUpdated(time))
+                                let time = progress * viewModel.recording.duration
+                                viewModel.scrub(to: time)
                             }
                     )
             }
@@ -242,8 +254,8 @@ struct EditRecordingView: View {
 
             GeometryReader { geo in
                 let totalWidth = geo.size.width
-                let startX = CGFloat(store.trimStart / store.recording.duration) * totalWidth
-                let endX = CGFloat(store.trimEnd / store.recording.duration) * totalWidth
+                let startX = CGFloat(viewModel.trimStart / viewModel.recording.duration) * totalWidth
+                let endX = CGFloat(viewModel.trimEnd / viewModel.recording.duration) * totalWidth
 
                 // Dimmed areas
                 Rectangle()
@@ -279,8 +291,8 @@ struct EditRecordingView: View {
                     .gesture(
                         DragGesture()
                             .onChanged { value in
-                                let newStart = (value.location.x / totalWidth) * store.recording.duration
-                                store.send(.trimStartChanged(max(0, min(newStart, store.trimEnd - 1))))
+                                let newStart = (value.location.x / totalWidth) * viewModel.recording.duration
+                                viewModel.trimStartChanged(max(0, min(newStart, viewModel.trimEnd - 1)))
                             }
                     )
 
@@ -292,8 +304,8 @@ struct EditRecordingView: View {
                     .gesture(
                         DragGesture()
                             .onChanged { value in
-                                let newEnd = (value.location.x / totalWidth) * store.recording.duration
-                                store.send(.trimEndChanged(max(store.trimStart + 1, min(newEnd, store.recording.duration))))
+                                let newEnd = (value.location.x / totalWidth) * viewModel.recording.duration
+                                viewModel.trimEndChanged(max(viewModel.trimStart + 1, min(newEnd, viewModel.recording.duration)))
                             }
                     )
 
@@ -301,7 +313,7 @@ struct EditRecordingView: View {
                 Rectangle()
                     .fill(Color.white)
                     .frame(width: 2)
-                    .offset(x: CGFloat(store.currentTime / store.recording.duration) * totalWidth)
+                    .offset(x: CGFloat(viewModel.currentTime / viewModel.recording.duration) * totalWidth)
             }
         }
     }
@@ -310,28 +322,28 @@ struct EditRecordingView: View {
 
     private var playbackControls: some View {
         HStack(spacing: 48) {
-            Button { store.send(.skipBackward) } label: {
+            Button { viewModel.skipBackward() } label: {
                 Image(systemName: "gobackward.15")
                     .font(.title2)
                     .foregroundColor(.white.opacity(0.7))
                     .frame(width: 52, height: 52)
             }
 
-            Button { store.send(.playPauseTapped) } label: {
+            Button { viewModel.playPauseTapped() } label: {
                 ZStack {
                     Circle()
                         .fill(Color.white)
                         .frame(width: 72, height: 72)
                         .shadow(color: .white.opacity(0.2), radius: 12, x: 0, y: 4)
 
-                    Image(systemName: store.isPlaying ? "pause.fill" : "play.fill")
+                    Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
                         .font(.title2)
                         .foregroundColor(.black)
-                        .offset(x: store.isPlaying ? 0 : 2)
+                        .offset(x: viewModel.isPlaying ? 0 : 2)
                 }
             }
 
-            Button { store.send(.skipForward) } label: {
+            Button { viewModel.skipForward() } label: {
                 Image(systemName: "goforward.15")
                     .font(.title2)
                     .foregroundColor(.white.opacity(0.7))

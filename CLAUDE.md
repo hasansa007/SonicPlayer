@@ -95,7 +95,7 @@ Migration status per #5. Reducers still compose into `AppFeature`; view models a
 | Home | `HomeViewModel` | **migrated** (#16) | Folder suggestions, recently added |
 | Files | `CollectionsFeature` | reducer | File/folder browser with navigation stack |
 | Player | `PlayerViewModel` | **migrated** (#15) | Playback engine, queue, session persistence |
-| Recording | `RecordingFeature` | reducer | Audio capture and trimming |
+| Recording | `RecordingViewModel` | **migrated** (#17) | Audio capture, and the editor via `EditRecordingViewModel` |
 | Settings | `SettingsViewModel` | **migrated** (#13) | Preferences via UserDefaults |
 | Onboarding | `OnboardingViewModel` | **migrated** (#14) | First-launch carousel |
 
@@ -118,6 +118,10 @@ and deletes the channel — do not build on it.
 - `SessionStore` for session persistence. It replaced `@Shared(.fileStorage(...))` in #15 and
   **writes the same JSON to the same path**, because existing installs have a `session.json` — the
   location and shape are a compatibility boundary, not an implementation detail
+- **Long-lived work in a view model is an owned `Task`, cancelled in an `isolated deinit`.** There
+  is no clock abstraction: `Clock.timer(interval:)` came from swift-clocks via TCA, so a periodic
+  loop is a hand-written `Task.sleep`. Extract the **cadence** as a constant and test that; the
+  sleep around it is glue and is deliberately untested (#17)
 - `@AppStorage` for user preferences
 - `StackState`/`StackAction` for push navigation
 - Manual `Equatable` conformance where needed (e.g., ignoring artwork cache)
@@ -160,19 +164,44 @@ compiled automatically — no project edit needed.
 
 Tests use **Swift Testing** (`@Suite`, `@Test`, `#expect`) — never XCTest (#27).
 
-Test reducers with a **non-exhaustive `TestStore`**:
+**Which style depends on what you are testing** — check the migration table above first.
+
+A migrated feature is a plain object. No `TestStore`, no `withDependencies`, no
+`import ComposableArchitecture` — pass `.test` clients to the initialiser:
+
+```swift
+@Suite(.serialized)
+struct RecordingSaveDismissTests {
+    @MainActor
+    @Test func savingReportsFinished() async {
+        let model = RecordingViewModel(audioRecorder: .test, audioPlayer: player, fileManager: .test)
+        await withCheckedContinuation { continuation in
+            model.onFinished = { continuation.resume() }
+            model.saveRecording()
+        }
+        #expect(!model.isSaveFlowPresented)
+    }
+}
+```
+
+`await withCheckedContinuation` around a callback beats sleeping for a fixed interval: it waits
+exactly as long as the work takes, and a call that never arrives hangs the test rather than passing
+it. Note `.test` clients leave every closure without an explicit default **unimplemented** — calling
+one reports a failure, so stub the ones the path under test actually reaches.
+
+A reducer that still exists gets a **non-exhaustive `TestStore`**:
 
 ```swift
 @Suite(.serialized)          // see the parallelism note below
-struct RecordingTests {
+struct FileBrowserTests {
     @MainActor
-    @Test func savingDismissesTheSheet() async {
+    @Test func tappingAFileEmitsPlay() async {
         let store = TestStore(initialState: state) { AppFeature() } withDependencies: {
             $0.fileManager.listItems = { _ in [] }
         }
         store.exhaustivity = .off       // assert one thing, don't match every effect
-        await store.send(.recording(.recordingSaved))
-        #expect(!store.state.isRecordingSheetPresented)
+        await store.send(.filesRoot(.fileTapped(file)))
+        #expect(store.state.commands == [.play(file, [file], .singleFile)])
     }
 }
 ```
