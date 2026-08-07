@@ -1,4 +1,3 @@
-import ComposableArchitecture
 import SwiftUI
 
 /// In-app collection picker for "Move To" operations.
