@@ -105,4 +105,58 @@ struct SessionDomainTests {
         let date = Date(timeIntervalSince1970: 1_000_000_000)
         #expect(RecordingFilename.make(at: date, timeZone: TimeZone(secondsFromGMT: 0)!, locale: Locale(identifier: "en_US_POSIX")) == "Recording 2001-09-09 01.46.40.m4a")
     }
+
+    // MARK: - RecordingFilename does not follow the device (#23)
+
+    private static let utc = TimeZone(secondsFromGMT: 0)!
+    /// 2026-02-06 14:14:57 UTC
+    private static let afternoon = Date(timeIntervalSince1970: 1_770_387_297)
+    /// 2026-02-06 02:14:57 UTC — the same clock face under a 12-hour formatter.
+    private static let morning = Date(timeIntervalSince1970: 1_770_344_097)
+
+    @Test func test_defaultLocale_isPOSIXRatherThanTheDeviceLocale() {
+        #expect(
+            RecordingFilename.make(at: Self.afternoon, timeZone: Self.utc)
+                == RecordingFilename.make(at: Self.afternoon, timeZone: Self.utc, locale: Locale(identifier: "en_US_POSIX"))
+        )
+    }
+
+    @Test func test_defaultCalendar_isGregorianRatherThanTheDeviceCalendar() {
+        #expect(
+            RecordingFilename.make(at: Self.afternoon, timeZone: Self.utc)
+                == RecordingFilename.make(at: Self.afternoon, calendar: Calendar(identifier: .gregorian), timeZone: Self.utc)
+        )
+    }
+
+    /// The headline of #23: whatever the device is set to, the name is ASCII.
+    @Test func test_digitsAreAlwaysASCII() {
+        let name = RecordingFilename.make(at: Self.afternoon, timeZone: Self.utc)
+        #expect(name.allSatisfy { !$0.isNumber || $0.isASCII }, "\(name)")
+    }
+
+    /// `HH` must mean 24-hour regardless of the user's 24-Hour Time setting — the QA1480 trap.
+    @Test func test_hourIsTwentyFourHour() {
+        #expect(RecordingFilename.make(at: Self.afternoon, timeZone: Self.utc) == "Recording 2026-02-06 14.14.57.m4a")
+    }
+
+    /// The regression this fix exists to prevent: two takes an hour-hand apart used to collide on
+    /// one name and be silently deduped to "... 2.m4a", reading as a duplicate of the first.
+    @Test func test_morningAndAfternoonTakesDoNotCollide() {
+        let a = RecordingFilename.make(at: Self.morning, timeZone: Self.utc)
+        let b = RecordingFilename.make(at: Self.afternoon, timeZone: Self.utc)
+        #expect(a == "Recording 2026-02-06 02.14.57.m4a", "\(a)")
+        #expect(b == "Recording 2026-02-06 14.14.57.m4a", "\(b)")
+        #expect(a != b)
+    }
+
+    /// The defaults changed; the seams did not. A caller that genuinely wants a device-shaped
+    /// name can still ask for one.
+    @Test func test_anExplicitCalendarIsStillHonoured() {
+        let hijri = RecordingFilename.make(
+            at: Self.afternoon,
+            calendar: Calendar(identifier: .islamicUmmAlQura),
+            timeZone: Self.utc
+        )
+        #expect(!hijri.hasPrefix("Recording 2026-"), "\(hijri)")
+    }
 }
