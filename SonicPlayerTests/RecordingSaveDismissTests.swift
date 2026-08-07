@@ -37,9 +37,17 @@ struct RecordingSaveDismissTests {
         #expect(!(store.state.isRecordingSheetPresented))
     }
 
-    /// A non-exhaustive store focused on the sheet flag. The overrides keep the
-    /// downstream `refreshFiles` / `loadRecentFiles` / `audioPlayer.stop` effects
-    /// inert so the test only observes the dismissal behaviour under scrutiny.
+    /// A non-exhaustive store focused on the sheet flag. The overrides keep the downstream
+    /// `refreshFiles` and `audioPlayer.stop` effects inert so the test only observes the
+    /// dismissal behaviour.
+    ///
+    /// This used to also set `$0.defaultFileStorage = .inMemory`, because `PlayerFeature.State`
+    /// held `@Shared(.fileStorage(session.json))` and letting it reach the real temp directory
+    /// made the state compare unequal mid-assertion — `TestStore` then reported "State was not
+    /// expected to change" with no visible diff. #15 replaced `@Shared` with `SessionStore` and
+    /// took the player out of the store entirely, so nothing in `AppFeature.State` is shared any
+    /// more and the override is dead. Removed rather than left in: an unexplained dependency
+    /// override is the kind of thing that gets copied into the next test as cargo.
     @MainActor
     private func makeStore() -> TestStore<AppFeature.State, AppFeature.Action> {
         var initialState = AppFeature.State()
@@ -49,12 +57,9 @@ struct RecordingSaveDismissTests {
             AppFeature()
         } withDependencies: {
             $0.fileManager.listItems = { _ in [] }
+            // `RecordingFeature.discardRecording` stops the shared AVPlayer — the recorder and
+            // the player use the same one. Still reached after #15, so still stubbed.
             $0.audioPlayer.stop = {}
-            // PlayerFeature.State holds @Shared(.fileStorage(session.json)). Without this the
-            // shared value is read from and written to the real temp directory while the test
-            // runs, so PlayerFeature.State compares unequal mid-assertion and TestStore reports
-            // "State was not expected to change" with no visible diff.
-            $0.defaultFileStorage = .inMemory
         }
         store.exhaustivity = .off
         return store

@@ -168,7 +168,6 @@ struct RecordingTests {
     @MainActor
     @Test func savingDismissesTheSheet() async {
         let store = TestStore(initialState: state) { AppFeature() } withDependencies: {
-            $0.defaultFileStorage = .inMemory   // only for reducers that still hold @Shared
             $0.fileManager.listItems = { _ in [] }
         }
         store.exhaustivity = .off       // assert one thing, don't match every effect
@@ -177,6 +176,10 @@ struct RecordingTests {
     }
 }
 ```
+
+`$0.defaultFileStorage = .inMemory` used to be required here and **no longer is** — nothing in
+`AppFeature.State` holds `@Shared` since #15 moved session persistence to `SessionStore`. If you
+see it in an older example, it is dead.
 
 Never call `SomeFeature().reduce(into:action:)` directly — it is deprecated as of TCA 1.26,
 and it bypasses the store, so effects never run and the assertion covers less than it appears to.

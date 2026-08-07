@@ -6,9 +6,9 @@ import Foundation
 /// happened to live in a file that imports it, which would have made every `Domain` type that
 /// touches a session transitively dependent on the framework this epic removes.
 ///
-/// `PlayerFeature` currently persists this via `@Shared(.fileStorage(...))`. Slice 6 (#15)
-/// replaces that with a hand-rolled store writing the same JSON to the same path, so the shape
-/// here is a compatibility boundary: change it and previously-saved sessions stop restoring.
+/// `SessionStore` persists this, writing the same JSON to the same path that
+/// `@Shared(.fileStorage(...))` used before #15 replaced it. The shape here is therefore a
+/// compatibility boundary: change it and previously-saved sessions stop restoring.
 struct QueueItem: Codable, Equatable {
     var fileURL: String
 }
