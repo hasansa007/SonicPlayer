@@ -1,6 +1,6 @@
 import Foundation
 
-enum FileSystemItem: Identifiable, Equatable, Hashable {
+enum FileSystemItem: Identifiable, Equatable, Hashable, Sendable {
     case folder(CollectionItem)
     case file(AudioFile)
 

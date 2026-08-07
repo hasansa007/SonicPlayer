@@ -18,7 +18,7 @@ import Observation
 @Observable
 final class EditRecordingViewModel: Identifiable {
 
-    var id: UUID { recording.id }
+    nonisolated let id: UUID
 
     private(set) var recording: AudioFile
     /// The untouched original. Only `saveChanges()` replaces it.
@@ -51,6 +51,7 @@ final class EditRecordingViewModel: Identifiable {
         audioTrimmer: AudioTrimmerClient = .live,
         fileManager: FileManagerClient = .live
     ) {
+        self.id = recording.id
         self.recording = recording
         self.originalURL = recording.url
         self.trimEnd = recording.duration

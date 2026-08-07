@@ -66,6 +66,9 @@
 		AB000030000000000000001 /* CollectionsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000031000000000000001 /* CollectionsViewModel.swift */; };
 		AB000032000000000000001 /* FolderImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000033000000000000001 /* FolderImport.swift */; };
 		AB000034000000000000001 /* ImportFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000035000000000000001 /* ImportFilter.swift */; };
+		AC000001000000000000001 /* SessionRestorePlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000010000000000000001 /* SessionRestorePlan.swift */; };
+		AC000002000000000000001 /* FileManaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000011000000000000001 /* FileManaging.swift */; };
+		AC000003000000000000001 /* PlaybackRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000012000000000000001 /* PlaybackRepository.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -142,6 +145,9 @@
 		AB000031000000000000001 /* CollectionsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsViewModel.swift; sourceTree = "<group>"; };
 		AB000033000000000000001 /* FolderImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderImport.swift; sourceTree = "<group>"; };
 		AB000035000000000000001 /* ImportFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFilter.swift; sourceTree = "<group>"; };
+		AC000010000000000000001 /* SessionRestorePlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRestorePlan.swift; sourceTree = "<group>"; };
+		AC000011000000000000001 /* FileManaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileManaging.swift; sourceTree = "<group>"; };
+		AC000012000000000000001 /* PlaybackRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRepository.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -253,6 +259,7 @@
 				8690789A2EEC9F8D005620F9 /* ArtworkClient.swift */,
 				A1000024000000000000001 /* AudioPlayerClient.swift */,
 				A1000026000000000000001 /* FileManagerClient.swift */,
+				AC000011000000000000001 /* FileManaging.swift */,
 			);
 			path = Clients;
 			sourceTree = "<group>";
@@ -297,6 +304,7 @@
 			isa = PBXGroup;
 			children = (
 				AB000011000000000000001 /* PlayerViewModel.swift */,
+				AC000012000000000000001 /* PlaybackRepository.swift */,
 				A1000010000000000000001 /* PlayerView.swift */,
 				A1000010000000000000003 /* MiniPlayerView.swift */,
 			);
@@ -336,6 +344,7 @@
 				AB000010000000000000001 /* SessionStore.swift */,
 				A9000016000000000000001 /* RecordingFilename.swift */,
 				A9000015000000000000001 /* SessionRestorePolicy.swift */,
+				AC000010000000000000001 /* SessionRestorePlan.swift */,
 				A9000014000000000000001 /* SessionCodec.swift */,
 				A9000013000000000000001 /* PlaybackSession.swift */,
 				A9000012000000000000001 /* QueueMath.swift */,
@@ -518,6 +527,9 @@
 				A9000001000000000000001 /* UniqueNameResolver.swift in Sources */,
 				A9000007000000000000001 /* RecordingFilename.swift in Sources */,
 				A9000006000000000000001 /* SessionRestorePolicy.swift in Sources */,
+				AC000001000000000000001 /* SessionRestorePlan.swift in Sources */,
+				AC000002000000000000001 /* FileManaging.swift in Sources */,
+				AC000003000000000000001 /* PlaybackRepository.swift in Sources */,
 				A9000005000000000000001 /* SessionCodec.swift in Sources */,
 				A9000004000000000000001 /* PlaybackSession.swift in Sources */,
 				A9000003000000000000001 /* QueueMath.swift in Sources */,
@@ -809,8 +821,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-
 	};
 	rootObject = A1000056000000000000001 /* Project object */;
 }
