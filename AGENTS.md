@@ -77,6 +77,13 @@ New features go the migrated way — do not add reducers to a codebase that is r
 
 ### File Management
 
+- `CollectionsViewModel` — migrated in #18. `CollectionsFeature`, `FileRowFeature` and
+  `CollectionItemCardFeature` are all deleted; the row reducers were ~90% "handled by parent" and
+  became closures passed into `ForEach`
+- One view model **per navigation depth**, owned by its screen as `@State`. Push by appending to
+  `AppView`'s `[URL]` path
+- The recursive folder import lives in `FolderImport`; its two decisions — which extensions count
+  as audio, and where a nested file lands — are in `Domain/ImportFilter` and are tested
 - `FileManagerClient` provides all file system operations
 - Files are identified by SHA256 hash of their path (stable IDs)
 - Supported formats: MP3, M4A, WAV

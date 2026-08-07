@@ -1,4 +1,3 @@
-import ComposableArchitecture
 import SwiftUI
 
 // MARK: - Home Collections Section
@@ -19,9 +18,9 @@ extension AppView {
 
     @ViewBuilder
     var collectionsSection: some View {
-        let collectionCards = store.filesRoot.filteredCollectionCards
+        let folders = filesRoot.filteredFolders
         let maxVisible = horizontalSizeClass == .regular ? 4 : 2
-        if !collectionCards.isEmpty {
+        if !folders.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Collections")
                     .font(.title3)
@@ -30,21 +29,22 @@ extension AppView {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(Array(collectionCards.prefix(maxVisible).enumerated()), id: \.element.id) { index, card in
-                            collectionCardView(folder: card.folder, index: index) {
-                                store.send(.filesRoot(.collectionCards(.element(id: card.id, action: .tapped))))
+                        ForEach(Array(folders.prefix(maxVisible).enumerated()), id: \.element.id) { index, folder in
+                            collectionCardView(folder: folder, index: index) {
+                                filesRoot.collectionTapped(folder)
                             } onMove: {
-                                store.send(.filesRoot(.collectionCards(.element(id: card.id, action: .moveTapped))))
+                                filesRoot.moveItemTapped(.folder(folder))
                             } onRename: {
-                                store.send(.filesRoot(.collectionCards(.element(id: card.id, action: .renameTapped))))
+                                filesRoot.renameItemTapped(.folder(folder))
                             } onDelete: {
-                                store.send(.filesRoot(.collectionCards(.element(id: card.id, action: .deleteTapped))))
+                                filesRoot.select(.folder(folder))
+                                filesRoot.deleteSelectedTapped()
                             }
                         }
 
                         // "View All" dashed card
                         Button {
-                            store.send(.viewAllCollectionsTapped)
+                            home.onViewAllCollectionsTapped()
                         } label: {
                             VStack(spacing: 8) {
                                 Image(systemName: "square.grid.2x2")
