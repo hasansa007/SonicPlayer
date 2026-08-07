@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-SonicPlayer is a native iOS audio player app (iOS 18.0+) built with **SwiftUI** and **The Composable Architecture (TCA)** v1.26.1. It supports browsing, playing, and recording audio files with a minimalist Sonic teal design.
+SonicPlayer is a native iOS audio player app (iOS 18.0+) built with **SwiftUI** and `@Observable` MVVM. TCA v1.26.1 is still a dependency — the clients use its `@DependencyClient` macro — and #20 removes it. It supports browsing, playing, and recording audio files with a minimalist Sonic teal design.
 
 **Bundle ID:** `com.hasan.sonicplayer`
 
@@ -84,51 +84,53 @@ Note also that this codebase is **async/await throughout**, not Combine.
 
 ## Architecture
 
-**TCA (The Composable Architecture)** with strict unidirectional data flow:
+**`ARCHITECTURE.md` is the authority** — the layering, what is deliberately absent, when each layer
+earns its place, and the mapping onto a textbook clean-architecture stack. What follows is the
+day-to-day version.
 
-- **Features/** - **Mid-migration (#5): TCA reducers are being replaced by `@Observable` view models, one feature at a time.** A feature is therefore either a `{Name}Feature.swift` (reducer, not yet migrated) or a `{Name}ViewModel.swift` (migrated), plus its `{Name}View.swift`. Check which before adding to one. Home is a further exception: no view file, its UI is inlined in `App/AppView.swift`
-- **Clients/** - Dependency-injected wrappers around system frameworks (AVFoundation, FileManager)
+**MVVM with `@Observable`, async/await throughout.** There are no reducers and no `Store`: the
+TCA→MVVM migration (#5) finished at slice 10 (#19). TCA still ships as a dependency because the
+five clients use its `@DependencyClient` macro; #20 removes it.
+
+- **Features/** - one `{Name}ViewModel.swift` + `{Name}View.swift` per feature. A `{Name}Feature.swift` would be a leftover — there are none. Home is an exception: no view file, its UI is inlined in `App/AppView.swift`
+- **Clients/** - structs of closures wrapping system frameworks (AVFoundation, FileManager), each with a `.live` and a `.test`
 - **Models/** - Plain data types (`AudioFile`, `FileSystemItem`, `PlaybackSpeed`)
-- **Domain/** - Pure decision logic, Foundation only, no TCA. Extracted from reducers so its tests survive the TCA→MVVM migration unchanged (#11). Add logic here rather than inlining it in a reducer.
+- **Domain/** - Pure decision logic, Foundation only. Extracted from reducers so its tests survived the migration unchanged (#11). Add logic here rather than inlining it in a view model.
 - **Utilities/** - Shared UI components and helpers
-- **App/** - `AppView` is the composition root and owns every view model as `@State`; `AppFeature` is three sheet flags awaiting deletion in #19. `AppView` is a single screen with no tab bar. Player, recording and import are presented as **sheets** over Home; settings is **pushed** via `.navigationDestination` (note the state flag is still named `isSettingsSheetPresented`)
+- **App/** - `AppViewModel` is the composition root: it owns every view model and wires every cross-feature edge in its `init`. `AppView` takes it from the environment and owns nothing but its own share sheet. Single screen, no tab bar — player, recording and import are **sheets** over Home; settings is **pushed** via `.navigationDestination`
 
 ### Feature modules
 
-Migration status per #5. Reducers still compose into `AppFeature`; view models are owned by
-`AppView` as `@State`, because `AppFeature.State` is a value type and cannot hold a reference.
-
-| Feature | Type | Status | Purpose |
-|---------|------|--------|---------|
-| Home | `HomeViewModel` | **migrated** (#16) | Folder suggestions, recently added |
-| Files | `CollectionsViewModel` | **migrated** (#18) | File/folder browser, one model per depth |
-| Player | `PlayerViewModel` | **migrated** (#15) | Playback engine, queue, session persistence |
-| Recording | `RecordingViewModel` | **migrated** (#17) | Audio capture, and the editor via `EditRecordingViewModel` |
-| Settings | `SettingsViewModel` | **migrated** (#13) | Preferences via UserDefaults |
-| Onboarding | `OnboardingViewModel` | **migrated** (#14) | First-launch carousel |
+| Feature | View model | Purpose |
+|---------|------------|---------|
+| Home | `HomeViewModel` (#16) | Folder suggestions, recently added |
+| Files | `CollectionsViewModel` (#18) | File/folder browser, one model per depth |
+| Player | `PlayerViewModel` (#15) | Playback engine, queue, session persistence, open-from-Files |
+| Recording | `RecordingViewModel` (#17) | Audio capture, and the editor via `EditRecordingViewModel` |
+| Settings | `SettingsViewModel` (#13) | Preferences via UserDefaults |
+| Onboarding | `OnboardingViewModel` (#14) | First-launch carousel |
 
 Cross-feature communication travels through a **closure wired at the composition root**, never by
 reading another feature's state. `CollectionsViewModel.onWillRemoveItems` is the canonical shape,
 and it is that shape for a reason: the items **travel in the call** rather than being read back,
-because the selection is cleared before the removal runs (#22). See `AppView.wireViewModels()`.
+because the selection is cleared before the removal runs (#22). All of it is in
+`AppViewModel.wire()`, run once at construction — which is what makes `AppViewModelTests` able to
+exercise every edge without a view.
 
-Not everything is in that helper: `.onOpenURL` calls `player.openFromFiles(_:onImported:)` and
-passes its callback inline (#33). Same shape and same place, but a reader who only greps
-`wireViewModels()` will not find it.
+The one edge not in `wire()`: `.onOpenURL` calls `app.openedFromFiles(url)` directly, because the
+URL only exists at the call site.
 
-**The `AppCommand` channel is gone (#18).** It existed for one reason: playing a tapped file
-needed the queue, which was computed from `filesRoot.items` and lived only in the store.
-`CollectionsViewModel` passes its own file list out through `onPlay`, so there was nothing left to
-carry. If you find a reference to it, it is stale.
+**`AppFeature`, the root `Store` and the `AppCommand` channel are all gone.** If you find a
+reference to any of them, it is stale.
 
-What remains of `AppFeature` is three sheet flags. #19 deletes it; the only reason it survives is
-that Quick Actions arrive through `AppDelegate`, which holds the store.
+**`SonicPlayerApp.app` is `static` for exactly one reason:** `AppDelegate` receives Home-screen
+quick actions from UIKit, outside any view, and `@State` cannot be static. Nothing else reads it —
+every view gets the coordinator from the environment. It is also a `static let` and therefore lazy,
+which is what keeps it uncreated under test; `isRunningTests` in that file depends on this.
 
 ### Key patterns
-- `@Reducer` macro with `@ObservableState`
-- `@Dependency` for all external effects (audio, files, artwork) — in reducers. Migrated view
-  models take their clients as **init parameters defaulting to `.live`**; there is no `@Dependency`
-  in a view model
+- View models take their clients as **init parameters defaulting to `.live`**. There is no
+  dependency-injection framework and no `@Dependency` anywhere outside the clients' own TCA bridge
 - `SessionStore` for session persistence. It replaced `@Shared(.fileStorage(...))` in #15 and
   **writes the same JSON to the same path**, because existing installs have a `session.json` — the
   location and shape are a compatibility boundary, not an implementation detail
@@ -137,17 +139,17 @@ that Quick Actions arrive through `AppDelegate`, which holds the store.
   loop is a hand-written `Task.sleep`. Extract the **cadence** as a constant and test that; the
   sleep around it is glue and is deliberately untested (#17)
 - `@AppStorage` for user preferences
-- **`NavigationStack(path:)` over a plain `[URL]`** for push navigation. `StackState`/`StackAction`
-  are gone (#18): each depth is a `CollectionsViewModel` owned by its own screen as `@State`, with
-  its callbacks wired at construction. The depth that raises an event passes its own data out —
-  which is what removed the parent reaching into arbitrary stack depth by element id
+- **`NavigationStack(path:)` over a plain `[URL]`** for push navigation, the path held by
+  `AppViewModel`. `StackState`/`StackAction` are gone (#18): each depth below the root is a
+  `CollectionsViewModel` owned by its own screen as `@State`, with its callbacks wired at
+  construction. The depth that raises an event passes its own data out — which is what removed the
+  parent reaching into arbitrary stack depth by element id
 - Manual `Equatable` conformance where needed (e.g., ignoring artwork cache)
 
 ## Coding Conventions
 
 - **Swift 5, iOS 18.0+, SwiftUI only** (no UIKit views)
-- **TCA patterns**: All state mutations in reducers, all side effects via `Effect`
-- **Naming**: Features as `{Name}Feature.swift` / `{Name}View.swift`; clients as `{Name}Client.swift`
+- **Naming**: features as `{Name}ViewModel.swift` / `{Name}View.swift`; clients as `{Name}Client.swift`
 - **Colors**: Use `ColorPalette` constants (`sonicPrimary`, `sonicTextPrimary`, etc.) - never hardcode hex
 - **Styles**: Reusable button styles and modifiers defined in `Theme.swift`
 - **No magic numbers**: Use constants or theme values for spacing/sizing
@@ -164,11 +166,11 @@ that Quick Actions arrive through `AppDelegate`, which holds the store.
 
 ```
 SonicPlayer/
-  App/           # Entry point, root reducer, root view, quickstart
+  App/           # Entry point, AppViewModel (composition root), AppView, quickstart
   Features/      # Home/, Player/, Files/, Recording/, Settings/
   Clients/       # AudioPlayerClient, AudioRecorderClient, FileManagerClient, ArtworkClient, AudioTrimmerClient
   Models/        # AudioFile, FileSystemItem, PlaybackSpeed
-  Domain/        # QueueMath, PathMatching, UniqueNameResolver, SessionCodec, SessionRestorePolicy, RecordingFilename, PlaybackSession, ScrubClamp, SelectionSet, ImportFilter
+  Domain/        # QueueMath, PathMatching, UniqueNameResolver, SessionCodec, SessionRestorePolicy, RecordingFilename, PlaybackSession, ScrubClamp, SelectionSet, ImportFilter, QuickAction
   Utilities/     # ColorPalette, Theme, WaveformView, EmptyStateView, ShareSheet, etc.
   Resources/     # Assets.xcassets, Localizable.xcstrings, Quickstart.json, Info.plist
 ```
@@ -181,10 +183,9 @@ compiled automatically — no project edit needed.
 
 Tests use **Swift Testing** (`@Suite`, `@Test`, `#expect`) — never XCTest (#27).
 
-**Which style depends on what you are testing** — check the migration table above first.
-
-A migrated feature is a plain object. No `TestStore`, no `withDependencies`, no
-`import ComposableArchitecture` — pass `.test` clients to the initialiser:
+**There is one style, because there is one shape.** Every feature is a plain object — no
+`TestStore`, no `withDependencies`, no `import ComposableArchitecture` anywhere in the target. Pass
+`.test` clients to the initialiser:
 
 ```swift
 @Suite(.serialized)
@@ -206,34 +207,29 @@ exactly as long as the work takes, and a call that never arrives hangs the test 
 it. Note `.test` clients leave every closure without an explicit default **unimplemented** — calling
 one reports a failure, so stub the ones the path under test actually reaches.
 
-A reducer that still exists gets a **non-exhaustive `TestStore`**:
+**Cross-feature behaviour is tested through `AppViewModel`**, which owns the wiring. Build one with
+`.test` children and call the closure the source feature would have called:
 
 ```swift
-@Suite(.serialized)          // see the parallelism note below
-struct FileBrowserTests {
-    @MainActor
-    @Test func tappingAFileEmitsPlay() async {
-        let store = TestStore(initialState: state) { AppFeature() } withDependencies: {
-            $0.fileManager.listItems = { _ in [] }
-        }
-        store.exhaustivity = .off       // assert one thing, don't match every effect
-        await store.send(.filesRoot(.fileTapped(file)))
-        #expect(store.state.commands == [.play(file, [file], .singleFile)])
-    }
-}
+let app = makeApp()
+app.player.currentTrack = audioFile(at: url)
+
+app.filesRoot.onWillRemoveItems([.file(audioFile(at: url))])   // what the browser raises
+
+#expect(app.player.currentTrack == nil)
 ```
 
-`$0.defaultFileStorage = .inMemory` used to be required here and **no longer is** — nothing in
-`AppFeature.State` holds `@Shared` since #15 moved session persistence to `SessionStore`. If you
-see it in an older example, it is dead.
+This is what owning the children buys (#19): under the old shape the same edges lived in
+`AppView.wireViewModels()` and were reachable only by rendering a view.
 
-Never call `SomeFeature().reduce(into:action:)` directly — it is deprecated as of TCA 1.26,
-and it bypasses the store, so effects never run and the assertion covers less than it appears to.
+Anything about `TestStore`, `withDependencies`, `$0.defaultFileStorage` or
+`SomeFeature().reduce(into:action:)` in an older note is **dead** — there are no reducers left.
 
 Three differences from XCTest that bite when writing new tests:
 
 - **Suites run in parallel**, across and within. Any suite touching global mutable state —
-  `UserDefaults` (which `AppFeature.State()` reads), or the shared `AudioPlayerManager` — needs
+  `UserDefaults` (which `SettingsViewModel` and `OnboardingViewModel` read), or the shared
+  `AudioPlayerManager` — needs
   `@Suite(.serialized)`, or must be made genuinely concurrency-safe. A captured `var` written from
   inside a `@Sendable` client closure is a data race; use `Mutex`.
 - **`Testing` does not re-export Foundation.** Add `import Foundation` for `URL`, `Date`, `UUID`.
