@@ -59,7 +59,6 @@ struct AppFeature {
         case importFiles([URL])
         case importTapped
         case dismissImportSheet
-        case openedFromFiles(URL)
 
         // From Home, which is a view model now — these need reducer state, so they stay actions
         case viewAllCollectionsTapped
@@ -71,7 +70,6 @@ struct AppFeature {
         case quickActionRecord
         case quickActionImport
 
-        case playImported(AudioFile)
         case commandsHandled
     }
 
@@ -179,29 +177,6 @@ struct AppFeature {
 
             case .dismissImportSheet:
                 state.isImportSheetPresented = false
-                return .none
-
-            case let .openedFromFiles(url):
-                // Import the file then play it
-                return .run { send in
-                    let accessing = url.startAccessingSecurityScopedResource()
-                    defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-
-                    let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-                    let dest = docs.appendingPathComponent(url.lastPathComponent)
-                    if !FileManager.default.fileExists(atPath: dest.path) {
-                        try? FileManager.default.copyItem(at: url, to: dest)
-                    }
-
-                    await send(.filesRoot(.refreshFiles))
-
-                    if let file = try? await fileManager.getMetadata(dest) {
-                        await send(.playImported(file))
-                    }
-                }
-
-            case let .playImported(file):
-                state.commands.append(.play(file, [file], .singleFile))
                 return .none
 
             // MARK: - Quick Actions

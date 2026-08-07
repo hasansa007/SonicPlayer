@@ -48,6 +48,18 @@ final class PlayerViewModel {
     var isLoadingTrack = false
     var isExpanded = false
 
+    /// Why a file handed over by another app could not be played. Presented with the app's
+    /// existing "Action Failed" alert rather than a new surface. Was a `try?` that dropped the
+    /// reason on the floor and left the user on Home with no explanation (#33).
+    var openError: String?
+
+    /// Set the moment an open-from-Files arrives, and never cleared: for the life of this launch
+    /// the user has named the track they want, and a restored session must not override it.
+    ///
+    /// A flag rather than cancelling the restore task, because `.onOpenURL` and `.onAppear` have
+    /// no guaranteed order — cancelling only covers the case where the restore started first.
+    private var didOpenExplicitly = false
+
     // MARK: - Derived
 
     var progress: Double {
@@ -362,9 +374,52 @@ final class PlayerViewModel {
         }
     }
 
+    // MARK: - Open in
+
+    /// Import a file handed over by another app, then play **what was actually written**.
+    ///
+    /// Lives here rather than in the root reducer (where it was) because it is playback
+    /// orchestration and because the session-restore it has to outrank is right below it. Three
+    /// things differ from the version it replaces, all of them #33:
+    ///
+    /// - the track is resolved from `OpenInImport`'s return value, not from a path computed
+    ///   before the copy ran
+    /// - the copy and the metadata read can fail, and the failure reaches the user
+    /// - it claims priority over `restoreSession` synchronously, before any `await`, so the
+    ///   ordering holds whichever of `.onOpenURL` / `.onAppear` fires first
+    ///
+    /// `onImported` fires once the file is on disk and before playback starts, so the browser and
+    /// the recents list refresh in the same order the reducer's `.refreshFiles` did.
+    func openFromFiles(_ url: URL, onImported: @escaping @MainActor () -> Void = {}) {
+        didOpenExplicitly = true
+        Task { [weak self, fileManager] in
+            do {
+                let imported = try OpenInImport.run(url: url, into: fileManager.documentsDirectory())
+                onImported()
+                let file = try await fileManager.getMetadata(imported)
+                self?.loadTrack(file, queue: [file], source: .singleFile)
+            } catch {
+                self?.openError = error.localizedDescription
+            }
+        }
+    }
+
     // MARK: - Session
 
     func restoreSession() {
+        // Nothing was saved. This has to be checked here rather than relying on the guard below,
+        // because `URL(fileURLWithPath: "")` resolves to the process's *current directory* — not
+        // to nothing. That directory exists and `resourceValues` succeeds on it, so the guard
+        // passes and a folder gets restored as a track: on iOS it surfaced as a mini player
+        // titled `/` (#33).
+        guard !session.isEmpty else { return }
+
+        // An explicit open outranks a restored session. Launching the app BY opening a file runs
+        // both this and `openFromFiles` against the same `currentTrack` and the same AVPlayer,
+        // and whichever finished last won — which is why a repeat open looked like it did
+        // nothing (#33).
+        guard !didOpenExplicitly else { return }
+
         let saved = session
         Task { [weak self, fileManager] in
             let currentURL = URL(fileURLWithPath: saved.fileURL)
@@ -386,9 +441,15 @@ final class PlayerViewModel {
             }
             let index = queueFiles.firstIndex(of: currentFile) ?? 0
 
-            await MainActor.run {
-                self?.sessionLoaded(track: currentFile, queue: queueFiles, index: index)
+            // Re-checked after the awaits above: an open can arrive while the metadata is
+            // loading, and `restoreWithRetry` drives the shared player, so landing late would
+            // replace the opened track *and* pause it.
+            let claimed = await MainActor.run { [weak self] in
+                guard let self, !self.didOpenExplicitly else { return false }
+                self.sessionLoaded(track: currentFile, queue: queueFiles, index: index)
+                return true
             }
+            guard claimed else { return }
             await self?.restoreWithRetry(track: currentFile, time: saved.currentTime)
         }
     }

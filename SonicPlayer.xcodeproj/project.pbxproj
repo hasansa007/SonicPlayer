@@ -12,8 +12,6 @@
 		8629C2A92EEB94DF0052A74B /* AudioMetadataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2A52EEB94DF0052A74B /* AudioMetadataService.swift */; };
 		8629C2AB2EEBB9710052A74B /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2AA2EEBB9710052A74B /* Theme.swift */; };
 		8629C2AF2EEBBE9B0052A74B /* WaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2AE2EEBBE9B0052A74B /* WaveformView.swift */; };
-		AB000020000000000000001 /* RecordingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000021000000000000001 /* RecordingViewModel.swift */; };
-		AB000022000000000000001 /* EditRecordingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000023000000000000001 /* EditRecordingViewModel.swift */; };
 		86662FE52EF7E7D7000577F1 /* EditRecordingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86662FE02EF7E7D7000577F1 /* EditRecordingView.swift */; };
 		86662FE62EF7E7D7000577F1 /* RecordingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86662FE22EF7E7D7000577F1 /* RecordingView.swift */; };
 		86662FEC2EF7EAC1000577F1 /* AudioRecorderClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86662FEA2EF7EAC1000577F1 /* AudioRecorderClient.swift */; };
@@ -50,6 +48,7 @@
 		A6000009000000000000001 /* SwipeToDelete.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6000010000000000000001 /* SwipeToDelete.swift */; };
 		A7000009000000000000001 /* MediaFileRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7000010000000000000001 /* MediaFileRowView.swift */; };
 		A8000009000000000000001 /* InAppCollectionPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8000010000000000000001 /* InAppCollectionPicker.swift */; };
+		A8000099000000000000001 /* OpenInImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8000098000000000000001 /* OpenInImport.swift */; };
 		A9000001000000000000001 /* UniqueNameResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000010000000000000001 /* UniqueNameResolver.swift */; };
 		A9000002000000000000001 /* PathMatching.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000011000000000000001 /* PathMatching.swift */; };
 		A9000003000000000000001 /* QueueMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000012000000000000001 /* QueueMath.swift */; };
@@ -65,6 +64,8 @@
 		AB000001000000000000001 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000010000000000000001 /* SessionStore.swift */; };
 		AB000002000000000000001 /* PlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000011000000000000001 /* PlayerViewModel.swift */; };
 		AB000003000000000000001 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000012000000000000001 /* HomeViewModel.swift */; };
+		AB000020000000000000001 /* RecordingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000021000000000000001 /* RecordingViewModel.swift */; };
+		AB000022000000000000001 /* EditRecordingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000023000000000000001 /* EditRecordingViewModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -84,8 +85,6 @@
 		8629C2AA2EEBB9710052A74B /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		8629C2AE2EEBBE9B0052A74B /* WaveformView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaveformView.swift; sourceTree = "<group>"; };
 		86662FE02EF7E7D7000577F1 /* EditRecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditRecordingView.swift; sourceTree = "<group>"; xcLanguageSpecificationIdentifier = xcode.lang.plist; };
-		AB000021000000000000001 /* RecordingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingViewModel.swift; sourceTree = "<group>"; };
-		AB000023000000000000001 /* EditRecordingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditRecordingViewModel.swift; sourceTree = "<group>"; };
 		86662FE22EF7E7D7000577F1 /* RecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingView.swift; sourceTree = "<group>"; };
 		86662FEA2EF7EAC1000577F1 /* AudioRecorderClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorderClient.swift; sourceTree = "<group>"; };
 		86662FEB2EF7EAC1000577F1 /* AudioTrimmerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioTrimmerClient.swift; sourceTree = "<group>"; };
@@ -124,6 +123,7 @@
 		A6000010000000000000001 /* SwipeToDelete.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeToDelete.swift; sourceTree = "<group>"; };
 		A7000010000000000000001 /* MediaFileRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFileRowView.swift; sourceTree = "<group>"; };
 		A8000010000000000000001 /* InAppCollectionPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InAppCollectionPicker.swift; sourceTree = "<group>"; };
+		A8000098000000000000001 /* OpenInImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenInImport.swift; sourceTree = "<group>"; };
 		A9000010000000000000001 /* UniqueNameResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UniqueNameResolver.swift; sourceTree = "<group>"; };
 		A9000011000000000000001 /* PathMatching.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathMatching.swift; sourceTree = "<group>"; };
 		A9000012000000000000001 /* QueueMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueMath.swift; sourceTree = "<group>"; };
@@ -139,6 +139,8 @@
 		AB000010000000000000001 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		AB000011000000000000001 /* PlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViewModel.swift; sourceTree = "<group>"; };
 		AB000012000000000000001 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
+		AB000021000000000000001 /* RecordingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingViewModel.swift; sourceTree = "<group>"; };
+		AB000023000000000000001 /* EditRecordingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditRecordingViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -306,6 +308,7 @@
 			children = (
 				A7000010000000000000001 /* MediaFileRowView.swift */,
 				A8000010000000000000001 /* InAppCollectionPicker.swift */,
+				A8000098000000000000001 /* OpenInImport.swift */,
 				86A1B3012F1B4A0100A1BEEF /* FileItemRow.swift */,
 				869078B72EECC1D7005620F9 /* FileRowFeature.swift */,
 				869078B82EECC1D7005620F9 /* CollectionsFeature.swift */,
@@ -481,6 +484,7 @@
 				A1000010000000000000002 /* MiniPlayerView.swift in Sources */,
 				A7000009000000000000001 /* MediaFileRowView.swift in Sources */,
 				A8000009000000000000001 /* InAppCollectionPicker.swift in Sources */,
+				A8000099000000000000001 /* OpenInImport.swift in Sources */,
 				86A1B3002F1B4A0100A1BEEF /* FileItemRow.swift in Sources */,
 				869078C22EECC1D7005620F9 /* CollectionsFeature.swift in Sources */,
 				A2000001000000000000001 /* CollectionsView.swift in Sources */,

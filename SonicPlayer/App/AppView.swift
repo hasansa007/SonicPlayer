@@ -134,7 +134,20 @@ struct AppView: View {
             store.send(.commandsHandled)
         }
         .onOpenURL { url in
-            store.send(.openedFromFiles(url))
+            // Straight to the player rather than through the store: it owns playback, and it is
+            // the only place that can make the import outrank the session restore that runs
+            // alongside it on a launch started BY this open (#33).
+            player.openFromFiles(url) {
+                store.send(.filesRoot(.refreshFiles))
+            }
+        }
+        .alert("Action Failed", isPresented: Binding(
+            get: { player.openError != nil },
+            set: { if !$0 { player.openError = nil } }
+        )) {
+            Button("OK", role: .cancel) { player.openError = nil }
+        } message: {
+            if let error = player.openError { Text(error) }
         }
         .onAppear {
             wireViewModels()
