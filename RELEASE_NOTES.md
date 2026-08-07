@@ -14,6 +14,8 @@ refactors, dependency bumps and test work out.
 - Select several files at once in a collection, then move or delete them in one go.
 - The Home screen now shows your three most recent recordings rather than ten, so it stays scannable.
 - Fixed: deleting or moving the file you were listening to left it playing. Playback now stops.
+- Fixed: opening an audio file from the Files app did not always start playing it — most often when
+  you had opened that file before. It now plays every time, and tells you if it cannot.
 
 ## 2.2.0
 
