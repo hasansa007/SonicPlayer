@@ -33,14 +33,7 @@ struct CollectionsFeature {
         var documentsDirectoryURL: URL?
 
         var filteredItems: [FileSystemItem] {
-            let sortedItems: [FileSystemItem] = items
-            
-            if searchText.isEmpty {
-                return sortedItems
-            }
-            return sortedItems.filter { item in
-                item.name.localizedCaseInsensitiveContains(searchText)
-            }
+            SelectionSet.matching(items, searchText: searchText)
         }
         
         var filteredCollectionCards: IdentifiedArrayOf<CollectionItemCardFeature.State> {
@@ -302,25 +295,17 @@ struct CollectionsFeature {
                 return .none
                 
             case let .toggleSelection(item):
-                if state.selectedItems.contains(item) {
-                    state.selectedItems.remove(item)
-                    if case let .folder(folder) = item {
-                        state.collectionCards[id: folder.id]?.isSelected = false
-                    } else if case let .file(file) = item {
-                        state.fileRows[id: file.id]?.isSelected = false
-                    }
-                } else {
-                    state.selectedItems.insert(item)
-                    if case let .folder(folder) = item {
-                        state.collectionCards[id: folder.id]?.isSelected = true
-                    } else if case let .file(file) = item {
-                        state.fileRows[id: file.id]?.isSelected = true
-                    }
+                state.selectedItems = SelectionSet.toggling(item, in: state.selectedItems)
+                let isSelected = state.selectedItems.contains(item)
+                if case let .folder(folder) = item {
+                    state.collectionCards[id: folder.id]?.isSelected = isSelected
+                } else if case let .file(file) = item {
+                    state.fileRows[id: file.id]?.isSelected = isSelected
                 }
                 return .none
-                
+
             case .selectAll:
-                state.selectedItems = Set(state.filteredItems)
+                state.selectedItems = SelectionSet.selectingAll(state.items, searchText: state.searchText)
                 for item in state.filteredItems {
                     if case let .folder(folder) = item {
                         state.collectionCards[id: folder.id]?.isSelected = true

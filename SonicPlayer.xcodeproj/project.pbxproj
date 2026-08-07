@@ -58,6 +58,8 @@
 		A9000005000000000000001 /* SessionCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000014000000000000001 /* SessionCodec.swift */; };
 		A9000006000000000000001 /* SessionRestorePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000015000000000000001 /* SessionRestorePolicy.swift */; };
 		A9000007000000000000001 /* RecordingFilename.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000016000000000000001 /* RecordingFilename.swift */; };
+		A9000008000000000000001 /* ScrubClamp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000017000000000000001 /* ScrubClamp.swift */; };
+		A9000009000000000000001 /* SelectionSet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000018000000000000001 /* SelectionSet.swift */; };
 		AA000001000000000000001 /* SettingsDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000010000000000000001 /* SettingsDefaults.swift */; };
 		AA000002000000000000001 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000011000000000000001 /* SettingsViewModel.swift */; };
 		AA000003000000000000001 /* OnboardingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000012000000000000001 /* OnboardingViewModel.swift */; };
@@ -128,6 +130,8 @@
 		A9000014000000000000001 /* SessionCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCodec.swift; sourceTree = "<group>"; };
 		A9000015000000000000001 /* SessionRestorePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRestorePolicy.swift; sourceTree = "<group>"; };
 		A9000016000000000000001 /* RecordingFilename.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingFilename.swift; sourceTree = "<group>"; };
+		A9000017000000000000001 /* ScrubClamp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrubClamp.swift; sourceTree = "<group>"; };
+		A9000018000000000000001 /* SelectionSet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionSet.swift; sourceTree = "<group>"; };
 		AA000010000000000000001 /* SettingsDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDefaults.swift; sourceTree = "<group>"; };
 		AA000011000000000000001 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
 		AA000012000000000000001 /* OnboardingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingViewModel.swift; sourceTree = "<group>"; };
@@ -328,6 +332,8 @@
 				A9000013000000000000001 /* PlaybackSession.swift */,
 				A9000012000000000000001 /* QueueMath.swift */,
 				A9000011000000000000001 /* PathMatching.swift */,
+				A9000017000000000000001 /* ScrubClamp.swift */,
+				A9000018000000000000001 /* SelectionSet.swift */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -506,6 +512,8 @@
 				A9000004000000000000001 /* PlaybackSession.swift in Sources */,
 				A9000003000000000000001 /* QueueMath.swift in Sources */,
 				A9000002000000000000001 /* PathMatching.swift in Sources */,
+				A9000008000000000000001 /* ScrubClamp.swift in Sources */,
+				A9000009000000000000001 /* SelectionSet.swift in Sources */,
 				86662FEC2EF7EAC1000577F1 /* AudioRecorderClient.swift in Sources */,
 				86662FED2EF7EAC1000577F1 /* AudioTrimmerClient.swift in Sources */,
 				8690789B2EEC9F8D005620F9 /* ArtworkClient.swift in Sources */,
