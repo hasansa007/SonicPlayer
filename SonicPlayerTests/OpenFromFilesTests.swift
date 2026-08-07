@@ -173,10 +173,10 @@ struct OpenFromFilesTests {
         }
     }
 
-    /// `.test` clients throughout. Every closure is stubbed rather than only the obvious ones:
-    /// `AudioPlayerClient.test` is `Self()`, and `@DependencyClient` replaces even the inline
-    /// defaults with unimplemented versions, so `setRemoteHandlers` / `duration` / `timeUpdates`
-    /// report failures the moment a track finishes loading.
+    /// `.test` clients throughout. Every closure is stubbed rather than only the obvious ones,
+    /// because `AudioPlayerClient.test` reports on *every* unstubbed call — including
+    /// `setRemoteHandlers` / `duration` / `timeUpdates`, which a track finishing its load reaches
+    /// and which this suite did not originally stub. See `TestClients.swift`.
     ///
     /// `prepare`/`seek`/`pause`/`stop` belong to the session restore that must NOT run. They are
     /// stubbed deliberately so a regression there shows up as a failed expectation about which

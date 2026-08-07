@@ -35,7 +35,6 @@
 		A1000030000000000000002 /* FileSystemItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000030000000000000003 /* FileSystemItem.swift */; };
 		A1000031000000000000001 /* ColorPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000032000000000000001 /* ColorPalette.swift */; };
 		A1000033000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000034000000000000001 /* Assets.xcassets */; };
-		A1000035000000000000001 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A1000036000000000000001 /* ComposableArchitecture */; };
 		A1000097000000000000001 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000096000000000000001 /* AppViewModel.swift */; };
 		A2000001000000000000001 /* CollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000002000000000000001 /* CollectionsView.swift */; };
 		A3000009000000000000001 /* CollectionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000010000000000000001 /* CollectionsSection.swift */; };
@@ -161,7 +160,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A1000035000000000000001 /* ComposableArchitecture in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -390,7 +388,6 @@
 			);
 			name = SonicPlayer;
 			packageProductDependencies = (
-				A1000036000000000000001 /* ComposableArchitecture */,
 			);
 			productName = SonicPlayer;
 			productReference = A1000037000000000000001 /* SonicPlayer.app */;
@@ -433,7 +430,6 @@
 			);
 			mainGroup = A1000040000000000000001;
 			packageReferences = (
-				A1000058000000000000001 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */,
 			);
 			productRefGroup = A1000042000000000000001 /* Products */;
 			projectDirPath = "";
@@ -814,26 +810,7 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		A1000058000000000000001 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/pointfreeco/swift-composable-architecture";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.26.0;
-			};
-			traits = (
-			);
-		};
-/* End XCRemoteSwiftPackageReference section */
 
-/* Begin XCSwiftPackageProductDependency section */
-		A1000036000000000000001 /* ComposableArchitecture */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A1000058000000000000001 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
-			productName = ComposableArchitecture;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A1000056000000000000001 /* Project object */;
 }

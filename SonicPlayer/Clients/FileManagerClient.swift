@@ -1,9 +1,7 @@
 import AVFoundation
-import ComposableArchitecture
 import CryptoKit
 import Foundation
 
-@DependencyClient
 struct FileManagerClient {
     var listItems: @Sendable (URL?) async throws -> [FileSystemItem]
     var createCollection: @Sendable (String, URL?) async throws -> Void
@@ -224,41 +222,5 @@ extension FileManagerClient {
             documentsDirectory: { documentsDirectory }
         )
     }()
-
-    static let test = Self(
-        listItems: { _ in [] },
-        createCollection: { _, _ in },
-        createCollectionForImport: { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] },
-        deleteItem: { _ in },
-        moveItem: { _, _ in },
-        renameItem: { _, _ in },
-        importFile: { _, _ in },
-        getMetadata: { url in
-            AudioFile(
-                url: url,
-                title: "Test",
-                duration: 0,
-                fileSize: 0,
-                format: .mp3,
-                creationDate: Date()
-            )
-        },
-        documentsDirectory: { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
-    )
 }
 
-// MARK: - TCA bridge
-//
-// Kept separate so #20 can delete this whole extension in one cut, leaving `live`
-// and `test` — which reference no TCA — exactly as they are.
-extension FileManagerClient: DependencyKey {
-    static var liveValue: FileManagerClient { .live }
-    static var testValue: FileManagerClient { .test }
-}
-
-extension DependencyValues {
-    var fileManager: FileManagerClient {
-        get { self[FileManagerClient.self] }
-        set { self[FileManagerClient.self] = newValue }
-    }
-}

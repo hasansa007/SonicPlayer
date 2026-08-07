@@ -1,8 +1,6 @@
 import AVFoundation
-import ComposableArchitecture
 import Foundation
 
-@DependencyClient
 struct AudioTrimmerClient {
     var trimAudio: @Sendable (URL, TimeInterval, TimeInterval) async throws -> URL
     var deleteAudioRange: @Sendable (URL, TimeInterval, TimeInterval) async throws -> URL
@@ -137,27 +135,8 @@ extension AudioTrimmerClient {
         )
     }()
 
-    static let test = Self(
-        trimAudio: { url, _, _ in url },
-        deleteAudioRange: { url, _, _ in url }
-    )
 }
 
-// MARK: - TCA bridge
-//
-// Kept separate so #20 can delete this whole extension in one cut, leaving `live`
-// and `test` — which reference no TCA — exactly as they are.
-extension AudioTrimmerClient: DependencyKey {
-    static var liveValue: AudioTrimmerClient { .live }
-    static var testValue: AudioTrimmerClient { .test }
-}
-
-extension DependencyValues {
-    var audioTrimmer: AudioTrimmerClient {
-        get { self[AudioTrimmerClient.self] }
-        set { self[AudioTrimmerClient.self] = newValue }
-    }
-}
 
 enum AudioTrimmerError: Error, LocalizedError {
     case invalidTimeRange

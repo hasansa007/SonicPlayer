@@ -1,8 +1,6 @@
 import AVFoundation
-import ComposableArchitecture
 import Foundation
 
-@DependencyClient
 struct AudioRecorderClient {
     let checkPermissions: @Sendable () async -> Bool
     let requestPermissions: @Sendable () async -> Bool
@@ -58,32 +56,8 @@ extension AudioRecorderClient {
         )
     }()
 
-    static let test = Self(
-        checkPermissions: { true },
-        requestPermissions: { true },
-        startRecording: { _ in },
-        stopRecording: { nil },
-        currentTime: { 0 },
-        peakPower: { 0 },
-        isRecording: { false }
-    )
 }
 
-// MARK: - TCA bridge
-//
-// Kept separate so #20 can delete this whole extension in one cut, leaving `live`
-// and `test` — which reference no TCA — exactly as they are.
-extension AudioRecorderClient: DependencyKey {
-    static var liveValue: AudioRecorderClient { .live }
-    static var testValue: AudioRecorderClient { .test }
-}
-
-extension DependencyValues {
-    var audioRecorder: AudioRecorderClient {
-        get { self[AudioRecorderClient.self] }
-        set { self[AudioRecorderClient.self] = newValue }
-    }
-}
 
 // MARK: - Actor for Thread Safety
 

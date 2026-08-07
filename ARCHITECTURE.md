@@ -136,8 +136,14 @@ URL only exists at the call site.
 ## History
 
 The app was built on **The Composable Architecture** and migrated off it feature by feature under
-epic #5. TCA still ships as a dependency — the five clients use its `@DependencyClient` macro — and
-slice 11 (#20) removes it, taking 14 packages with it.
+epic #5, finishing at slice 11 (#20). Removing it took **14 packages** with it and the project now
+has none.
+
+The clients kept their shape through all of it — a struct of closures was always substitutable by
+assignment, and `@DependencyClient` was only ever generating the memberwise init and the
+unimplemented test defaults. The unimplemented behaviour was worth keeping, so it is hand-written
+in `SonicPlayerTests/TestClients.swift`, which is also where `.test` now lives: TCA's `DependencyKey`
+had required a `testValue` visible to the app target, and nothing else did.
 
 Two things that migration proved, worth keeping:
 

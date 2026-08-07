@@ -9,9 +9,10 @@ import Testing
 /// machinery. These tests are the demonstration: no `TestStore`, no `withDependencies`, no
 /// `@Dependency` — the clients are called directly as the plain structs of closures they are.
 ///
-/// Deliberately no `import ComposableArchitecture` in this file. If a future change makes one
-/// necessary here, the seam has regressed. (SwiftUI is imported only for `Color`, which the
-/// artwork client's palette is expressed in — unrelated to the dependency machinery.)
+/// The package is gone entirely as of #20, so "no TCA in this file" is now true everywhere and
+/// not worth restating. What this suite still pins is the *shape*: a client is a struct of
+/// closures, substitutable by assignment. (SwiftUI is imported only for `Color`, which the artwork
+/// client's palette is expressed in.)
 @Suite(.serialized)
 struct ClientSubstitutionTests {
 
