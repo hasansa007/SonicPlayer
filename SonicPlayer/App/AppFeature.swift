@@ -73,8 +73,6 @@ struct AppFeature {
         case commandsHandled
     }
 
-    @Dependency(\.fileManager) var fileManager
-
     var body: some ReducerOf<Self> {
         Scope(state: \.filesRoot, action: \.filesRoot) {
             CollectionsFeature()
