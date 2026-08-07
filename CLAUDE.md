@@ -31,6 +31,49 @@ Requires Xcode 27 — `xcode-select -p` must point at the Xcode app, not Command
 
 No CocoaPods or Carthage. All dependencies managed via Swift Package Manager.
 
+## Architecture — and what it deliberately is not
+
+```
+View (SwiftUI)  ->  ViewModel (@Observable)  ->  Client (struct of closures)  ->  AVFoundation / FileManager
+
+Domain/   pure decision logic, Foundation only, no framework and no TCA
+Models/   plain data types
+```
+
+There is **no Repository, no DataSource, no UseCase and no DTO layer**, and that is a decision
+rather than an omission. Those layers solve problems this app does not have:
+
+| Layer | Why it is absent |
+|---|---|
+| Repository / DataSource | They hide *which source answered* — cache vs network. This app has one source: the filesystem. The clients already are that abstraction, substitutable by plain assignment. |
+| DTO | Wire formats drift from domain models. There is no wire. The only serialised type is `PlaybackSession`, whose JSON shape is pinned by test because it *is* the on-disk contract. |
+| UseCase | They hold orchestration reusable across UIs. There is one UI, and the business rules are pure functions in `Domain/` — wrapping each in a protocol and a class to call one function is ceremony. |
+
+**Depth is decided per feature, not for the app.** A layer is added when a specific condition
+makes it necessary, never because a feature feels important:
+
+| Layer | Add it when |
+|---|---|
+| `Domain/` type | there is a decision statable without UI or I/O — almost always |
+| Client | it touches a system framework or the filesystem |
+| Repository | **two sources answer the same question** and something must choose between them |
+| DTO | an external format exists **that you do not control** |
+| UseCase | orchestration spans 2+ clients **and** is called from 2+ places, or must be tested without a view model |
+
+By that test, every feature today is ViewModel + clients + `Domain/`: one source, no wire format.
+The StudyHub epics (#7 auth, #8 upload, #9 listening) are the ones that qualify for the full stack —
+Keychain and remote both answer "who is signed in", the API JSON is not ours, and a remote course
+list with a local cache is the repository case exactly.
+
+Do not retrofit those layers onto the offline features to make the codebase look uniform. Uniformity
+is not the goal; each layer paying for itself is.
+
+Known cost of the current shape: orchestration lives in view models. `PlayerViewModel.restoreSession`
+is real business logic in the presentation layer. If a view model keeps growing, extract the
+orchestration into `Domain/` rather than reaching for the full layered stack.
+
+Note also that this codebase is **async/await throughout**, not Combine.
+
 ## Architecture
 
 **TCA (The Composable Architecture)** with strict unidirectional data flow:
@@ -49,9 +92,9 @@ Migration status per #5. Reducers still compose into `AppFeature`; view models a
 
 | Feature | Type | Status | Purpose |
 |---------|------|--------|---------|
-| Home | `HomeFeature` | reducer | Folder suggestions, recently added |
+| Home | `HomeViewModel` | **migrated** (#16) | Folder suggestions, recently added |
 | Files | `CollectionsFeature` | reducer | File/folder browser with navigation stack |
-| Player | `PlayerFeature` | reducer | Playback engine, queue, session persistence |
+| Player | `PlayerViewModel` | **migrated** (#15) | Playback engine, queue, session persistence |
 | Recording | `RecordingFeature` | reducer | Audio capture and trimming |
 | Settings | `SettingsViewModel` | **migrated** (#13) | Preferences via UserDefaults |
 | Onboarding | `OnboardingViewModel` | **migrated** (#14) | First-launch carousel |
@@ -60,10 +103,21 @@ Cross-feature communication out of a migrated feature travels through a **closur
 composition root**, never by reading another feature's state — the shape `willRemoveItems` uses in
 `CollectionsFeature` and that #19 generalises. See `AppView.wireViewModels()`.
 
+**`AppFeature.State.commands` runs the other direction and is temporary.** A few reducer cases
+still need to reach the player or Home — playing a tapped file needs the queue, which is computed
+from `filesRoot.items` and exists only in the store. A reducer cannot call a reference type, so it
+appends an `AppCommand` and `AppView` drains the array in `.onChange`, then sends
+`.commandsHandled`. #19 turns `AppFeature` into a coordinator that holds the view models directly
+and deletes the channel — do not build on it.
+
 ### Key patterns
 - `@Reducer` macro with `@ObservableState`
-- `@Dependency` for all external effects (audio, files, artwork)
-- `@Shared(.fileStorage(...))` for session persistence
+- `@Dependency` for all external effects (audio, files, artwork) — in reducers. Migrated view
+  models take their clients as **init parameters defaulting to `.live`**; there is no `@Dependency`
+  in a view model
+- `SessionStore` for session persistence. It replaced `@Shared(.fileStorage(...))` in #15 and
+  **writes the same JSON to the same path**, because existing installs have a `session.json` — the
+  location and shape are a compatibility boundary, not an implementation detail
 - `@AppStorage` for user preferences
 - `StackState`/`StackAction` for push navigation
 - Manual `Equatable` conformance where needed (e.g., ignoring artwork cache)
@@ -114,7 +168,6 @@ struct RecordingTests {
     @MainActor
     @Test func savingDismissesTheSheet() async {
         let store = TestStore(initialState: state) { AppFeature() } withDependencies: {
-            $0.defaultFileStorage = .inMemory   // PlayerFeature.State holds @Shared(.fileStorage)
             $0.fileManager.listItems = { _ in [] }
         }
         store.exhaustivity = .off       // assert one thing, don't match every effect
@@ -123,6 +176,10 @@ struct RecordingTests {
     }
 }
 ```
+
+`$0.defaultFileStorage = .inMemory` used to be required here and **no longer is** — nothing in
+`AppFeature.State` holds `@Shared` since #15 moved session persistence to `SessionStore`. If you
+see it in an older example, it is dead.
 
 Never call `SomeFeature().reduce(into:action:)` directly — it is deprecated as of TCA 1.26,
 and it bypasses the store, so effects never run and the assertion covers less than it appears to.

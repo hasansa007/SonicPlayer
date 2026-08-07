@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		8629C23C2EEA25340052A74B /* HomeFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2382EEA25340052A74B /* HomeFeature.swift */; };
 		8629C2A72EEB94DF0052A74B /* ArtworkCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2A42EEB94DF0052A74B /* ArtworkCache.swift */; };
 		8629C2A82EEB94DF0052A74B /* ColorExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2A62EEB94DF0052A74B /* ColorExtractor.swift */; };
 		8629C2A92EEB94DF0052A74B /* AudioMetadataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2A52EEB94DF0052A74B /* AudioMetadataService.swift */; };
@@ -29,7 +28,6 @@
 		A1000001000000000000001 /* SonicPlayerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000001 /* SonicPlayerApp.swift */; };
 		A1000003000000000000001 /* AppFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000004000000000000001 /* AppFeature.swift */; };
 		A1000005000000000000001 /* AppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000006000000000000001 /* AppView.swift */; };
-		A1000007000000000000001 /* PlayerFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000008000000000000001 /* PlayerFeature.swift */; };
 		A1000009000000000000001 /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010000000000000001 /* PlayerView.swift */; };
 		A1000010000000000000002 /* MiniPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010000000000000003 /* MiniPlayerView.swift */; };
 		A1000017000000000000001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000018000000000000001 /* SettingsView.swift */; };
@@ -61,6 +59,9 @@
 		AA000001000000000000001 /* SettingsDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000010000000000000001 /* SettingsDefaults.swift */; };
 		AA000002000000000000001 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000011000000000000001 /* SettingsViewModel.swift */; };
 		AA000003000000000000001 /* OnboardingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000012000000000000001 /* OnboardingViewModel.swift */; };
+		AB000001000000000000001 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000010000000000000001 /* SessionStore.swift */; };
+		AB000002000000000000001 /* PlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000011000000000000001 /* PlayerViewModel.swift */; };
+		AB000003000000000000001 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000012000000000000001 /* HomeViewModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -74,7 +75,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		8629C2382EEA25340052A74B /* HomeFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeFeature.swift; sourceTree = "<group>"; };
 		8629C2A42EEB94DF0052A74B /* ArtworkCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkCache.swift; sourceTree = "<group>"; };
 		8629C2A52EEB94DF0052A74B /* AudioMetadataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioMetadataService.swift; sourceTree = "<group>"; };
 		8629C2A62EEB94DF0052A74B /* ColorExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorExtractor.swift; sourceTree = "<group>"; };
@@ -97,7 +97,6 @@
 		A1000002000000000000001 /* SonicPlayerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonicPlayerApp.swift; sourceTree = "<group>"; };
 		A1000004000000000000001 /* AppFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFeature.swift; sourceTree = "<group>"; };
 		A1000006000000000000001 /* AppView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppView.swift; sourceTree = "<group>"; };
-		A1000008000000000000001 /* PlayerFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerFeature.swift; sourceTree = "<group>"; };
 		A1000010000000000000001 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		A1000010000000000000003 /* MiniPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerView.swift; sourceTree = "<group>"; };
 		A1000018000000000000001 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -131,6 +130,9 @@
 		AA000010000000000000001 /* SettingsDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDefaults.swift; sourceTree = "<group>"; };
 		AA000011000000000000001 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
 		AA000012000000000000001 /* OnboardingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingViewModel.swift; sourceTree = "<group>"; };
+		AB000010000000000000001 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
+		AB000011000000000000001 /* PlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViewModel.swift; sourceTree = "<group>"; };
+		AB000012000000000000001 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -159,7 +161,7 @@
 		8629C23A2EEA25340052A74B /* Home */ = {
 			isa = PBXGroup;
 			children = (
-				8629C2382EEA25340052A74B /* HomeFeature.swift */,
+				AB000012000000000000001 /* HomeViewModel.swift */,
 			);
 			path = Home;
 			sourceTree = "<group>";
@@ -285,7 +287,7 @@
 		A1000049000000000000001 /* Player */ = {
 			isa = PBXGroup;
 			children = (
-				A1000008000000000000001 /* PlayerFeature.swift */,
+				AB000011000000000000001 /* PlayerViewModel.swift */,
 				A1000010000000000000001 /* PlayerView.swift */,
 				A1000010000000000000003 /* MiniPlayerView.swift */,
 			);
@@ -322,6 +324,7 @@
 			isa = PBXGroup;
 			children = (
 				A9000010000000000000001 /* UniqueNameResolver.swift */,
+				AB000010000000000000001 /* SessionStore.swift */,
 				A9000016000000000000001 /* RecordingFilename.swift */,
 				A9000015000000000000001 /* SessionRestorePolicy.swift */,
 				A9000014000000000000001 /* SessionCodec.swift */,
@@ -465,7 +468,6 @@
 				A4000009000000000000002 /* OnboardingView.swift in Sources */,
 				A3000009000000000000001 /* CollectionsSection.swift in Sources */,
 				A5000001000000000000001 /* ScreenshotMode.swift in Sources */,
-				A1000007000000000000001 /* PlayerFeature.swift in Sources */,
 				A1000009000000000000001 /* PlayerView.swift in Sources */,
 				A1000010000000000000002 /* MiniPlayerView.swift in Sources */,
 				A7000009000000000000001 /* MediaFileRowView.swift in Sources */,
@@ -491,11 +493,13 @@
 				86662FE42EF7E7D7000577F1 /* RecordingFeature.swift in Sources */,
 				86662FE52EF7E7D7000577F1 /* EditRecordingView.swift in Sources */,
 				86662FE62EF7E7D7000577F1 /* RecordingView.swift in Sources */,
-				8629C23C2EEA25340052A74B /* HomeFeature.swift in Sources */,
 				A1000027000000000000001 /* AudioFile.swift in Sources */,
 				A1000029000000000000001 /* PlaybackSpeed.swift in Sources */,
 				A1000030000000000000002 /* FileSystemItem.swift in Sources */,
 				A1000031000000000000001 /* ColorPalette.swift in Sources */,
+				AB000003000000000000001 /* HomeViewModel.swift in Sources */,
+				AB000002000000000000001 /* PlayerViewModel.swift in Sources */,
+				AB000001000000000000001 /* SessionStore.swift in Sources */,
 				AA000003000000000000001 /* OnboardingViewModel.swift in Sources */,
 				AA000002000000000000001 /* SettingsViewModel.swift in Sources */,
 				AA000001000000000000001 /* SettingsDefaults.swift in Sources */,

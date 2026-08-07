@@ -198,7 +198,6 @@ enum ScreenshotDemoData {
 
         case .homeWithMiniPlayer:
             populateHome(&state)
-            populateMiniPlayer(&state)
 
         case .collections:
             populateHome(&state)
@@ -206,7 +205,6 @@ enum ScreenshotDemoData {
 
         case .player:
             populateHome(&state)
-            populateFullPlayer(&state)
 
         case .recording, .editRecording:
             // Recording/edit states are handled via sheets after launch
@@ -219,8 +217,6 @@ enum ScreenshotDemoData {
     // MARK: - State Population
 
     private static func populateHome(_ state: inout AppFeature.State) {
-        state.home.recentFiles = recentFiles
-
         // Build filesystem items from collections + recent files
         let folderItems: [FileSystemItem] = collections.map { .folder($0) }
         let fileItems: [FileSystemItem] = recentFiles.prefix(5).map { .file($0) }
@@ -241,21 +237,6 @@ enum ScreenshotDemoData {
             rows.append(row)
         }
         state.filesRoot.fileRows = rows
-    }
-
-    private static func populateMiniPlayer(_ state: inout AppFeature.State) {
-        let track = recentFiles[0]
-        state.player.currentTrack = track
-        state.player.isPlaying = true
-        state.player.isExpanded = false
-        state.player.duration = track.duration
-        state.player.currentTime = 847 // ~14 min into the track
-        state.player.queue = [track] + Array(recentFiles.dropFirst().prefix(3))
-        state.player.currentIndex = 0
-
-        state.home.lastPlayedTrack = track
-        state.home.isPlaying = true
-        state.home.playbackProgress = 847 / track.duration
     }
 
     private static func populateCollectionsBrowser(_ state: inout AppFeature.State) {
@@ -308,14 +289,48 @@ enum ScreenshotDemoData {
         state.filesPath.append(collectionsState)
     }
 
-    private static func populateFullPlayer(_ state: inout AppFeature.State) {
-        let track = recentFiles[0]
-        state.player.currentTrack = track
-        state.player.isPlaying = true
-        state.player.isExpanded = true
-        state.player.duration = track.duration
-        state.player.currentTime = 1234
-        state.player.queue = Array(recentFiles.prefix(5))
-        state.player.currentIndex = 0
+}
+
+// MARK: - Seeding the view models
+
+extension ScreenshotDemoData {
+
+    /// Player and Home are `@Observable` view models rather than reducer state (#15, #16), so
+    /// `buildAppState` cannot reach them. `AppView` calls this instead.
+    ///
+    /// Miss it and every screenshot run renders an empty Home and a dead player — the same class
+    /// of break as the onboarding skip that moved in #14.
+    @MainActor
+    static func seedViewModels(
+        player: PlayerViewModel,
+        home: HomeViewModel,
+        for screen: ScreenshotMode.Screen
+    ) {
+        home.recentFiles = recentFiles
+
+        switch screen {
+        case .homeWithMiniPlayer:
+            let track = recentFiles[0]
+            player.currentTrack = track
+            player.isPlaying = true
+            player.isExpanded = false
+            player.duration = track.duration
+            player.currentTime = 847 // ~14 min into the track
+            player.queue = [track] + Array(recentFiles.dropFirst().prefix(3))
+            player.currentIndex = 0
+
+        case .player:
+            let track = recentFiles[0]
+            player.currentTrack = track
+            player.isPlaying = true
+            player.isExpanded = true
+            player.duration = track.duration
+            player.currentTime = 1234
+            player.queue = Array(recentFiles.prefix(5))
+            player.currentIndex = 0
+
+        case .home, .collections, .recording, .editRecording:
+            break
+        }
     }
 }

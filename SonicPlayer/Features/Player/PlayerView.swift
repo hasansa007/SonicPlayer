@@ -1,9 +1,8 @@
-import ComposableArchitecture
 import SwiftUI
 import MediaPlayer
 
 struct PlayerView: View {
-    @Bindable var store: StoreOf<PlayerFeature>
+    let player: PlayerViewModel
     @State private var showQueue = false
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -21,7 +20,7 @@ struct PlayerView: View {
             )
             .ignoresSafeArea()
 
-            if store.currentTrack == nil {
+            if player.currentTrack == nil {
                 emptyStateView
             } else if verticalSizeClass == .compact {
                 landscapeLayout
@@ -80,7 +79,7 @@ struct PlayerView: View {
                     queueListView
                 } else {
                     artworkView
-                    Text(store.currentTrack?.title ?? "")
+                    Text(player.currentTrack?.title ?? "")
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(.sonicTextPrimary)
@@ -113,7 +112,7 @@ struct PlayerView: View {
 
     private var artworkView: some View {
         Group {
-            if let artwork = store.artwork {
+            if let artwork = player.artwork {
                 Image(uiImage: artwork)
                     .resizable()
                     .aspectRatio(1, contentMode: .fill)
@@ -124,8 +123,8 @@ struct PlayerView: View {
                     .fill(LinearGradient.sonicGradient)
                     .frame(width: artworkSize, height: artworkSize)
                     .overlay {
-                        if store.isPlaying && !showQueue && store.progress > 0 {
-                            PlayerWaveformView(isPlaying: store.isPlaying)
+                        if player.isPlaying && !showQueue && player.progress > 0 {
+                            PlayerWaveformView(isPlaying: player.isPlaying)
                                 .frame(width: 80, height: 40)
                                 .foregroundColor(.white.opacity(0.8))
                         } else {
@@ -143,7 +142,7 @@ struct PlayerView: View {
 
     private var trackInfoView: some View {
         VStack(spacing: 8) {
-            ScrollingText(text: store.currentTrack?.title ?? "Unknown Track")
+            ScrollingText(text: player.currentTrack?.title ?? "Unknown Track")
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundColor(.sonicTextPrimary)
@@ -156,7 +155,7 @@ struct PlayerView: View {
 
     private var queueListView: some View {
         ScrollView {
-            if store.queue.isEmpty {
+            if player.queue.isEmpty {
                 VStack(spacing: 16) {
                     Spacer()
                     Text("No tracks in queue")
@@ -168,9 +167,9 @@ struct PlayerView: View {
                 .frame(height: 200)
             } else {
                 LazyVStack(spacing: 8) {
-                    ForEach(Array(store.queue.enumerated()), id: \.element.id) { index, track in
+                    ForEach(Array(player.queue.enumerated()), id: \.element.id) { index, track in
                         HStack(spacing: 12) {
-                            if index == store.currentIndex {
+                            if index == player.currentIndex {
                                 Image(systemName: "speaker.wave.3.fill")
                                     .font(.caption)
                                     .foregroundColor(.sonicPrimary)
@@ -186,7 +185,7 @@ struct PlayerView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(track.title)
                                     .font(.subheadline)
-                                    .fontWeight(index == store.currentIndex ? .semibold : .regular)
+                                    .fontWeight(index == player.currentIndex ? .semibold : .regular)
                                     .foregroundColor(.sonicTextPrimary)
                                     .lineLimit(1)
 
@@ -200,15 +199,15 @@ struct PlayerView: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background {
-                            if index == store.currentIndex {
+                            if index == player.currentIndex {
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(Color.sonicPrimary.opacity(0.1))
                             }
                         }
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if index != store.currentIndex {
-                                store.send(.jumpToTrack(index))
+                            if index != player.currentIndex {
+                                player.jumpToTrack(index)
                             }
                         }
                     }
@@ -246,9 +245,9 @@ struct PlayerView: View {
         VStack(spacing: 12) {
             HStack(spacing: 16) {
                 Button {
-                    store.send(.skipBackward)
+                    player.skipBackward()
                 } label: {
-                    Image(systemName: "gobackward.\(Int(store.skipDuration.rawValue))")
+                    Image(systemName: "gobackward.\(Int(player.skipDuration.rawValue))")
                         .font(.title3)
                         .foregroundColor(.sonicPrimary)
                         .frame(width: 44, height: 44)
@@ -262,24 +261,24 @@ struct PlayerView: View {
 
                         RoundedRectangle(cornerRadius: 4)
                             .fill(Color.sonicPrimary)
-                            .frame(width: geometry.size.width * store.progress, height: 8)
-                            .animation(.linear(duration: 0.1), value: store.progress)
+                            .frame(width: geometry.size.width * player.progress, height: 8)
+                            .animation(.linear(duration: 0.1), value: player.progress)
                     }
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
                                 let progress = min(max(0, value.location.x / geometry.size.width), 1)
-                                let newTime = progress * store.duration
-                                store.send(.seekToPosition(newTime))
+                                let newTime = progress * player.duration
+                                player.seek(to: newTime)
                             }
                     )
                 }
                 .frame(height: 8)
 
                 Button {
-                    store.send(.skipForward)
+                    player.skipForward()
                 } label: {
-                    Image(systemName: "goforward.\(Int(store.skipDuration.rawValue))")
+                    Image(systemName: "goforward.\(Int(player.skipDuration.rawValue))")
                         .font(.title3)
                         .foregroundColor(.sonicPrimary)
                         .frame(width: 44, height: 44)
@@ -287,14 +286,14 @@ struct PlayerView: View {
             }
 
             HStack {
-                Text(store.currentTimeFormatted ?? "0:00")
+                Text(player.currentTimeFormatted ?? "0:00")
                     .font(.caption)
                     .foregroundColor(.sonicTextSecondary)
                     .monospacedDigit()
 
                 Spacer()
 
-                Text(store.durationFormatted ?? "0:00")
+                Text(player.durationFormatted ?? "0:00")
                     .font(.caption)
                     .foregroundColor(.sonicTextSecondary)
                     .monospacedDigit()
@@ -305,17 +304,17 @@ struct PlayerView: View {
     private var controlsView: some View {
         HStack(spacing: 40) {
             Button {
-                store.send(.previousTrack)
+                player.previousTrack()
             } label: {
                 Image(systemName: "backward.end.fill")
                     .font(.title2)
-                    .foregroundColor(store.hasPreviousTrack ? .sonicPrimary : .sonicTextMuted)
+                    .foregroundColor(player.hasPreviousTrack ? .sonicPrimary : .sonicTextMuted)
                     .frame(width: 56, height: 56)
             }
-            .disabled(!store.hasPreviousTrack && store.currentTime < 3)
+            .disabled(!player.hasPreviousTrack && player.currentTime < 3)
 
             Button {
-                store.send(.playPauseButtonTapped)
+                player.playPauseTapped()
             } label: {
                 ZStack {
                     Circle()
@@ -323,22 +322,22 @@ struct PlayerView: View {
                         .frame(width: 64, height: 64)
                         .shadow(color: Color.sonicPrimary.opacity(0.3), radius: 8, x: 0, y: 4)
 
-                    Image(systemName: store.isPlaying ? "pause.fill" : "play.fill")
+                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .font(.title2)
                         .foregroundColor(.white)
-                        .offset(x: store.isPlaying ? 0 : 2)
+                        .offset(x: player.isPlaying ? 0 : 2)
                 }
             }
 
             Button {
-                store.send(.nextTrack)
+                player.nextTrack()
             } label: {
                 Image(systemName: "forward.end.fill")
                     .font(.title2)
-                    .foregroundColor(store.hasNextTrack ? .sonicPrimary : .sonicTextMuted)
+                    .foregroundColor(player.hasNextTrack ? .sonicPrimary : .sonicTextMuted)
                     .frame(width: 56, height: 56)
             }
-            .disabled(!store.hasNextTrack)
+            .disabled(!player.hasNextTrack)
         }
     }
 
@@ -348,18 +347,18 @@ struct PlayerView: View {
             Menu {
                 ForEach(PlaybackSpeed.allCases) { speed in
                     Button {
-                        store.send(.setPlaybackSpeed(speed))
+                        player.setPlaybackSpeed(speed)
                     } label: {
                         HStack {
                             Text(speed.displayText)
-                            if speed == store.playbackSpeed {
+                            if speed == player.playbackSpeed {
                                 Image(systemName: "checkmark")
                             }
                         }
                     }
                 }
             } label: {
-                Text(store.playbackSpeed.displayText)
+                Text(player.playbackSpeed.displayText)
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .monospacedDigit()
@@ -371,24 +370,24 @@ struct PlayerView: View {
 
             // Repeat mode
             Button {
-                store.send(.toggleRepeatMode)
+                player.toggleRepeatMode()
             } label: {
-                Image(systemName: store.repeatMode.icon)
+                Image(systemName: player.repeatMode.icon)
                     .font(.title3)
-                    .foregroundColor(store.repeatMode == .off ? .sonicTextMuted : .sonicPrimary)
+                    .foregroundColor(player.repeatMode == .off ? .sonicTextMuted : .sonicPrimary)
                     .frame(width: 44, height: 44)
-                    .background(Color.sonicPrimary.opacity(store.repeatMode == .off ? 0.05 : 0.1), in: RoundedRectangle(cornerRadius: 8))
+                    .background(Color.sonicPrimary.opacity(player.repeatMode == .off ? 0.05 : 0.1), in: RoundedRectangle(cornerRadius: 8))
             }
 
             // Shuffle
             Button {
-                store.send(.toggleShuffle)
+                player.toggleShuffle()
             } label: {
                 Image(systemName: "shuffle")
                     .font(.title3)
-                    .foregroundColor(store.isShuffleEnabled ? .sonicPrimary : .sonicTextMuted)
+                    .foregroundColor(player.isShuffleEnabled ? .sonicPrimary : .sonicTextMuted)
                     .frame(width: 44, height: 44)
-                    .background(Color.sonicPrimary.opacity(store.isShuffleEnabled ? 0.1 : 0.05), in: RoundedRectangle(cornerRadius: 8))
+                    .background(Color.sonicPrimary.opacity(player.isShuffleEnabled ? 0.1 : 0.05), in: RoundedRectangle(cornerRadius: 8))
             }
 
             // Queue toggle

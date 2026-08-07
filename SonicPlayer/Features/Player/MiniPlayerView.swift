@@ -1,8 +1,7 @@
-import ComposableArchitecture
 import SwiftUI
 
 struct MiniPlayerView: View {
-    let store: StoreOf<PlayerFeature>
+    let player: PlayerViewModel
 
     var body: some View {
         VStack(spacing: 0) {
@@ -10,20 +9,20 @@ struct MiniPlayerView: View {
             GeometryReader { geo in
                 Rectangle()
                     .fill(Color.sonicPrimary)
-                    .frame(width: geo.size.width * store.progress, height: 2)
-                    .animation(.linear(duration: 0.3), value: store.progress)
+                    .frame(width: geo.size.width * player.progress, height: 2)
+                    .animation(.linear(duration: 0.3), value: player.progress)
             }
             .frame(height: 2)
 
             HStack(spacing: 12) {
                 // Tap area: artwork + title → expand player
                 Button {
-                    store.send(.setExpanded(true))
+                    player.setExpanded(true)
                 } label: {
                     HStack(spacing: 10) {
                         // Thumbnail
                         ZStack {
-                            if let artwork = store.artwork {
+                            if let artwork = player.artwork {
                                 Image(uiImage: artwork)
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
@@ -35,11 +34,11 @@ struct MiniPlayerView: View {
                                     .frame(width: 40, height: 40)
                             }
 
-                            if store.isPlaying {
-                                MiniWaveformView(isPlaying: store.isPlaying)
+                            if player.isPlaying {
+                                MiniWaveformView(isPlaying: player.isPlaying)
                                     .frame(width: 24, height: 16)
                                     .foregroundColor(.white)
-                            } else if store.artwork == nil {
+                            } else if player.artwork == nil {
                                 Image(systemName: "music.note")
                                     .font(.caption)
                                     .foregroundColor(.white)
@@ -47,7 +46,7 @@ struct MiniPlayerView: View {
                         }
 
                         // Title
-                        Text(store.currentTrack?.title ?? "Not Playing")
+                        Text(player.currentTrack?.title ?? "Not Playing")
                             .font(.subheadline)
                             .fontWeight(.medium)
                             .foregroundColor(.primary)
@@ -60,7 +59,7 @@ struct MiniPlayerView: View {
 
                 // Previous
                 Button {
-                    store.send(.previousTrack)
+                    player.previousTrack()
                 } label: {
                     Image(systemName: "backward.fill")
                         .font(.body)
@@ -69,9 +68,9 @@ struct MiniPlayerView: View {
 
                 // Play/Pause
                 Button {
-                    store.send(.playPauseButtonTapped)
+                    player.playPauseTapped()
                 } label: {
-                    Image(systemName: store.isPlaying ? "pause.fill" : "play.fill")
+                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .font(.title3)
                         .foregroundColor(.sonicPrimary)
                         .frame(width: 44, height: 44)
@@ -79,7 +78,7 @@ struct MiniPlayerView: View {
 
                 // Next
                 Button {
-                    store.send(.nextTrack)
+                    player.nextTrack()
                 } label: {
                     Image(systemName: "forward.fill")
                         .font(.body)
@@ -88,7 +87,7 @@ struct MiniPlayerView: View {
 
                 // Close
                 Button {
-                    store.send(.clearSession)
+                    player.clearSession()
                 } label: {
                     Image(systemName: "xmark")
                         .font(.caption)
