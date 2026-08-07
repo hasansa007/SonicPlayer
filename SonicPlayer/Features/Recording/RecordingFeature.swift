@@ -435,14 +435,14 @@ struct EditRecordingFeature {
                 )
 
             case .skipForward:
-                let newTime = min(state.currentTime + 15, state.recording.duration)
+                let newTime = ScrubClamp.forward(from: state.currentTime, duration: state.recording.duration)
                 state.currentTime = newTime
                 return .run { _ in
                     await audioPlayer.seek(newTime)
                 }
 
             case .skipBackward:
-                let newTime = max(state.currentTime - 15, 0)
+                let newTime = ScrubClamp.backward(from: state.currentTime)
                 state.currentTime = newTime
                 return .run { _ in
                     await audioPlayer.seek(newTime)
