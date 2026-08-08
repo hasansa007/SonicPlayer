@@ -26,23 +26,31 @@ struct MiniPlayerView: View {
             HStack(spacing: Spacing.md) {
                 expandButton
 
-                IconControlButton(
-                    systemImage: "backward.fill",
-                    label: Text("Previous track"),
-                    action: { player.previousTrack() }
-                )
+                // Pinned to LTR for the reason `PlayerView.transportRow` is: an `HStack` mirrors
+                // under RTL, so these three rendered as `[next, play, previous]` in Arabic. Only
+                // the transport is pinned — the expand and close buttons around it are chrome and
+                // mirror correctly, so the group is nested rather than the whole bar being frozen.
+                // The inner spacing matches the outer so LTR is byte-identical to before.
+                HStack(spacing: Spacing.md) {
+                    IconControlButton(
+                        systemImage: "backward.fill",
+                        label: Text("Previous track"),
+                        action: { player.previousTrack() }
+                    )
 
-                IconControlButton(
-                    systemImage: player.isPlaying ? "pause.fill" : "play.fill",
-                    label: Text(player.isPlaying ? "Pause" : "Play"),
-                    action: { player.playPauseTapped() }
-                )
+                    IconControlButton(
+                        systemImage: player.isPlaying ? "pause.fill" : "play.fill",
+                        label: Text(player.isPlaying ? "Pause" : "Play"),
+                        action: { player.playPauseTapped() }
+                    )
 
-                IconControlButton(
-                    systemImage: "forward.fill",
-                    label: Text("Next track"),
-                    action: { player.nextTrack() }
-                )
+                    IconControlButton(
+                        systemImage: "forward.fill",
+                        label: Text("Next track"),
+                        action: { player.nextTrack() }
+                    )
+                }
+                .environment(\.layoutDirection, .leftToRight)
 
                 IconControlButton(
                     systemImage: "xmark",

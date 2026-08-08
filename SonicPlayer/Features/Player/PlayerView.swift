@@ -266,6 +266,17 @@ struct PlayerView: View {
         }
     }
 
+    /// **Transport keeps its LTR order in every language, RTL included.**
+    ///
+    /// An `HStack` mirrors under RTL, so `[previous, play, next]` rendered as `[next, play,
+    /// previous]` in Arabic: the glyphs were right, the order was not, and "next" sat where the eye
+    /// expects "previous". These controls point at the direction the *media* travels rather than
+    /// the direction text is read — the same reason Apple's own player does not mirror them — so
+    /// pinning the row to `.leftToRight` is the fix rather than swapping the icons, which would
+    /// leave the arrows pointing away from the buttons they belong to.
+    ///
+    /// It also settles the play glyph's optical nudge below, which is an absolute `.offset(x:)` and
+    /// would otherwise push the triangle the wrong way in Arabic.
     private var transportRow: some View {
         HStack(spacing: Spacing.xxxl) {
             IconControlButton(
@@ -305,6 +316,7 @@ struct PlayerView: View {
                 action: { player.nextTrack() }
             )
         }
+        .environment(\.layoutDirection, .leftToRight)
     }
 
     private var toolRow: some View {
@@ -421,11 +433,24 @@ struct VolumeView: UIViewRepresentable {
 
 /// A title too long for its container, scrolled horizontally.
 ///
-/// **Carried across unchanged, and it is the one RTL gap slice 1 leaves open.** The scroll is
-/// hardcoded leftward, which is correct for the eight LTR languages and backwards for Arabic.
-/// Fixing it means reworking the animation around `layoutDirection` — a behaviour change to a
-/// component, where this slice is a layout extraction whose done-when requires playback
-/// behaviour to be unchanged. Filed as #54 so it closes on its own issue, per #6's rule.
+/// **This is already correct under RTL. Do not make it direction-aware — that breaks it.** (#54)
+///
+/// The offsets below look absolute and are not: **SwiftUI mirrors `.offset(x:)` under RTL**, the
+/// same way `ZStack(alignment: .leading)` mirrors its anchor. Measured 2026-08-08 with three
+/// squares at offsets `0`, `+100`, `-100` in this exact container, located by pixel:
+///
+///     en:  offset 0 -> x140    offset +100 -> x440    (+100 moved RIGHT)
+///     ar:  offset 0 -> x1064   offset +100 -> x764    (+100 moved LEFT)
+///
+/// So `-(textWidth + wrapGap)` travels leftward in English and **rightward in Arabic**, which is
+/// what each reading direction needs, and the wrapped copy lands on the trailing side in both.
+/// Verified end to end on a long Arabic title by tracking the wrap gap across four frames:
+/// `ar 83 -> 638 -> 777 -> 914` (rightward), `en 1036 -> 926 -> 788 -> 648` (leftward).
+///
+/// #54 claimed the opposite — that the anchor flips and these offsets do not — and a fix built on
+/// that reading double-flipped the sign and made Arabic scroll backwards. Reasoning about it gave
+/// the wrong answer three times; only rendering it and measuring settled it. The issue is closed
+/// as not-a-bug and carries the same numbers.
 struct ScrollingText: View {
     let text: String
     @State private var offset: CGFloat = 10
@@ -490,3 +515,4 @@ struct ScrollingText: View {
         }
     }
 }
+
