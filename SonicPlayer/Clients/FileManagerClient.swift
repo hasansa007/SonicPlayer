@@ -13,10 +13,10 @@ struct FileManagerClient: Sendable {
     var getMetadata: @Sendable (URL) async throws -> AudioFile
     /// Empties iOS's hand-off directory. See `ImportFilter.stagingDirectoryName` (#41).
     ///
-    /// Synchronous on purpose, and the one place in this client that is. Its only caller runs at
-    /// `scenePhase == .background`, where an `async` hop is not merely slower — it does not
-    /// reliably run at all. Measured 2026-08-08: the app suspends before the continuation is
-    /// scheduled, and the work lands on the *next foreground* instead, which is exactly when an
+    /// Synchronous on purpose — the only member here that does I/O without being `async`. Its
+    /// caller runs at `scenePhase == .background`, where an `async` hop is not merely slower: it
+    /// does not reliably run at all. Measured 2026-08-08: the app suspends before the continuation
+    /// is scheduled, and the work lands on the *next foreground* instead, which is exactly when an
     /// `.onOpenURL` import may be in flight over the same directory.
     var drainStagingDirectory: @Sendable () throws -> Void
     var documentsDirectory: @Sendable () -> URL = { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }

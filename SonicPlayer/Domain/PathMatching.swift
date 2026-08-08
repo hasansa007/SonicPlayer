@@ -2,6 +2,10 @@ import Foundation
 
 /// Decides whether the currently playing track is affected by an operation on a set of items.
 ///
+/// Since #41 it has a second consumer with nothing to do with playback: `ImportFilter.isStaged`
+/// asks the same containment question of iOS's staging directory. The parameter names still read
+/// for the first caller; the arithmetic below is what both need.
+///
 /// Extracted from three byte-identical copies in `AppFeature` — the move, the root delete, and
 /// the pushed-folder delete — each of which clears the playback session when it matches.
 /// Getting this wrong is the worst regression available in this app: playback keeps running

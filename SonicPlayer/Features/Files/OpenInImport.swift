@@ -10,7 +10,8 @@ import Foundation
 ///
 /// Not in `Domain/`: this is almost entirely I/O — security-scoped access and a copy — which is
 /// the same reason the recursive folder import is not there either. There is no decision here
-/// worth extracting; the one conditional is a single line.
+/// worth extracting: #41 added two branches, and the decision behind both (*is this file one iOS
+/// staged for us?*) went to `ImportFilter` rather than staying inline. What is left is the I/O.
 enum OpenInImport {
 
     /// Moves or copies `url` into `documentsDirectory` and returns the URL that now holds the audio.
@@ -42,10 +43,21 @@ enum OpenInImport {
 
         guard !FileManager.default.fileExists(atPath: destination.path) else {
             // Already imported — but a staged copy still has to go, because leaving it is what
-            // makes iOS rename the next hand-off. Deliberately not fatal: failing to tidy our own
-            // queue must not stop a file the user can already play from opening. The cost of the
-            // `try?` is one duplicate next time, not a lost file.
-            if isStaged { try? FileManager.default.removeItem(at: url) }
+            // makes iOS rename the next hand-off.
+            //
+            // **A shared name is not proof of identity, and the contents check is what stops this
+            // being a delete of the user's file.** Two different files can arrive under one name —
+            // a re-sent lecture, a second `recording.m4a` — and iOS does not rename the incoming
+            // one, because by now the queue is empty and there is nothing to collide with. Without
+            // the comparison this branch would destroy the file the user just asked to open and
+            // then play the older one, silently. The read costs a pass over two files on the
+            // duplicate-open path only, and it runs off the main actor.
+            //
+            // Deliberately not fatal: failing to tidy our own queue must not stop a file the user
+            // can already play from opening. The cost of the `try?` is one duplicate next time.
+            if isStaged, FileManager.default.contentsEqual(atPath: url.path, andPath: destination.path) {
+                try? FileManager.default.removeItem(at: url)
+            }
             return destination
         }
 

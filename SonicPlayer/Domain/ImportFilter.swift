@@ -4,8 +4,9 @@ import Foundation
 ///
 /// Extracted from the recursive-import effect (#18), which was the largest single effect in the
 /// app at ~130 lines and had no test because every line of it was tangled with security-scoped
-/// URLs and `FileManager`. These two decisions are the part that can be stated without any I/O,
-/// and they are the part that silently drops a user's files when wrong.
+/// URLs and `FileManager`. These decisions are the part that can be stated without any I/O, and
+/// they are the part that silently drops a user's files when wrong — which is why #41's two
+/// staging predicates joined them here rather than staying inline in `OpenInImport`.
 enum ImportFilter {
 
     /// Unchanged from the inline set. `mp4` is here because `.m4b`/`.mp4` audiobooks are common;

@@ -98,10 +98,39 @@ app suspends before the continuation is scheduled, so the drain landed on the ne
 which is exactly the `.onOpenURL` that follows a user sharing a file, reintroducing the race the
 `.background` placement exists to avoid. A synchronous delete is guaranteed to finish inside the
 background window, and costs less than the `session.json` write happening beside it on the same
-line. `drainStagingDirectory` is the only synchronous member of `FileManagerClient` for this reason.
+line. It is the only member of `FileManagerClient` that does I/O without being `async`, for this
+reason.
 
 The unit test asserts the flag with no `await`, because "drained by the time the handler returns" is
 the actual requirement — a test that polled for it passed against the broken version too.
+
+**An in-flight import outranks the drain.** `openFromFiles` runs `OpenInImport.run` inside a
+detached task, so it can still be moving a file out of `Inbox` when the app backgrounds — a large
+file plus a user who switches away is the whole scenario. A drain firing then deletes the file
+mid-import: the import is lost, and `openFromFiles`'s `catch` raises "Action Failed" for an open iOS
+had already accepted, which is exactly the failure #33 was about. `PlayerViewModel.isImporting` is
+set synchronously before the task is created, so `.onOpenURL` returning already means an import is
+in flight, and `scenePhaseChanged` skips the drain while it is. Skipping costs nothing — the
+leftovers are old, and the next backgrounding clears them.
+
+### A shared name is not proof of identity
+
+The already-imported branch removes the staged copy, and it must first confirm the two files
+actually *are* the same. Two different files can arrive under one name — a re-sent lecture, a second
+`recording.m4a` — and by then the queue is empty, so iOS does not rename the incoming one. Without a
+contents comparison that branch deletes the file the user just asked to open and plays the older one
+silently. `FileManager.contentsEqual` guards it, at the cost of a read over two files on the
+duplicate-open path only, off the main actor.
+
+Caught in review, after being introduced by this branch: before it, that branch was a no-op that
+merely left the staged file behind. Turning a filename heuristic into a delete is what made the
+imprecision destructive.
+
+**Still imprecise, and left that way:** opening a *different* file that shares a name with an
+imported one plays the imported one. That predates this branch (`OpenInImport`'s contract has always
+been "a name already present is treated as already imported"), and fixing it means either content
+identity for every import or a unique-name import, both of which change #33's behaviour. Recorded as
+a known gap, not fixed here.
 
 ## Consequences
 

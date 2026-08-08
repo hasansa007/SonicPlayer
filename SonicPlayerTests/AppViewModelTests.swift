@@ -188,6 +188,25 @@ struct AppViewModelTests {
     /// precisely when a staged file is sitting in `Inbox` waiting for `.onOpenURL`, and the
     /// ordering of `.onOpenURL` against the launch path is not guaranteed. Draining on any phase
     /// but `.background` could delete the file the user just asked to open.
+    /// `openFromFiles` runs its move detached, so it can still be working inside `Inbox` when the
+    /// app backgrounds. Draining then deletes the file mid-import — the import is lost, and the
+    /// user gets "Action Failed" for an open iOS already accepted.
+    @MainActor
+    @Test func test_backgrounding_doesNotDrainWhileAnImportIsInFlight() throws {
+        let drained = Mutex(false)
+        var fileManager = FileManagerClient.test
+        fileManager.drainStagingDirectory = { drained.withLock { $0 = true } }
+        let app = makeApp(fileManager: fileManager)
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DrainRace-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+
+        app.player.openFromFiles(dir.appendingPathComponent("Never Resolves.mp3"))
+        app.scenePhaseChanged(.background)
+
+        #expect(!drained.withLock { $0 }, "An in-flight import outranks the drain (#41).")
+    }
+
     @MainActor
     @Test func test_becomingActiveOrInactive_neverDrains() {
         let drained = Mutex(false)

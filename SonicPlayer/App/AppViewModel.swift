@@ -19,6 +19,13 @@ import SwiftUI    // ScenePhase only — this type renders nothing.
 /// **Deliberately not a place for logic.** It composes, it wires, and it holds the three
 /// presentation flags. Anything that decides something belongs on the view model that owns the
 /// state, or in `Domain/`.
+///
+/// **One exception, taken knowingly (#41):** it holds a `FileManagerClient` and decides, in
+/// `scenePhaseChanged`, when to drain iOS's staging directory. That is app housekeeping no feature
+/// owns — draining belongs to neither the player nor the browser — and its two conditions
+/// (`.background` only, and never while an import is in flight) are lifecycle facts rather than
+/// domain rules, so `Domain/` would not hold them either. ADR 0003 has the reasoning. If a second
+/// such thing appears, that is the signal this rule needs revisiting rather than another exception.
 @MainActor
 @Observable
 final class AppViewModel {
@@ -142,11 +149,17 @@ final class AppViewModel {
     /// follows the user sharing a file. Deleting a handful of directory entries on the main actor
     /// costs less than the `session.json` write happening beside it on the same line.
     ///
+    /// **An in-flight import outranks it.** `openFromFiles` runs the move detached, so it can still
+    /// be working on a file in that directory when the app backgrounds — a large file plus a user
+    /// who switches away is all it takes. Draining then would delete the file mid-import, losing it
+    /// and raising "Action Failed" for an open iOS had already accepted. Skipping is free: the
+    /// leftovers this clears are old, and the next backgrounding gets them.
+    ///
     /// Failure is swallowed for the same reason it is in `OpenInImport`: not tidying a directory
     /// the user cannot see must not surface as an error they cannot act on.
     func scenePhaseChanged(_ phase: ScenePhase) {
         player.scenePhaseChanged(phase)
-        guard phase == .background else { return }
+        guard phase == .background, !player.isImporting else { return }
         try? fileManager.drainStagingDirectory()
     }
 

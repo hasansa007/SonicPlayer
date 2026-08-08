@@ -217,17 +217,41 @@ struct OpenFromFilesTests {
 
     /// Re-opening something already imported must ALSO drain the queue — otherwise the staged copy
     /// left behind by the no-op path is what renames the next one.
+    ///
+    /// The two files carry the *same* contents, because that is what "re-opening the same file"
+    /// means and it is the only case in which discarding the staged copy is safe. An earlier
+    /// version of this test wrote `"restaged"` against an imported `"original"` — two different
+    /// files — and asserted the staged one was deleted anyway. It passed, and it was asserting the
+    /// data loss that `test_import_neverDeletesADifferentFileThatSharesAName` now forbids.
     @Test func test_import_drainsTheQueueEvenWhenTheFileIsAlreadyImported() throws {
         let dir = try TempDir()
         let inbox = dir.url.appendingPathComponent("Inbox")
         try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
-        try dir.write("Track.mp3", contents: "original")
-        let staged = try dir.write("Track.mp3", in: inbox, contents: "restaged")
+        try dir.write("Track.mp3", contents: "the same audio")
+        let staged = try dir.write("Track.mp3", in: inbox, contents: "the same audio")
 
         let written = try OpenInImport.run(url: staged, into: dir.url)
 
-        #expect(try String(contentsOf: written, encoding: .utf8) == "original", "The imported copy wins.")
+        #expect(written == dir.url.appendingPathComponent("Track.mp3"), "The imported copy wins.")
         #expect(!FileManager.default.fileExists(atPath: staged.path), "The staged copy still has to go (#41).")
+    }
+
+    /// A name collision is not proof of identity. Two different files can share a name — a
+    /// re-sent lecture, a second `recording.m4a` — and the already-imported branch must not
+    /// destroy the one the user just handed over.
+    @Test func test_import_neverDeletesADifferentFileThatSharesAName() throws {
+        let dir = try TempDir()
+        let inbox = dir.url.appendingPathComponent("Inbox")
+        try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+        try dir.write("Song.mp3", contents: "already imported")
+        let staged = try dir.write("Song.mp3", in: inbox, contents: "the one just shared")
+
+        _ = try OpenInImport.run(url: staged, into: dir.url)
+
+        #expect(
+            FileManager.default.fileExists(atPath: staged.path),
+            "A staged file whose contents differ from the imported one must not be deleted (#41)."
+        )
     }
 
     /// **The data-loss guard.** `LSSupportsOpeningDocumentsInPlace` is `true`, so the handed-over

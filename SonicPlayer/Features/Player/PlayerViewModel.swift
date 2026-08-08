@@ -60,6 +60,11 @@ final class PlayerViewModel {
     /// no guaranteed order — cancelling only covers the case where the restore started first.
     private var didOpenExplicitly = false
 
+    /// True from the moment an open-from-Files is requested until its detached import finishes.
+    /// Read by `AppViewModel` before draining iOS's staging directory (#41) — that import is the
+    /// one other thing that touches the same files.
+    private(set) var isImporting = false
+
     // MARK: - Derived
 
     var progress: Double {
@@ -407,8 +412,15 @@ final class PlayerViewModel {
     /// the recents list refresh in the same order the reducer's `.refreshFiles` did.
     func openFromFiles(_ url: URL, onImported: @escaping @MainActor () -> Void = {}) {
         didOpenExplicitly = true
+        // Set synchronously, before the task exists, so `.onOpenURL` returning already means "an
+        // import is in flight". The staging drain (#41) reads this: the move below runs detached
+        // and can still be going when the app backgrounds, and a drain that fired then would
+        // delete the file out from under it — losing the import and reporting a failure for an
+        // open iOS had already accepted.
+        isImporting = true
         let documentsDirectory = fileManager.documentsDirectory()
         Task { [weak self, fileManager] in
+            defer { self?.isImporting = false }
             do {
                 // Detached because the copy must not run on the main actor: an audiobook-sized
                 // file would freeze the UI for the length of the write. `Effect.run` gave this
