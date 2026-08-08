@@ -94,6 +94,12 @@ enum Sizing {
     /// 28 — one line of the track title. Reserved explicitly because `ScrollingText` lives in a
     /// `GeometryReader`, which has no intrinsic height to offer.
     static let titleLine: CGFloat = 28
+    /// 130 — a collection card. Fixed so a grid row stays level whether a folder's name wraps to
+    /// one line or two.
+    static let collectionCard: CGFloat = 130
+    /// 64 — one `SonicRow`. Home reserves this per row because its list is inside a fixed-height
+    /// frame with scrolling disabled, so it has to know the height in advance.
+    static let rowHeight: CGFloat = 64
 }
 
 /// A shadow, as one value rather than four loose arguments at the call site.
@@ -112,6 +118,9 @@ enum Elevation {
     static let control = Shadow(color: Color.sonicPrimary.opacity(0.3), radius: 8, x: 0, y: 4)
     /// A bar pinned above content, casting *upward*.
     static let bar = Shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: -2)
+    /// Not a depth — a legibility aid. A white glyph drawn straight onto a collection card can
+    /// land on the pale end of that card's gradient and disappear; this keeps its edge.
+    static let glyphContrast = Shadow(color: Color.black.opacity(0.3), radius: 2, x: 0, y: 0)
 }
 
 extension View {
@@ -135,6 +144,12 @@ enum Motion {
     static let press: Animation = .easeInOut(duration: 0.1)
     /// Something settling after it stops.
     static let settle: Animation = .easeOut(duration: 0.3)
+
+    /// A row or card acknowledging that it has been picked. Faster than `press` because it is
+    /// confirming a state change rather than a touch.
+    static let selection: Animation = .easeInOut(duration: 0.15)
+    /// Entering or leaving selection mode, which moves the whole toolbar and every row's inset.
+    static let selectionMode: Animation = .easeInOut(duration: 0.2)
 
     /// The playing-waveform bars. `index` staggers them so they do not pulse in unison.
     ///

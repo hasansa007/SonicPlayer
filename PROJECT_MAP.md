@@ -51,12 +51,12 @@ reading another feature's state. The one exception is `.onOpenURL`, which calls
 
 | Layer | Directory | Count |
 |---|---|---|
-| Views | `Features/*/`, `App/` | 12 |
+| Views | `Features/*/`, `App/` | 10 |
 | View models | `Features/*/`, `App/` | 8 |
 | Clients (structs of closures, `.live` + `.test`) | `Clients/` | 5 + 2 protocols |
-| Pure decision logic (Foundation only) | `Domain/` | 14 |
+| Pure decision logic (Foundation only) | `Domain/` | 17 |
 | Plain data | `Models/` | 3 |
-| Design system | `DesignSystem/`, `DesignSystem/Components/` | 2 + 3 |
+| Design system | `DesignSystem/`, `DesignSystem/Components/` | 2 + 4 |
 | Legacy shared UI | `Utilities/` | 10 |
 
 ### A track, from tap to sound
@@ -97,15 +97,21 @@ somebody has to make.
 | `Utilities/ShareSheet.swift` | **Zero references.** A `UIActivityViewController` bridge nothing presents. `AppView` was documented as owning a share sheet; it no longer does |
 | `Utilities/SwipeToDelete.swift` | **Zero references.** `SwipeToDeleteRow` — the browser uses the system swipe actions instead |
 
-Both are candidates for deletion in #48, which is the slice that owns the browser and would be
-the only plausible caller.
+Both survive #48. The browser uses SwiftUI's own `.swipeActions`, and neither is reachable from
+any screen this epic has touched — deleting them belongs to whoever owns sharing, not to a
+restructure passing through.
+
+**`Features/Files/FileItemRow.swift` was deleted in #48** — 111 lines, a 56pt tile, a chevron and
+a press animation, and **zero consumers**. It was the file #48 was scoped to extract the shared
+Row *from*; nothing had called it in a long time. `MediaFileRowView` was absorbed into `SonicRow`
+in the same slice.
 
 ### Declared but unconsumed
 
 | Thing | State |
 |---|---|
 | `AudioPlaying` protocol | No caller. Declared in #44 alongside `FileManaging`; waits for #7 / #9. `ARCHITECTURE.md` names it as the first thing to delete if those never arrive |
-| 12 fixed `.system(size:)` values | Five in `RecordingView`, three in `OnboardingView`, one each in `AboutView`, `CollectionsView`, `CollectionsSection`, `AppView`. None scales under Dynamic Type. Slices #49–#51 own them; the player's was fixed in #47 |
+| 11 fixed `.system(size:)` values | Five in `RecordingView`, three in `OnboardingView`, one each in `AboutView`, `CollectionsSection`, `AppView`. None scales under Dynamic Type. Slices #49–#51 own them; the player's went in #47 and the collection card's in #48 |
 | `ColorPalette` / `Theme` outside `DesignSystem/` | Deliberate deferral, ADR 0002. Revisit at epic end |
 | `FileManaging` — 8 of 9 members | Only `metadata(for:)` has a caller (`LivePlaybackRepository`). The rest are exercised by `ClientProtocolConformanceTests` and nothing else |
 
@@ -114,7 +120,7 @@ the only plausible caller.
 | Slice | Screen | State |
 |---|---|---|
 | #47 | Player + foundation | **in progress** — this branch |
-| #48 | Files / Collections | not started. Owns the shared Row — the player's queue row is inline until then, per ADR 0002's second-consumer rule |
+| #48 | Files / Collections | **in progress** — `SonicRow` built, with the browser, Home's recent list and the player's queue as its three consumers |
 | #49 | Recording + editor | not started. Largest surface (915 lines) |
 | #50 | Settings / About / Help | not started |
 | #51 | Home | not started. Removes the last inline layout, from `App/AppView.swift` |
@@ -129,6 +135,7 @@ they all pass literals.
 | Gap | Where |
 |---|---|
 | `ScrollingText` scrolls left-only | RTL languages scroll the wrong way — **#54**, not fixed in #47 |
+| Player does not fit at AX5 | **#55** — the portrait layout does not scroll |
 | Lint gate is advisory and scoped | `scripts/lint-magic-numbers.sh` checks only migrated screens; `--all` reports 298 literals still outstanding. Not in CI |
 | Nothing enforces the layering | No module boundary, no build-time check. The discipline is review and `ARCHITECTURE.md` |
 | No UI tests | The 157 tests are unit tests over view models and `Domain/`. No screen is asserted on |

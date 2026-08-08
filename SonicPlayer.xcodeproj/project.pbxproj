@@ -19,7 +19,6 @@
 		8690789B2EEC9F8D005620F9 /* ArtworkClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8690789A2EEC9F8D005620F9 /* ArtworkClient.swift */; };
 		8692B7E32EFC094200DFAF7C /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 8692B7E22EFC094200DFAF7C /* Localizable.xcstrings */; };
 		86A1B2042F1B3F0000A1BEEF /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A1B2032F1B3F0000A1BEEF /* ShareSheet.swift */; };
-		86A1B3002F1B4A0100A1BEEF /* FileItemRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A1B3012F1B4A0100A1BEEF /* FileItemRow.swift */; };
 		86A1B7012F1C500000A1BEEF /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A1B7002F1C500000A1BEEF /* EmptyStateView.swift */; };
 		A1000001000000000000001 /* SonicPlayerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000001 /* SonicPlayerApp.swift */; };
 		A1000005000000000000001 /* AppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000006000000000000001 /* AppView.swift */; };
@@ -42,7 +41,6 @@
 		A5000001000000000000001 /* ScreenshotMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5000002000000000000001 /* ScreenshotMode.swift */; };
 		A5000009000000000000001 /* AudioWaveformExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5000010000000000000001 /* AudioWaveformExtractor.swift */; };
 		A6000009000000000000001 /* SwipeToDelete.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6000010000000000000001 /* SwipeToDelete.swift */; };
-		A7000009000000000000001 /* MediaFileRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7000010000000000000001 /* MediaFileRowView.swift */; };
 		A8000009000000000000001 /* InAppCollectionPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8000010000000000000001 /* InAppCollectionPicker.swift */; };
 		A8000099000000000000001 /* OpenInImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8000098000000000000001 /* OpenInImport.swift */; };
 		A9000001000000000000001 /* UniqueNameResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000010000000000000001 /* UniqueNameResolver.swift */; };
@@ -70,6 +68,9 @@
 		AC000002000000000000001 /* FileManaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000011000000000000001 /* FileManaging.swift */; };
 		AC000003000000000000001 /* PlaybackRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000012000000000000001 /* PlaybackRepository.swift */; };
 		AC000004000000000000001 /* AudioPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000013000000000000001 /* AudioPlaying.swift */; };
+		AC00000D000000000000001 /* CollectionLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC00001C000000000000001 /* CollectionLabel.swift */; };
+		AC00000E000000000000001 /* CollectionPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC00001D000000000000001 /* CollectionPalette.swift */; };
+		AC00000F000000000000001 /* SonicRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC00001E000000000000001 /* SonicRow.swift */; };
 		AC000005000000000000001 /* ScrubGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000014000000000000001 /* ScrubGeometry.swift */; };
 		AC000006000000000000001 /* Tokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000015000000000000001 /* Tokens.swift */; };
 		AC000007000000000000001 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000016000000000000001 /* Typography.swift */; };
@@ -101,7 +102,6 @@
 		8690789A2EEC9F8D005620F9 /* ArtworkClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkClient.swift; sourceTree = "<group>"; };
 		8692B7E22EFC094200DFAF7C /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		86A1B2032F1B3F0000A1BEEF /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
-		86A1B3012F1B4A0100A1BEEF /* FileItemRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileItemRow.swift; sourceTree = "<group>"; };
 		86A1B7002F1C500000A1BEEF /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		9FD073A130248C9F0007DEBD /* SonicPlayerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SonicPlayerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000002000000000000001 /* SonicPlayerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonicPlayerApp.swift; sourceTree = "<group>"; };
@@ -128,7 +128,6 @@
 		A5000002000000000000001 /* ScreenshotMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotMode.swift; sourceTree = "<group>"; };
 		A5000010000000000000001 /* AudioWaveformExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioWaveformExtractor.swift; sourceTree = "<group>"; };
 		A6000010000000000000001 /* SwipeToDelete.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeToDelete.swift; sourceTree = "<group>"; };
-		A7000010000000000000001 /* MediaFileRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFileRowView.swift; sourceTree = "<group>"; };
 		A8000010000000000000001 /* InAppCollectionPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InAppCollectionPicker.swift; sourceTree = "<group>"; };
 		A8000098000000000000001 /* OpenInImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenInImport.swift; sourceTree = "<group>"; };
 		A9000010000000000000001 /* UniqueNameResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UniqueNameResolver.swift; sourceTree = "<group>"; };
@@ -156,6 +155,9 @@
 		AC000011000000000000001 /* FileManaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileManaging.swift; sourceTree = "<group>"; };
 		AC000012000000000000001 /* PlaybackRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRepository.swift; sourceTree = "<group>"; };
 		AC000013000000000000001 /* AudioPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlaying.swift; sourceTree = "<group>"; };
+		AC00001C000000000000001 /* CollectionLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionLabel.swift; sourceTree = "<group>"; };
+		AC00001D000000000000001 /* CollectionPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionPalette.swift; sourceTree = "<group>"; };
+		AC00001E000000000000001 /* SonicRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonicRow.swift; sourceTree = "<group>"; };
 		AC000014000000000000001 /* ScrubGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrubGeometry.swift; sourceTree = "<group>"; };
 		AC000015000000000000001 /* Tokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tokens.swift; sourceTree = "<group>"; };
 		AC000016000000000000001 /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
@@ -296,6 +298,7 @@
 				AC000017000000000000001 /* IconControlButton.swift */,
 				AC000018000000000000001 /* ArtworkView.swift */,
 				AC000019000000000000001 /* SonicScrubber.swift */,
+				AC00001E000000000000001 /* SonicRow.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -350,10 +353,8 @@
 		A1000050000000000000001 /* Files */ = {
 			isa = PBXGroup;
 			children = (
-				A7000010000000000000001 /* MediaFileRowView.swift */,
 				A8000010000000000000001 /* InAppCollectionPicker.swift */,
 				A8000098000000000000001 /* OpenInImport.swift */,
-				86A1B3012F1B4A0100A1BEEF /* FileItemRow.swift */,
 				AB000031000000000000001 /* CollectionsViewModel.swift */,
 				AB000033000000000000001 /* FolderImport.swift */,
 				A2000002000000000000001 /* CollectionsView.swift */,
@@ -382,6 +383,8 @@
 				A9000015000000000000001 /* SessionRestorePolicy.swift */,
 				AC000010000000000000001 /* SessionRestorePlan.swift */,
 				AC000014000000000000001 /* ScrubGeometry.swift */,
+				AC00001C000000000000001 /* CollectionLabel.swift */,
+				AC00001D000000000000001 /* CollectionPalette.swift */,
 				A9000014000000000000001 /* SessionCodec.swift */,
 				A9000013000000000000001 /* PlaybackSession.swift */,
 				A9000012000000000000001 /* QueueMath.swift */,
@@ -527,10 +530,8 @@
 				A5000001000000000000001 /* ScreenshotMode.swift in Sources */,
 				A1000009000000000000001 /* PlayerView.swift in Sources */,
 				A1000010000000000000002 /* MiniPlayerView.swift in Sources */,
-				A7000009000000000000001 /* MediaFileRowView.swift in Sources */,
 				A8000009000000000000001 /* InAppCollectionPicker.swift in Sources */,
 				A8000099000000000000001 /* OpenInImport.swift in Sources */,
-				86A1B3002F1B4A0100A1BEEF /* FileItemRow.swift in Sources */,
 				AB000030000000000000001 /* CollectionsViewModel.swift in Sources */,
 				AB000032000000000000001 /* FolderImport.swift in Sources */,
 				A2000001000000000000001 /* CollectionsView.swift in Sources */,
@@ -568,6 +569,9 @@
 				AC000002000000000000001 /* FileManaging.swift in Sources */,
 				AC000003000000000000001 /* PlaybackRepository.swift in Sources */,
 				AC000004000000000000001 /* AudioPlaying.swift in Sources */,
+				AC00000D000000000000001 /* CollectionLabel.swift in Sources */,
+				AC00000E000000000000001 /* CollectionPalette.swift in Sources */,
+				AC00000F000000000000001 /* SonicRow.swift in Sources */,
 				AC000005000000000000001 /* ScrubGeometry.swift in Sources */,
 				AC000006000000000000001 /* Tokens.swift in Sources */,
 				AC000007000000000000001 /* Typography.swift in Sources */,

@@ -353,16 +353,24 @@ private extension AppView {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .scrollDisabled(true)
-                .frame(height: CGFloat(home.recentFiles.count) * 64)
+                .frame(height: CGFloat(home.recentFiles.count) * Sizing.rowHeight)
             }
         }
     }
 
+    /// Second consumer of the shared Row (#48). Home is the one place that shows *which*
+    /// collection a file came from — the browser is already inside one.
     func recentFileRow(file: AudioFile) -> some View {
-        MediaFileRowView(
-            file: file,
-            onTap: { home.fileTapped(file) }
+        SonicRow(
+            leading: .tile(image: nil, side: Sizing.thumbnail, fallbackSystemImage: "waveform"),
+            title: file.title,
+            secondary: .durationDateAndCollection(
+                file.durationFormatted,
+                file.creationDate.formatted(date: .abbreviated, time: .omitted),
+                CollectionLabel.name(for: file.url, documentsURL: home.documentsURL)
+            )
         )
+        .onTapGesture { home.fileTapped(file) }
     }
 
     // MARK: - Record FAB

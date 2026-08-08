@@ -24,6 +24,8 @@ MIGRATED=(
   "SonicPlayer/DesignSystem/Components/IconControlButton.swift"
   "SonicPlayer/DesignSystem/Components/ArtworkView.swift"
   "SonicPlayer/DesignSystem/Components/SonicScrubber.swift"
+  "SonicPlayer/DesignSystem/Components/SonicRow.swift"
+  "SonicPlayer/Features/Files/CollectionsView.swift"
 )
 
 if [[ "${1:-}" == "--all" ]]; then

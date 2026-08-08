@@ -37,6 +37,11 @@ final class HomeViewModel {
 
     private let fileManager: FileManagerClient
 
+    /// Where the root is, so `CollectionLabel` can tell a file in a collection from one that is
+    /// not. Read through the injected client rather than `FileManager.default`, which is what
+    /// `MediaFileRowView` used to do from inside its own `body` (#48).
+    var documentsURL: URL { fileManager.documentsDirectory() }
+
     init(player: PlayerViewModel, fileManager: FileManagerClient = .live) {
         self.player = player
         self.fileManager = fileManager

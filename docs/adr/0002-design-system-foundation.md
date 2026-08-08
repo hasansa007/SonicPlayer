@@ -52,6 +52,16 @@ than two consumers inside slice 1's scope, and building them now repeats the mis
 it.** They are deferred to the slice where the second consumer actually appears — the shared Row to
 #48, `Pill` and `SurfaceCard` to #48/#50.
 
+> **Resolved in #48, and the deferral paid.** `SonicRow` was built in slice 2 with three consumers
+> at once — the browser's file rows, Home's recent list, and the player's queue row that slice 1
+> left inline. Built in slice 1 it would have had one consumer and been shaped only by the queue;
+> built in slice 2 it had to satisfy a selectable row with a date and a collection label as well,
+> which is why it carries a `Leading` case for a marker *and* one for a tile. The extra slice of
+> waiting is what produced the right seam rather than the first one.
+>
+> `FileItemRow` — the 111-line row #48 was nominally extracting *from* — turned out to have zero
+> consumers and was deleted rather than absorbed.
+
 The three that were built clear the bar:
 
 | Component | Consumers today |

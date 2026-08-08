@@ -33,6 +33,20 @@ final class CollectionsViewModel {
     private(set) var isLoading = false
     var documentsDirectoryURL: URL?
 
+    /// What went wrong, for the browser's error state (#48).
+    ///
+    /// Every failure on this screen used to be a `try?`. A listing that threw left the previous
+    /// list on screen and said nothing — on a first load that is a permanently empty browser with
+    /// no explanation. A delete that threw removed the item from the selection and left it on
+    /// disk. A move that threw reached `print(_:)`, in a shipping app.
+    ///
+    /// Surfacing them changes no success path; it gives the failures somewhere to go.
+    var operationError: String?
+
+    /// Set only when the *listing* failed, which is the one failure that has to replace the
+    /// content rather than sit over it — there is no content to sit over.
+    private(set) var loadFailed = false
+
     var searchText = ""
     var isSelectionMode = false
     private(set) var selectedItems: Set<FileSystemItem> = []
@@ -123,15 +137,30 @@ final class CollectionsViewModel {
 
         loadTask?.cancel()
         loadTask = Task { [weak self, fileManager, currentDirectory] in
-            let loaded = try? await fileManager.listItems(currentDirectory)
-            guard !Task.isCancelled else { return }
-            self?.itemsLoaded(loaded)
+            do {
+                let loaded = try await fileManager.listItems(currentDirectory)
+                guard !Task.isCancelled else { return }
+                self?.itemsLoaded(loaded)
+            } catch {
+                guard !Task.isCancelled else { return }
+                self?.listingFailed(error)
+            }
         }
     }
 
-    private func itemsLoaded(_ loaded: [FileSystemItem]?) {
+    /// The listing threw. Previously a `try?` swallowed it and left whatever was on screen —
+    /// which on a first load is nothing at all, forever, with no way to tell an empty folder
+    /// from a broken one (#48).
+    private func listingFailed(_ error: any Error) {
         isLoading = false
-        guard let loaded else { return }   // load failure leaves the previous list in place
+        loadFailed = true
+        operationError = error.localizedDescription
+    }
+
+    private func itemsLoaded(_ loaded: [FileSystemItem]) {
+        isLoading = false
+        loadFailed = false
+        operationError = nil
         items = loaded
         onItemsLoaded()
     }
@@ -219,7 +248,12 @@ final class CollectionsViewModel {
 
     private func createCollection(named name: String) {
         workTask = Task { [weak self, fileManager, currentDirectory] in
-            try? await fileManager.createCollection(name, currentDirectory)
+            do {
+                try await fileManager.createCollection(name, currentDirectory)
+            } catch {
+                self?.operationError = error.localizedDescription
+                return
+            }
             self?.refreshFiles()
 
             // Navigate straight into the folder just created.
@@ -242,7 +276,12 @@ final class CollectionsViewModel {
         let itemURL = item.url
 
         workTask = Task { [weak self, fileManager] in
-            try? await fileManager.renameItem(itemURL, finalName)
+            do {
+                try await fileManager.renameItem(itemURL, finalName)
+            } catch {
+                self?.operationError = error.localizedDescription
+                return
+            }
             self?.refreshFiles()
         }
     }
@@ -263,8 +302,22 @@ final class CollectionsViewModel {
         onWillRemoveItems(itemsToDelete)
 
         workTask = Task { [weak self, fileManager] in
+            // Each item is attempted even if an earlier one failed: the caller has already been
+            // told all of them are going (`onWillRemoveItems` fires before this runs), so
+            // abandoning the batch on the first error would leave the app disagreeing with disk
+            // about several files instead of one.
+            var failures: [String] = []
             for item in itemsToDelete {
-                try? await fileManager.deleteItem(item.url)
+                do {
+                    try await fileManager.deleteItem(item.url)
+                } catch {
+                    failures.append(item.name)
+                }
+            }
+            if !failures.isEmpty {
+                self?.operationError = String(
+                    localized: "Couldn't delete \(failures.count) of \(itemsToDelete.count) items"
+                )
             }
             self?.refreshFiles()
         }
@@ -326,7 +379,8 @@ final class CollectionsViewModel {
                 do {
                     try FileManager.default.moveItem(at: item.url, to: targetURL)
                 } catch {
-                    print("Failed to move \(item.name): \(error.localizedDescription)")
+                    // Was `print(_:)`, which in a shipping build goes nowhere a user can see.
+                    await MainActor.run { self?.operationError = error.localizedDescription }
                 }
             }
             self?.refreshFiles()

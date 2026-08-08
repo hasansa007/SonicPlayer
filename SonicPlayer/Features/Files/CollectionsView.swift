@@ -43,6 +43,10 @@ struct CollectionsView: View {
         _viewModel = Bindable(wrappedValue: viewModel)
     }
 
+    /// The looks a collection card can have. Which one a folder *gets* is
+    /// `CollectionPalette.slot(forName:at:)` — a decision, and now a stable one: these used to be
+    /// indexed by the folder's position in the **filtered** list, so typing in the search box
+    /// recoloured every card that survived the filter (#48).
     private static let gradients: [[Color]] = [
         [Color(hex: "1a3a5a"), Color(hex: "1B5B7E")],
         [Color(hex: "2a4a3a"), Color(hex: "1a6b4a")],
@@ -55,19 +59,26 @@ struct CollectionsView: View {
         "waveform", "music.note.list", "mic.fill", "headphones", "square.stack.3d.up"
     ]
 
+    /// The collection-card glyph, scaled. A bare `.system(size: 50)` stayed 50 points at every
+    /// accessibility setting — one of the twelve fixed sizes `PROJECT_MAP.md` lists.
+    @ScaledMetric(relativeTo: .largeTitle) private var cardGlyph = DisplayFont.collectionCardGlyph
+    @ScaledMetric(relativeTo: .largeTitle) private var stateIcon = DisplayFont.stateIcon
+
     var body: some View {
         ZStack {
             Color.sonicBackground.ignoresSafeArea()
 
-            if viewModel.isLoading && viewModel.items.isEmpty {
-                ProgressView().tint(.sonicPrimary)
+            if viewModel.loadFailed && viewModel.items.isEmpty {
+                errorState
+            } else if viewModel.isLoading && viewModel.items.isEmpty {
+                loadingState
             } else if viewModel.items.isEmpty {
                 EmptyStateView(
                     icon: "folder.badge.questionmark",
                     title: "Collection is Empty",
                     iconStyle: AnyShapeStyle(LinearGradient.sonicGradient),
-                    iconSize: 64,
-                    spacing: 24
+                    iconSize: stateIcon,
+                    spacing: Spacing.xxl
                 )
             } else {
                 contentList
@@ -129,6 +140,69 @@ struct CollectionsView: View {
             ActivityView(items: [item.url])
         }
         .onAppear { viewModel.onAppear() }
+        // A failed rename / move / delete sits over the content rather than replacing it —
+        // there is still a browser to look at. Only a failed *listing* takes the whole screen.
+        .alert(
+            "Something Went Wrong",
+            isPresented: Binding(
+                get: { viewModel.operationError != nil && !viewModel.loadFailed },
+                set: { if !$0 { viewModel.operationError = nil } }
+            ),
+            actions: { Button("OK", role: .cancel) { viewModel.operationError = nil } },
+            message: { Text(viewModel.operationError ?? "") }
+        )
+    }
+
+    // MARK: - States
+
+    /// Was a bare `ProgressView` with no label — indistinguishable from a hung screen.
+    private var loadingState: some View {
+        VStack(spacing: Spacing.lg) {
+            ProgressView()
+                .controlSize(.large)
+                .tint(.sonicPrimary)
+                .frame(height: stateIcon)
+
+            Text("Loading Files")
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundColor(.sonicTextPrimary)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// New in #48. The listing used to fail into a `try?`, so a folder that could not be read
+    /// was indistinguishable from an empty one — permanently, with no way to retry.
+    private var errorState: some View {
+        VStack(spacing: Spacing.xl) {
+            EmptyStateView(
+                icon: "exclamationmark.triangle",
+                title: "Couldn't Open This Collection",
+                iconStyle: AnyShapeStyle(Color.sonicOrange),
+                iconSize: stateIcon,
+                spacing: Spacing.lg
+            )
+
+            if let message = viewModel.operationError {
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundColor(.sonicTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, Spacing.xxl)
+            }
+
+            Button("Try Again") { viewModel.refreshFiles() }
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.sonicPrimary)
+                .padding(.horizontal, Sizing.chipInsetH)
+                .padding(.vertical, Spacing.sm)
+                .background(
+                    Color.sonicPrimary.opacity(ControlTint.on),
+                    in: RoundedRectangle(cornerRadius: Radius.sm)
+                )
+                .buttonStyle(ScaleButtonStyle())
+        }
     }
 
     // MARK: - Content List
@@ -138,16 +212,16 @@ struct CollectionsView: View {
             if !viewModel.filteredFolders.isEmpty {
                 Section {
                     LazyVGrid(
-                        columns: Array(repeating: GridItem(.flexible(), spacing: 12),
+                        columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.md),
                                        count: horizontalSizeClass == .regular ? 4 : 2),
-                        spacing: 12
+                        spacing: Spacing.md
                     ) {
                         ForEach(Array(viewModel.filteredFolders.enumerated()), id: \.element.id) { index, folder in
                             collectionCard(folder: folder, index: index)
                         }
                     }
                 }
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.lg, bottom: Spacing.sm, trailing: Spacing.lg))
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
             }
@@ -156,7 +230,7 @@ struct CollectionsView: View {
                 Button {
                     viewModel.playAllTapped()
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: Spacing.sm) {
                         Image(systemName: "play.fill")
                             .font(.caption)
                         Text("Play All")
@@ -164,11 +238,11 @@ struct CollectionsView: View {
                             .fontWeight(.medium)
                     }
                     .foregroundColor(.sonicPrimary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Color.sonicPrimary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                    .padding(.horizontal, Sizing.chipInsetH)
+                    .padding(.vertical, Spacing.sm)
+                    .background(Color.sonicPrimary.opacity(ControlTint.on), in: RoundedRectangle(cornerRadius: Radius.sm))
                 }
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                .listRowInsets(EdgeInsets(top: Spacing.xs, leading: Spacing.lg, bottom: Spacing.xs, trailing: Spacing.lg))
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
             }
@@ -176,7 +250,7 @@ struct CollectionsView: View {
             if !viewModel.filteredFiles.isEmpty {
                 HStack {
                     Spacer()
-                    HStack(spacing: 3) {
+                    HStack(spacing: Spacing.xs) {
                         Image(systemName: "hand.draw")
                             .font(.caption2)
                         Text("Swipe for actions")
@@ -184,7 +258,7 @@ struct CollectionsView: View {
                     }
                     .foregroundColor(.sonicTextMuted)
                 }
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                .listRowInsets(EdgeInsets(top: Spacing.xs, leading: Spacing.lg, bottom: Spacing.xs, trailing: Spacing.lg))
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
 
@@ -200,22 +274,25 @@ struct CollectionsView: View {
     }
 
     private func fileRow(_ file: AudioFile) -> some View {
-        MediaFileRowView(
-            file: file,
-            showsCollectionName: false,
-            isSelecting: viewModel.isSelectionMode,
+        SonicRow(
+            leading: .tile(image: nil, side: Sizing.thumbnail, fallbackSystemImage: "waveform"),
+            title: file.title,
+            // The browser is already inside a collection, so naming it on every row would repeat
+            // the screen's own title once per line.
+            secondary: .durationAndDate(file.durationFormatted, file.creationDate.formatted(date: .abbreviated, time: .omitted)),
             isSelected: viewModel.isSelected(.file(file)),
-            onTap: {
-                if viewModel.isSelectionMode {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        viewModel.toggleSelection(.file(file))
-                    }
-                } else {
-                    viewModel.fileTapped(file)
-                }
-            }
+            selection: viewModel.isSelectionMode ? viewModel.isSelected(.file(file)) : nil
         )
-        .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
+        .onTapGesture {
+            if viewModel.isSelectionMode {
+                withAnimation(Motion.selection) {
+                    viewModel.toggleSelection(.file(file))
+                }
+            } else {
+                viewModel.fileTapped(file)
+            }
+        }
+        .listRowInsets(EdgeInsets(top: Spacing.xxs, leading: Spacing.sm, bottom: Spacing.xxs, trailing: Spacing.sm))
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -260,7 +337,7 @@ struct CollectionsView: View {
     var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
             if viewModel.isSelectionMode {
-                HStack(spacing: 16) {
+                HStack(spacing: Spacing.lg) {
                     if !viewModel.selectedItems.isEmpty {
                         Menu {
                             Button {
@@ -289,7 +366,7 @@ struct CollectionsView: View {
                     }
 
                     Button("Done") {
-                        withAnimation(.easeInOut(duration: 0.2)) {
+                        withAnimation(Motion.selectionMode) {
                             viewModel.toggleSelectionMode()
                         }
                     }
@@ -297,7 +374,7 @@ struct CollectionsView: View {
                     .foregroundColor(.sonicPrimary)
                 }
             } else {
-                HStack(spacing: 12) {
+                HStack(spacing: Spacing.md) {
                     Button {
                         showingDocumentPicker = true
                     } label: {
@@ -305,7 +382,7 @@ struct CollectionsView: View {
                             .foregroundColor(.sonicPrimary)
                     }
 
-                    Divider().frame(height: 20)
+                    Divider().frame(height: Spacing.xl)
 
                     Button {
                         viewModel.moveSelectedTapped()
@@ -321,10 +398,10 @@ struct CollectionsView: View {
                             .foregroundColor(.sonicPrimary)
                     }
 
-                    Divider().frame(height: 20)
+                    Divider().frame(height: Spacing.xl)
 
                     Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
+                        withAnimation(Motion.selectionMode) {
                             viewModel.toggleSelectionMode()
                         }
                     } label: {
@@ -339,14 +416,15 @@ struct CollectionsView: View {
     // MARK: - Collection Card
 
     func collectionCard(folder: CollectionItem, index: Int) -> some View {
-        let colors = Self.gradients[index % Self.gradients.count]
-        let icon = Self.icons[index % Self.icons.count]
+        let slot = CollectionPalette.slot(forName: folder.name, at: index)
+        let colors = Self.gradients[slot % Self.gradients.count]
+        let icon = Self.icons[slot % Self.icons.count]
         let isSelected = viewModel.isSelected(.folder(folder))
         let isSelecting = viewModel.isSelectionMode
 
         return Button {
             if isSelecting {
-                withAnimation(.easeInOut(duration: 0.15)) {
+                withAnimation(Motion.selection) {
                     viewModel.toggleSelection(.folder(folder))
                 }
             } else {
@@ -354,7 +432,7 @@ struct CollectionsView: View {
             }
         } label: {
             ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: Radius.lg)
                     .fill(
                         LinearGradient(
                             colors: colors,
@@ -364,10 +442,10 @@ struct CollectionsView: View {
                     )
 
                 Image(systemName: icon)
-                    .font(.system(size: 50))
+                    .font(.system(size: cardGlyph))
                     .foregroundColor(.white.opacity(0.2))
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.bottom, 5)
+                    .padding(.bottom, Spacing.xs)
                     .frame(maxHeight: .infinity, alignment: .bottom)
 
                 VStack(alignment: .leading, spacing: 0) {
@@ -379,39 +457,40 @@ struct CollectionsView: View {
 
                     Spacer()
 
-                    HStack(spacing: 4) {
+                    HStack(spacing: Spacing.xs) {
                         Image(systemName: "music.note")
                             .font(.caption2)
                         Text("\(folder.itemCount)")
                             .font(.caption)
                             .fontWeight(.medium)
+                            .monospacedDigit()
                     }
                     .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, Spacing.sm)
+                    .padding(.vertical, Spacing.xs)
                     .background(.white.opacity(0.2), in: Capsule())
                 }
-                .padding(14)
+                .padding(Sizing.chipInsetH)
 
                 if isSelecting {
                     VStack {
                         HStack {
                             Spacer()
                             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                                .font(.title3)
+                                .font(.sonicControlGlyph)
                                 .foregroundColor(.white)
-                                .shadow(color: .black.opacity(0.3), radius: 2)
+                                .sonicShadow(Elevation.glyphContrast)
                         }
                     }
-                    .padding(10)
+                    .padding(Sizing.barRowInsetV)
                 }
             }
-            .frame(height: 130)
+            .frame(height: Sizing.collectionCard)
             .frame(maxWidth: .infinity)
             .overlay {
                 if isSelected {
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.white, lineWidth: 2)
+                    RoundedRectangle(cornerRadius: Radius.lg)
+                        .stroke(Color.white, lineWidth: Sizing.hairlineTrackHeight)
                 }
             }
         }
