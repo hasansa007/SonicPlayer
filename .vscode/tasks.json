@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "run",
+      "detail": "Build SonicPlayer and launch it on a simulator. The canonical way to run this app — resolves one simulator UDID rather than a name, because two simulators share the name 'iPhone 17 Pro'.",
+      "type": "shell",
+      "command": "./scripts/run.sh",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    }
+  ]
+}

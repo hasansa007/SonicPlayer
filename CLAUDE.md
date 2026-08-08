@@ -9,10 +9,15 @@ SonicPlayer is a native iOS audio player app (iOS 18.0+) built with **SwiftUI** 
 ## Build & Run
 
 ```bash
+# Build AND run — the canonical path
+./scripts/run.sh                      # newest booted iPhone simulator, else the newest available
+./scripts/run.sh "iPhone 17 Pro Max"  # a specific device, by name or by UDID
+./scripts/run.sh --shot               # ...and open a screenshot once it is up
+
 # Open in Xcode
 open SonicPlayer.xcodeproj
 
-# Build via CLI (iPhone simulator)
+# Build only — no install, no launch
 xcodebuild -project SonicPlayer.xcodeproj -scheme SonicPlayer \
   -destination 'platform=iOS Simulator,name=iPhone 17' build
 
@@ -20,6 +25,19 @@ xcodebuild -project SonicPlayer.xcodeproj -scheme SonicPlayer \
 xcodebuild test -project SonicPlayer.xcodeproj -scheme SonicPlayer \
   -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
+
+**`./scripts/run.sh` is how the app gets run. Do not hand-assemble the `xcodebuild` →
+`simctl install` → `simctl launch` sequence** — that includes agents following a generic
+build-and-run procedure, which should call this script instead of rebuilding its own. The script
+resolves **one** simulator UDID and hands the same one to all three commands, because both
+`-destination 'name=...'` and `simctl ... booted` are ambiguous the moment two runtimes carry a
+device of the same name, which is the normal state of a machine with two iOS SDKs installed. The
+ambiguity does not error — it silently picks, and you build for one device and read the screen of
+another. The script is also declared as the `run` task in `.vscode/tasks.json`, so tooling that
+reads a project's declared entry points finds it there rather than guessing at a filename.
+
+The `xcodebuild ... build` line above remains correct for a **compile check**. It is not a way to
+run the app: it produces a `.app` and installs nothing.
 
 **There are no dependencies to resolve.** `-skipMacroValidation` used to be required here because
 TCA shipped a macro and Xcode gates unapproved macros behind a GUI trust prompt `xcodebuild` cannot
