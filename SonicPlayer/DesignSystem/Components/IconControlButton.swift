@@ -51,6 +51,16 @@ struct IconControlButton: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(font)
+                // The glyph is capped so it cannot outgrow the frame around it. Without this the
+                // frame stayed 44pt while `.title3` kept scaling, and at AX5 the repeat / shuffle
+                // / queue glyphs overlapped each other.
+                //
+                // Letting the *frame* grow instead was tried and is worse: the player's portrait
+                // layout is a fixed, non-scrolling `VStack` around a 280pt artwork, so larger
+                // controls push the tool row off the bottom of the screen entirely. Both states
+                // are in `artifacts/after/`. Icons carry no text, so bounding them costs a
+                // reader nothing — the title, the times and the queue still scale to AX5.
+                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                 .foregroundColor(tint)
                 .frame(width: size.side, height: size.side)
                 .background(background)

@@ -17,6 +17,11 @@ struct PlayerView: View {
     /// accessibility setting, so at AX5 it sat beside body text three times its relative size.
     @ScaledMetric(relativeTo: .largeTitle) private var stateIconSize = DisplayFont.stateIcon
 
+    /// One line of the track title. Fixed at 28pt it clipped the descenders at the accessibility
+    /// sizes — `ScrollingText` sits in a `GeometryReader`, which offers no intrinsic height, so
+    /// whatever is reserved here is all the title ever gets.
+    @ScaledMetric(relativeTo: .title3) private var titleLineHeight = Sizing.titleLine
+
     private var isLandscape: Bool { verticalSizeClass == .compact }
 
     var body: some View {
@@ -224,7 +229,7 @@ struct PlayerView: View {
             .font(.title3)
             .fontWeight(.semibold)
             .foregroundColor(.sonicTextPrimary)
-            .frame(height: Sizing.titleLine)
+            .frame(height: titleLineHeight)
             .padding(.horizontal, Spacing.sm)
     }
 
