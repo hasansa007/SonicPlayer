@@ -152,7 +152,7 @@ they all pass literals.
 
 | Gap | Where |
 |---|---|
-| `ScrollingText` scrolls left-only | RTL languages scroll the wrong way — **#54**, not fixed in #47 |
+| RTL flips are reasoned about, not measured | **#63** — `ScrubGeometry` inverts the scrub fraction on `isRightToLeft`, and that flip has never been checked against a real drag. #54 closed as not-a-bug precisely because the equivalent assumption there was wrong: **SwiftUI mirrors `.offset(x:)` under RTL**, measured, so a "fix" that flipped it again broke a working marquee. `ScrollingText`'s doc comment carries the numbers |
 | Player does not fit at AX5 | **#55** — the portrait layout does not scroll |
 | Lint gate is advisory and scoped | `scripts/lint-magic-numbers.sh` checks only migrated screens; `--all` reports 298 literals still outstanding. Not in CI |
 | Nothing enforces the layering | No module boundary, no build-time check. The discipline is review and `ARCHITECTURE.md` |
