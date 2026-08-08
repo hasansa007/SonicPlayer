@@ -1594,60 +1594,60 @@
         }
       }
     },
-    "Language updates immediately." : {
+    "Choose a language in iOS Settings. The app restarts to apply it." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "يتم تحديث اللغة فورًا."
+            "value" : "اختر اللغة من إعدادات iOS. سيُعاد تشغيل التطبيق لتطبيقها."
           }
         },
         "bn" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ভাষা সঙ্গে সঙ্গে আপডেট হয়।"
+            "value" : "iOS সেটিংসে ভাষা বেছে নিন। এটি প্রয়োগ করতে অ্যাপ পুনরায় চালু হবে।"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Language updates immediately."
+            "value" : "Choose a language in iOS Settings. The app restarts to apply it."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El idioma se actualiza de inmediato."
+            "value" : "Elige un idioma en Ajustes de iOS. La app se reiniciará para aplicarlo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La langue se met à jour immédiatement."
+            "value" : "Choisissez une langue dans Réglages iOS. L’app redémarrera pour l’appliquer."
           }
         },
         "hi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "भाषा तुरंत अपडेट होती है।"
+            "value" : "iOS सेटिंग्स में भाषा चुनें. इसे लागू करने के लिए ऐप पुनः आरंभ होगा."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O idioma é atualizado imediatamente."
+            "value" : "Escolha um idioma nos Ajustes do iOS. O app reiniciará para aplicá-lo."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Язык обновляется сразу."
+            "value" : "Выберите язык в Настройках iOS. Приложение перезапустится, чтобы применить его."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "语言会立即更新。"
+            "value" : "在 iOS 设置中选择语言。应用将重启以应用更改。"
           }
         }
       }
