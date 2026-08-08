@@ -69,6 +69,7 @@
 		AC000001000000000000001 /* SessionRestorePlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000010000000000000001 /* SessionRestorePlan.swift */; };
 		AC000002000000000000001 /* FileManaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000011000000000000001 /* FileManaging.swift */; };
 		AC000003000000000000001 /* PlaybackRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000012000000000000001 /* PlaybackRepository.swift */; };
+		AC000004000000000000001 /* AudioPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000013000000000000001 /* AudioPlaying.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -148,6 +149,7 @@
 		AC000010000000000000001 /* SessionRestorePlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRestorePlan.swift; sourceTree = "<group>"; };
 		AC000011000000000000001 /* FileManaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileManaging.swift; sourceTree = "<group>"; };
 		AC000012000000000000001 /* PlaybackRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRepository.swift; sourceTree = "<group>"; };
+		AC000013000000000000001 /* AudioPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlaying.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -260,6 +262,7 @@
 				A1000024000000000000001 /* AudioPlayerClient.swift */,
 				A1000026000000000000001 /* FileManagerClient.swift */,
 				AC000011000000000000001 /* FileManaging.swift */,
+				AC000013000000000000001 /* AudioPlaying.swift */,
 			);
 			path = Clients;
 			sourceTree = "<group>";
@@ -530,6 +533,7 @@
 				AC000001000000000000001 /* SessionRestorePlan.swift in Sources */,
 				AC000002000000000000001 /* FileManaging.swift in Sources */,
 				AC000003000000000000001 /* PlaybackRepository.swift in Sources */,
+				AC000004000000000000001 /* AudioPlaying.swift in Sources */,
 				A9000005000000000000001 /* SessionCodec.swift in Sources */,
 				A9000004000000000000001 /* PlaybackSession.swift in Sources */,
 				A9000003000000000000001 /* QueueMath.swift in Sources */,

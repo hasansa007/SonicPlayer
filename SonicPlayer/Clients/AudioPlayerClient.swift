@@ -2,7 +2,7 @@ import AVFoundation
 import Foundation
 import MediaPlayer
 
-struct AudioPlayerClient {
+struct AudioPlayerClient: Sendable {
     var prepare: @Sendable (URL) async throws -> Void
     var play: @Sendable (URL) async throws -> Void
     var pause: @Sendable () async -> Void

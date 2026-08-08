@@ -39,12 +39,12 @@ Domain/   pure decision logic, Foundation only, no framework and no TCA
 Models/   plain data types
 ```
 
-There is **no Repository, no DataSource, no UseCase and no DTO layer**, and that is a decision
-rather than an omission. Those layers solve problems this app does not have:
+There is **no DataSource, no UseCase and no DTO layer, and exactly one Repository**, and that is a
+decision rather than an omission. Those layers solve problems this app does not have:
 
 | Layer | Why it is absent |
 |---|---|
-| Repository / DataSource | They hide *which source answered* — cache vs network. This app has one source: the filesystem. The clients already are that abstraction, substitutable by plain assignment. |
+| Repository / DataSource | They hide *which source answered* — cache vs network. This app has one source: the filesystem. The clients already are that abstraction, substitutable by plain assignment. **One exception, taken knowingly: `PlaybackRepository` (#44) — `ARCHITECTURE.md` says why it does not meet the trigger below and was added anyway.** |
 | DTO | Wire formats drift from domain models. There is no wire. The only serialised type is `PlaybackSession`, whose JSON shape is pinned by test because it *is* the on-disk contract. |
 | UseCase | They hold orchestration reusable across UIs. There is one UI, and the business rules are pure functions in `Domain/` — wrapping each in a protocol and a class to call one function is ceremony. |
 
@@ -67,10 +67,14 @@ list with a local cache is the repository case exactly.
 Do not retrofit those layers onto the offline features to make the codebase look uniform. Uniformity
 is not the goal; each layer paying for itself is.
 
-Known cost of the current shape: orchestration lives in view models. `PlayerViewModel.restoreSession`
-and `PlayerViewModel.openFromFiles` are real business logic in the presentation layer. If a view
-model keeps growing, extract the orchestration into `Domain/` rather than reaching for the full
-layered stack.
+Known cost of the current shape: orchestration lives in view models. `PlayerViewModel.openFromFiles`
+is real business logic in the presentation layer. If a view model keeps growing, extract the
+orchestration into `Domain/` rather than reaching for the full layered stack.
+
+`restoreSession` used to be the other example and is now the worked one (#44): the decision went to
+`SessionRestorePlan`, the I/O to `PlaybackRepository`, and what stayed is the part that genuinely
+coordinates two things. Note what that did **not** buy — the file went 615 lines to 613. Splitting
+one method out of a six-concern type makes it testable, not smaller.
 
 `openFromFiles` also shows the limit of that rule. Its I/O half went to `OpenInImport` in
 `Features/Files/` rather than `Domain/`, for the same reason the recursive folder import does not
@@ -172,8 +176,9 @@ SonicPlayer/
   App/           # Entry point, AppViewModel (composition root), AppView, quickstart
   Features/      # Home/, Player/, Files/, Recording/, Settings/
   Clients/       # AudioPlayerClient, AudioRecorderClient, FileManagerClient, ArtworkClient, AudioTrimmerClient
+                 #   + AudioPlaying / FileManaging — protocols the first two conform to (#44)
   Models/        # AudioFile, FileSystemItem, PlaybackSpeed
-  Domain/        # QueueMath, PathMatching, UniqueNameResolver, SessionCodec, SessionRestorePolicy, RecordingFilename, PlaybackSession, ScrubClamp, SelectionSet, ImportFilter, QuickAction
+  Domain/        # QueueMath, PathMatching, UniqueNameResolver, SessionCodec, SessionRestorePolicy, SessionRestorePlan, RecordingFilename, PlaybackSession, ScrubClamp, SelectionSet, ImportFilter, QuickAction
   Utilities/     # ColorPalette, Theme, WaveformView, EmptyStateView, ShareSheet, etc.
   Resources/     # Assets.xcassets, Localizable.xcstrings, Quickstart.json, Info.plist
 ```
