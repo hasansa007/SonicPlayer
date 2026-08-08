@@ -1,14 +1,31 @@
 import SwiftUI
 import MediaPlayer
 
+/// The full-screen player (#47, epic #6).
+///
+/// What is left here is **composition and state** — which piece goes where, in which of the three
+/// layouts. Every measurement resolves to a token in `DesignSystem/Tokens.swift`, the repeated
+/// pieces are the three slice-1 components, and the seek arithmetic went to
+/// `Domain/ScrubGeometry` (#52, #53). `scripts/lint-magic-numbers.sh` is what keeps it that way.
 struct PlayerView: View {
     let player: PlayerViewModel
+
     @State private var showQueue = false
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
+    /// The empty/error icon, scaled. A bare `.system(size: 80)` is the same 80 points at every
+    /// accessibility setting, so at AX5 it sat beside body text three times its relative size.
+    @ScaledMetric(relativeTo: .largeTitle) private var stateIconSize = DisplayFont.stateIcon
+
+    /// One line of the track title. Fixed at 28pt it clipped the descenders at the accessibility
+    /// sizes — `ScrollingText` sits in a `GeometryReader`, which offers no intrinsic height, so
+    /// whatever is reserved here is all the title ever gets.
+    @ScaledMetric(relativeTo: .title3) private var titleLineHeight = Sizing.titleLine
+
+    private var isLandscape: Bool { verticalSizeClass == .compact }
+
     var body: some View {
         ZStack {
-            // Background
             LinearGradient(
                 colors: [
                     Color.sonicPrimaryLight.opacity(0.15),
@@ -20,9 +37,18 @@ struct PlayerView: View {
             )
             .ignoresSafeArea()
 
-            if player.currentTrack == nil {
-                emptyStateView
-            } else if verticalSizeClass == .compact {
+            if let error = player.openError {
+                errorState(error)
+            } else if player.currentTrack == nil {
+                emptyState
+            } else if player.isLoadingTrack && player.duration == 0 {
+                // `loadTrack` sets `currentTrack` and `isLoadingTrack` in the same breath, so
+                // "loading" is not "no track" — it is "a track with nothing to show yet". Gating
+                // on a zero duration keeps this off the screen during a track *switch*, where
+                // the previous duration is still valid and blanking the player would be a
+                // regression rather than a fix.
+                loadingState
+            } else if isLandscape {
                 landscapeLayout
             } else {
                 portraitLayout
@@ -30,55 +56,126 @@ struct PlayerView: View {
         }
     }
 
-    private var emptyStateView: some View {
-        VStack(spacing: 24) {
-            headerView
+    // MARK: - States
 
+    private var emptyState: some View {
+        stateContainer {
             EmptyStateView(
                 icon: "music.note",
                 title: "No Track Selected",
                 message: "Select a file from the Library to start playing",
                 iconStyle: AnyShapeStyle(LinearGradient.sonicGradient),
-                iconSize: 80,
-                spacing: 16
+                iconSize: stateIconSize,
+                spacing: Spacing.lg
             )
         }
-        .padding()
     }
 
+    /// Previously rendered as the empty state, so a slow file was indistinguishable from no file.
+    /// `isLoadingTrack` has been set in four places since #15 and read by no view until now.
+    private var loadingState: some View {
+        stateContainer {
+            VStack(spacing: Spacing.lg) {
+                ProgressView()
+                    .controlSize(.large)
+                    .tint(.sonicPrimary)
+                    .frame(height: stateIconSize)
+
+                Text("Loading Track")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.sonicTextPrimary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    /// #33 gave the view model an `openError` and nothing ever rendered it — a failed open left
+    /// the user on a blank player with no explanation.
+    private func errorState(_ message: String) -> some View {
+        stateContainer {
+            VStack(spacing: Spacing.xl) {
+                EmptyStateView(
+                    icon: "exclamationmark.triangle",
+                    title: "Couldn't Open This File",
+                    iconStyle: AnyShapeStyle(Color.sonicOrange),
+                    iconSize: stateIconSize,
+                    spacing: Spacing.lg
+                )
+
+                // Rendered separately rather than through `message:`, which is now a
+                // `LocalizedStringKey`. This string comes from the failing `Error` and is
+                // already localised by whoever produced it — running it through the catalog
+                // would look up a key that by definition is not there.
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundColor(.sonicTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, Spacing.xxl)
+
+                Button("Dismiss") { player.openError = nil }
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.sonicPrimary)
+                    .padding(.horizontal, Sizing.chipInsetH)
+                    .padding(.vertical, Spacing.sm)
+                    .background(
+                        Color.sonicPrimary.opacity(ControlTint.on),
+                        in: RoundedRectangle(cornerRadius: Radius.sm)
+                    )
+                    .buttonStyle(ScaleButtonStyle())
+            }
+        }
+    }
+
+    private func stateContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(spacing: Spacing.xxl) {
+            grabber
+            content()
+        }
+        .padding(Spacing.lg)
+    }
+
+    // MARK: - Layouts
+
     private var portraitLayout: some View {
-        VStack(spacing: 20) {
-            headerView
+        VStack(spacing: Spacing.xl) {
+            grabber
 
-            VStack(spacing: 20) {
-                // Artwork
-                artworkView
-                    .frame(height: showQueue ? 100 : nil)
+            VStack(spacing: Spacing.xl) {
+                artwork
 
-                // Track info or queue
                 if showQueue {
-                    queueListView
+                    queueList
                 } else {
-                    trackInfoView
+                    trackTitle
                 }
             }
             .frame(maxHeight: .infinity)
 
-            // Controls
-            fullPlayerControls
+            VStack(spacing: Spacing.xl) {
+                Spacer()
+                scrubberRow
+                transportRow
+                VolumeView()
+                    .frame(height: Sizing.tapTarget)
+                    .padding(.horizontal, Spacing.lg)
+                toolRow
+                Spacer()
+            }
         }
-        .padding(.horizontal, 24)
-        .padding(.bottom, 40)
+        .padding(.horizontal, Spacing.xxl)
+        .padding(.bottom, Spacing.xxxl)
     }
 
     private var landscapeLayout: some View {
-        HStack(spacing: 20) {
-            // Left side: artwork or queue
-            VStack(spacing: 8) {
+        HStack(spacing: Spacing.xl) {
+            VStack(spacing: Spacing.sm) {
                 if showQueue {
-                    queueListView
+                    queueList
                 } else {
-                    artworkView
+                    artwork
                     Text(player.currentTrack?.title ?? "")
                         .font(.caption)
                         .fontWeight(.medium)
@@ -87,231 +184,98 @@ struct PlayerView: View {
                         .multilineTextAlignment(.center)
                 }
             }
-            .frame(width: 260)
+            .frame(width: Sizing.landscapeColumn)
             .clipped()
 
-            // Right side: controls
-            VStack(spacing: 8) {
-                progressSliderWithSkipsView
-                controlsView
-                bottomControlsView
+            VStack(spacing: Spacing.sm) {
+                scrubberRow
+                transportRow
+                toolRow
             }
             .frame(maxWidth: .infinity)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 4)
+        .padding(.horizontal, Spacing.xl)
+        .padding(.vertical, Spacing.xs)
     }
 
-    // MARK: - Artwork
+    // MARK: - Pieces
 
-    private var artworkSize: CGFloat {
-        if showQueue { return 80 }
-        if verticalSizeClass == .compact { return 120 }
-        return 280
+    private var grabber: some View {
+        RoundedRectangle(cornerRadius: Radius.hairline)
+            .fill(Color.sonicTextSecondary.opacity(0.3))
+            .frame(width: Sizing.grabber.width, height: Sizing.grabber.height)
+            .padding(.top, Spacing.sm)
+            .accessibilityHidden(true)
     }
 
-    private var artworkView: some View {
-        Group {
-            if let artwork = player.artwork {
-                Image(uiImage: artwork)
-                    .resizable()
-                    .aspectRatio(1, contentMode: .fill)
-                    .frame(width: artworkSize, height: artworkSize)
-                    .clipShape(RoundedRectangle(cornerRadius: showQueue ? 12 : 16))
-            } else {
-                RoundedRectangle(cornerRadius: showQueue ? 12 : 16)
-                    .fill(LinearGradient.sonicGradient)
-                    .frame(width: artworkSize, height: artworkSize)
-                    .overlay {
-                        if player.isPlaying && !showQueue && player.progress > 0 {
-                            PlayerWaveformView(isPlaying: player.isPlaying)
-                                .frame(width: 80, height: 40)
-                                .foregroundColor(.white.opacity(0.8))
-                        } else {
-                            Image(systemName: "waveform")
-                                .font(showQueue ? .title3 : .largeTitle)
-                                .foregroundColor(.white.opacity(0.7))
-                        }
-                    }
-            }
-        }
-        .shadow(color: Color.sonicPrimary.opacity(0.2), radius: 16, x: 0, y: 8)
+    private var artworkSide: CGFloat {
+        if showQueue { return Sizing.artworkCollapsed }
+        if isLandscape { return Sizing.artworkCompact }
+        return Sizing.artworkFull
     }
 
-    // MARK: - Track Info
-
-    private var trackInfoView: some View {
-        VStack(spacing: 8) {
-            ScrollingText(text: player.currentTrack?.title ?? "Unknown Track")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundColor(.sonicTextPrimary)
-                .frame(height: 28)
-                .padding(.horizontal, 10)
-        }
+    private var artwork: some View {
+        ArtworkView(
+            image: player.artwork,
+            side: artworkSide,
+            cornerRadius: showQueue ? Radius.md : Radius.lg,
+            isPlaying: player.isPlaying && player.progress > 0,
+            showsWaveform: !showQueue
+        )
     }
 
-    // MARK: - Queue
-
-    private var queueListView: some View {
-        ScrollView {
-            if player.queue.isEmpty {
-                VStack(spacing: 16) {
-                    Spacer()
-                    Text("No tracks in queue")
-                        .font(.subheadline)
-                        .foregroundColor(.sonicTextSecondary)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 200)
-            } else {
-                LazyVStack(spacing: 8) {
-                    ForEach(Array(player.queue.enumerated()), id: \.element.id) { index, track in
-                        HStack(spacing: 12) {
-                            if index == player.currentIndex {
-                                Image(systemName: "speaker.wave.3.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.sonicPrimary)
-                                    .frame(width: 24)
-                            } else {
-                                Text("\(index + 1)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .monospacedDigit()
-                                    .frame(width: 24)
-                            }
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(track.title)
-                                    .font(.subheadline)
-                                    .fontWeight(index == player.currentIndex ? .semibold : .regular)
-                                    .foregroundColor(.sonicTextPrimary)
-                                    .lineLimit(1)
-
-                                Text(track.durationFormatted)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-
-                            Spacer()
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background {
-                            if index == player.currentIndex {
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.sonicPrimary.opacity(0.1))
-                            }
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if index != player.currentIndex {
-                                player.jumpToTrack(index)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 4)
-            }
-        }
+    private var trackTitle: some View {
+        ScrollingText(text: player.currentTrack?.title ?? String(localized: "Unknown Track"))
+            .font(.title3)
+            .fontWeight(.semibold)
+            .foregroundColor(.sonicTextPrimary)
+            .frame(height: titleLineHeight)
+            .padding(.horizontal, Spacing.sm)
     }
 
-    // MARK: - Controls
+    private var scrubberRow: some View {
+        VStack(spacing: Spacing.md) {
+            HStack(spacing: Spacing.lg) {
+                IconControlButton(
+                    systemImage: "gobackward.\(Int(player.skipDuration.rawValue))",
+                    label: Text("Skip back \(Int(player.skipDuration.rawValue)) seconds"),
+                    action: { player.skipBackward() }
+                )
 
-    private var fullPlayerControls: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            progressSliderWithSkipsView
-            controlsView
-            VolumeView()
-                .frame(height: 40)
-                .padding(.horizontal)
-            bottomControlsView
-            Spacer()
-        }
-    }
+                SonicScrubber(
+                    progress: player.progress,
+                    duration: player.duration,
+                    onSeek: { player.seek(to: $0) }
+                )
 
-    private var headerView: some View {
-        VStack(spacing: 0) {
-            RoundedRectangle(cornerRadius: 3)
-                .fill(Color.sonicTextSecondary.opacity(0.3))
-                .frame(width: 36, height: 5)
-                .padding(.top, 8)
-        }
-    }
-
-    private var progressSliderWithSkipsView: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 16) {
-                Button {
-                    player.skipBackward()
-                } label: {
-                    Image(systemName: "gobackward.\(Int(player.skipDuration.rawValue))")
-                        .font(.title3)
-                        .foregroundColor(.sonicPrimary)
-                        .frame(width: 44, height: 44)
-                }
-
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.sonicBorder)
-                            .frame(height: 8)
-
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.sonicPrimary)
-                            .frame(width: geometry.size.width * player.progress, height: 8)
-                            .animation(.linear(duration: 0.1), value: player.progress)
-                    }
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                let progress = min(max(0, value.location.x / geometry.size.width), 1)
-                                let newTime = progress * player.duration
-                                player.seek(to: newTime)
-                            }
-                    )
-                }
-                .frame(height: 8)
-
-                Button {
-                    player.skipForward()
-                } label: {
-                    Image(systemName: "goforward.\(Int(player.skipDuration.rawValue))")
-                        .font(.title3)
-                        .foregroundColor(.sonicPrimary)
-                        .frame(width: 44, height: 44)
-                }
+                IconControlButton(
+                    systemImage: "goforward.\(Int(player.skipDuration.rawValue))",
+                    label: Text("Skip forward \(Int(player.skipDuration.rawValue)) seconds"),
+                    action: { player.skipForward() }
+                )
             }
 
             HStack {
                 Text(player.currentTimeFormatted ?? "0:00")
-                    .font(.caption)
-                    .foregroundColor(.sonicTextSecondary)
-                    .monospacedDigit()
-
                 Spacer()
-
                 Text(player.durationFormatted ?? "0:00")
-                    .font(.caption)
-                    .foregroundColor(.sonicTextSecondary)
-                    .monospacedDigit()
             }
+            .font(.sonicTimeLabel)
+            .foregroundColor(.sonicTextSecondary)
+            .monospacedDigit()
         }
     }
 
-    private var controlsView: some View {
-        HStack(spacing: 40) {
-            Button {
-                player.previousTrack()
-            } label: {
-                Image(systemName: "backward.end.fill")
-                    .font(.title2)
-                    .foregroundColor(player.hasPreviousTrack ? .sonicPrimary : .sonicTextMuted)
-                    .frame(width: 56, height: 56)
-            }
-            .disabled(!player.hasPreviousTrack && player.currentTime < 3)
+    private var transportRow: some View {
+        HStack(spacing: Spacing.xxxl) {
+            IconControlButton(
+                systemImage: "backward.end.fill",
+                label: Text("Previous track"),
+                size: .secondary,
+                font: .sonicTransportGlyph,
+                isEnabled: player.hasPreviousTrack || player.canRestartCurrentTrack,
+                action: { player.previousTrack() }
+            )
 
             Button {
                 player.playPauseTapped()
@@ -319,31 +283,32 @@ struct PlayerView: View {
                 ZStack {
                     Circle()
                         .fill(Color.sonicPrimary)
-                        .frame(width: 64, height: 64)
-                        .shadow(color: Color.sonicPrimary.opacity(0.3), radius: 8, x: 0, y: 4)
+                        .frame(width: Sizing.playButton, height: Sizing.playButton)
+                        .sonicShadow(Elevation.control)
 
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.title2)
+                        .font(.sonicTransportGlyph)
                         .foregroundColor(.white)
-                        .offset(x: player.isPlaying ? 0 : 2)
+                        // The play triangle's visual centre sits left of its bounding box's;
+                        // the pause bars' does not, so only one glyph is nudged.
+                        .offset(x: player.isPlaying ? 0 : Sizing.playGlyphOpticalOffset)
                 }
             }
+            .accessibilityLabel(Text(player.isPlaying ? "Pause" : "Play"))
 
-            Button {
-                player.nextTrack()
-            } label: {
-                Image(systemName: "forward.end.fill")
-                    .font(.title2)
-                    .foregroundColor(player.hasNextTrack ? .sonicPrimary : .sonicTextMuted)
-                    .frame(width: 56, height: 56)
-            }
-            .disabled(!player.hasNextTrack)
+            IconControlButton(
+                systemImage: "forward.end.fill",
+                label: Text("Next track"),
+                size: .secondary,
+                font: .sonicTransportGlyph,
+                isEnabled: player.hasNextTrack,
+                action: { player.nextTrack() }
+            )
         }
     }
 
-    private var bottomControlsView: some View {
+    private var toolRow: some View {
         HStack {
-            // Speed control
             Menu {
                 ForEach(PlaybackSpeed.allCases) { speed in
                     Button {
@@ -363,46 +328,109 @@ struct PlayerView: View {
                     .fontWeight(.semibold)
                     .monospacedDigit()
                     .foregroundColor(.sonicPrimary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Color.sonicPrimary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                    .padding(.horizontal, Sizing.chipInsetH)
+                    .padding(.vertical, Spacing.sm)
+                    .background(
+                        Color.sonicPrimary.opacity(ControlTint.on),
+                        in: RoundedRectangle(cornerRadius: Radius.sm)
+                    )
             }
+            .accessibilityLabel(Text("Playback speed"))
 
-            // Repeat mode
-            Button {
-                player.toggleRepeatMode()
-            } label: {
-                Image(systemName: player.repeatMode.icon)
-                    .font(.title3)
-                    .foregroundColor(player.repeatMode == .off ? .sonicTextMuted : .sonicPrimary)
-                    .frame(width: 44, height: 44)
-                    .background(Color.sonicPrimary.opacity(player.repeatMode == .off ? 0.05 : 0.1), in: RoundedRectangle(cornerRadius: 8))
-            }
+            Spacer(minLength: 0)
 
-            // Shuffle
-            Button {
-                player.toggleShuffle()
-            } label: {
-                Image(systemName: "shuffle")
-                    .font(.title3)
-                    .foregroundColor(player.isShuffleEnabled ? .sonicPrimary : .sonicTextMuted)
-                    .frame(width: 44, height: 44)
-                    .background(Color.sonicPrimary.opacity(player.isShuffleEnabled ? 0.1 : 0.05), in: RoundedRectangle(cornerRadius: 8))
-            }
+            IconControlButton(
+                systemImage: player.repeatMode.icon,
+                label: Text("Repeat"),
+                style: .toggle(isOn: player.repeatMode != .off),
+                action: { player.toggleRepeatMode() }
+            )
 
-            // Queue toggle
-            Button {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    showQueue.toggle()
+            IconControlButton(
+                systemImage: "shuffle",
+                label: Text("Shuffle"),
+                style: .toggle(isOn: player.isShuffleEnabled),
+                action: { player.toggleShuffle() }
+            )
+
+            IconControlButton(
+                systemImage: showQueue ? "list.bullet.rectangle.fill" : "list.bullet.rectangle",
+                label: Text("Queue"),
+                style: .toggle(isOn: showQueue),
+                action: { withAnimation(Motion.panel) { showQueue.toggle() } }
+            )
+        }
+    }
+
+    private var queueList: some View {
+        ScrollView {
+            if player.queue.isEmpty {
+                Text("No tracks in queue")
+                    .font(.subheadline)
+                    .foregroundColor(.sonicTextSecondary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: Sizing.queuePlaceholder)
+            } else {
+                LazyVStack(spacing: Spacing.sm) {
+                    ForEach(Array(player.queue.enumerated()), id: \.element.id) { index, track in
+                        queueRow(index: index, track: track)
+                    }
                 }
-            } label: {
-                Image(systemName: showQueue ? "list.bullet.rectangle.fill" : "list.bullet.rectangle")
-                    .font(.title3)
-                    .foregroundColor(.sonicPrimary)
-                    .frame(width: 44, height: 44)
-                    .background(Color.sonicPrimary.opacity(showQueue ? 0.15 : 0.1), in: RoundedRectangle(cornerRadius: 8))
+                .padding(.horizontal, Spacing.xs)
             }
         }
+    }
+
+    /// Left inline rather than extracted. It has exactly one consumer today, and #48 is the slice
+    /// that gives the shared Row a second — building it here would repeat the `AudioPlaying`
+    /// mistake of a boundary with nothing behind it.
+    private func queueRow(index: Int, track: AudioFile) -> some View {
+        HStack(spacing: Spacing.md) {
+            Group {
+                if index == player.currentIndex {
+                    Image(systemName: "speaker.wave.3.fill")
+                        .foregroundColor(.sonicPrimary)
+                        .accessibilityLabel(Text("Now playing"))
+                } else {
+                    Text("\(index + 1)")
+                        .foregroundColor(.sonicTextSecondary)
+                        .monospacedDigit()
+                }
+            }
+            .font(.caption)
+            .frame(width: Spacing.xxl)
+
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                Text(track.title)
+                    .font(.subheadline)
+                    .fontWeight(index == player.currentIndex ? .semibold : .regular)
+                    .foregroundColor(.sonicTextPrimary)
+                    .lineLimit(1)
+
+                Text(track.durationFormatted)
+                    .font(.caption2)
+                    .foregroundColor(.sonicTextSecondary)
+                    .monospacedDigit()
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Spacing.md)
+        .padding(.vertical, Spacing.sm)
+        .background {
+            if index == player.currentIndex {
+                RoundedRectangle(cornerRadius: Radius.sm)
+                    .fill(Color.sonicPrimary.opacity(ControlTint.on))
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if index != player.currentIndex {
+                player.jumpToTrack(index)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(index == player.currentIndex ? [.isSelected] : [])
     }
 }
 
@@ -423,11 +451,25 @@ struct VolumeView: UIViewRepresentable {
 
 // MARK: - Scrolling Text
 
+/// A title too long for its container, scrolled horizontally.
+///
+/// **Carried across unchanged, and it is the one RTL gap slice 1 leaves open.** The scroll is
+/// hardcoded leftward, which is correct for the eight LTR languages and backwards for Arabic.
+/// Fixing it means reworking the animation around `layoutDirection` — a behaviour change to a
+/// component, where this slice is a layout extraction whose done-when requires playback
+/// behaviour to be unchanged. Filed as #54 so it closes on its own issue, per #6's rule.
 struct ScrollingText: View {
     let text: String
     @State private var offset: CGFloat = 10
     @State private var textWidth: CGFloat = 0
     @State private var containerWidth: CGFloat = 0
+
+    /// The gap between the title and its wrapped second copy.
+    private static let wrapGap = Spacing.xxxl
+    /// Points per second. Long titles take proportionally longer rather than speeding up.
+    private static let scrollSpeed: Double = 30
+    /// How long the title sits still before it starts, so a glance can read the beginning.
+    private static let startDelay: TimeInterval = 2
 
     var body: some View {
         GeometryReader { geometry in
@@ -452,7 +494,7 @@ struct ScrollingText: View {
 
                 if textWidth > containerWidth {
                     Text(text)
-                        .offset(x: offset + textWidth + 40)
+                        .offset(x: offset + textWidth + Self.wrapGap)
                         .fixedSize()
                 }
             }
@@ -472,49 +514,11 @@ struct ScrollingText: View {
     }
 
     private func startScrolling() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            let duration = max(0.1, Double(textWidth) / 30)
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.startDelay) {
+            let duration = max(0.1, Double(textWidth) / Self.scrollSpeed)
             withAnimation(.linear(duration: duration).repeatForever(autoreverses: false)) {
-                offset = -(textWidth + 40)
+                offset = -(textWidth + Self.wrapGap)
             }
         }
-    }
-}
-
-// MARK: - Player Waveform Animation
-
-struct PlayerWaveformView: View {
-    let isPlaying: Bool
-    @State private var animating = false
-
-    private let barCount = 5
-    private let minHeight: CGFloat = 8
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 5) {
-            ForEach(0..<barCount, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 3)
-                    .frame(width: 6, height: animating ? barHeight(index) : minHeight)
-                    .animation(
-                        isPlaying ?
-                            .easeInOut(duration: Double.random(in: 0.3...0.6))
-                            .repeatForever(autoreverses: true)
-                            .delay(Double(index) * 0.1) :
-                            .easeOut(duration: 0.3),
-                        value: animating
-                    )
-            }
-        }
-        .onAppear {
-            if isPlaying { animating = true }
-        }
-        .onChange(of: isPlaying) { _, newValue in
-            animating = newValue
-        }
-    }
-
-    private func barHeight(_ index: Int) -> CGFloat {
-        let heights: [CGFloat] = [28, 36, 20, 32, 24]
-        return heights[index % heights.count]
     }
 }

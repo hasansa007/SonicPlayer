@@ -74,6 +74,14 @@ final class PlayerViewModel {
     var hasPreviousTrack: Bool { !queue.isEmpty && currentIndex > 0 }
     var shouldShowMiniPlayer: Bool { currentTrack != nil && !isExpanded && duration > 0 }
 
+    /// Past this point into a track, "previous" is understood as *restart this one* — which is
+    /// why the button stays live at the head of the queue.
+    static let restartThreshold: TimeInterval = 3
+
+    /// Kept off the view so `PlayerView` holds no thresholds of its own (#47). The literal `3`
+    /// used to sit inline in the button's `.disabled(...)`, where nothing named it.
+    var canRestartCurrentTrack: Bool { currentTime >= Self.restartThreshold }
+
     // MARK: - Effects
 
     /// Replaces `CancelID.timeObserver`. Must be cancelled wherever the reducer cancelled it.

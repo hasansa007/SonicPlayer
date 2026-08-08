@@ -2,16 +2,21 @@ import SwiftUI
 
 struct EmptyStateView: View {
     let icon: String
-    let title: String
-    let message: String?
+    // `LocalizedStringKey`, not `String` (#47). `Text(someString)` binds to the `StringProtocol`
+    // overload, which does **not** localize — so every empty state in the app rendered its
+    // English source text in all nine languages, even though the strings were sitting in
+    // `Localizable.xcstrings` the whole time. Every caller passes a literal, and
+    // `LocalizedStringKey` is `ExpressibleByStringLiteral`, so none of them had to change.
+    let title: LocalizedStringKey
+    let message: LocalizedStringKey?
     let iconStyle: AnyShapeStyle
     let iconSize: CGFloat
     let spacing: CGFloat
 
     init(
         icon: String,
-        title: String,
-        message: String? = nil,
+        title: LocalizedStringKey,
+        message: LocalizedStringKey? = nil,
         iconStyle: AnyShapeStyle,
         iconSize: CGFloat = 72,
         spacing: CGFloat = 20

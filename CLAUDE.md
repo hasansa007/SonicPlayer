@@ -155,7 +155,18 @@ which is what keeps it uncreated under test; `isRunningTests` in that file depen
 - **Naming**: features as `{Name}ViewModel.swift` / `{Name}View.swift`; clients as `{Name}Client.swift`
 - **Colors**: Use `ColorPalette` constants (`sonicPrimary`, `sonicTextPrimary`, etc.) - never hardcode hex
 - **Styles**: Reusable button styles and modifiers defined in `Theme.swift`
-- **No magic numbers**: Use constants or theme values for spacing/sizing
+- **No magic numbers**: layout values come from `DesignSystem/Tokens.swift` — `Spacing`, `Radius`,
+  `Sizing`, `Elevation` (via `.sonicShadow(_:)`), `Motion`. Run `./scripts/lint-magic-numbers.sh`
+  before a PR; it checks the screens the #6 epic has already migrated and each slice appends its
+  own files to the list. `--all` shows the whole backlog. Zero dependencies on purpose — no
+  SwiftLint (#20)
+- **Type**: use SwiftUI's semantic styles (`.title3`, `.subheadline`) **directly**. There is
+  deliberately no parallel type scale — see `docs/adr/0002-design-system-foundation.md`.
+  `Font.sonic*` exists only for a style-plus-weight role with 2+ consumers, and `DisplayFont`
+  only for genuinely fixed sizes, which must be read through `@ScaledMetric`
+- **Components before literals**: a repeated control belongs in `DesignSystem/Components/`, but
+  **only once it has a second consumer** — a component with one caller is the `AudioPlaying`
+  mistake in a new place
 - **Empty states**: Use `EmptyStateView` for consistent empty state UI
 - **Localization**: All user-facing strings must go through `Localizable.xcstrings` (9 languages supported: en, es, fr, ar, zh-Hans, hi, pt, ru, bn)
 
