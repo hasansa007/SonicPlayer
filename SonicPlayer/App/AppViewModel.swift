@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI    // ScenePhase only — this type renders nothing.
 
 /// The composition root, and what replaced `AppFeature` and the root `Store` (#19).
 ///
@@ -18,6 +19,13 @@ import Observation
 /// **Deliberately not a place for logic.** It composes, it wires, and it holds the three
 /// presentation flags. Anything that decides something belongs on the view model that owns the
 /// state, or in `Domain/`.
+///
+/// **One exception, taken knowingly (#41):** it holds a `FileManagerClient` and decides, in
+/// `scenePhaseChanged`, when to drain iOS's staging directory. That is app housekeeping no feature
+/// owns — draining belongs to neither the player nor the browser — and its two conditions
+/// (`.background` only, and never while an import is in flight) are lifecycle facts rather than
+/// domain rules, so `Domain/` would not hold them either. ADR 0003 has the reasoning. If a second
+/// such thing appears, that is the signal this rule needs revisiting rather than another exception.
 @MainActor
 @Observable
 final class AppViewModel {
@@ -48,6 +56,10 @@ final class AppViewModel {
     /// wiring below can push onto it without reaching back into the view.
     var path: [URL] = []
 
+    /// Held for one reason: draining iOS's hand-off directory (#41). No feature owns that — it is
+    /// housekeeping for the app, not state any screen shows.
+    private let fileManager: FileManagerClient
+
     /// The live composition. Separate from the designated initialiser below because a default
     /// argument expression is evaluated in a *nonisolated* context, and every one of these
     /// initialisers is `@MainActor` — so they cannot be defaults, only a body.
@@ -66,13 +78,15 @@ final class AppViewModel {
         recording: RecordingViewModel,
         settings: SettingsViewModel,
         filesRoot: CollectionsViewModel,
-        onboarding: OnboardingViewModel?
+        onboarding: OnboardingViewModel?,
+        fileManager: FileManagerClient = .live
     ) {
         self.player = player
         self.recording = recording
         self.settings = settings
         self.filesRoot = filesRoot
         self.onboarding = onboarding
+        self.fileManager = fileManager
         // Home holds the *same* player instance — that is what let `HomeFeature`'s three mirrored
         // playback properties be deleted rather than ported (#16), so it cannot be defaulted
         // independently of `player`.
@@ -116,6 +130,37 @@ final class AppViewModel {
     /// because it has to outrank the session restore running alongside it (#33).
     func openedFromFiles(_ url: URL) {
         player.openFromFiles(url) { [filesRoot] in filesRoot.refreshFiles() }
+    }
+
+    /// Forwards to the player, and takes the one piece of housekeeping that belongs to no feature.
+    ///
+    /// **Draining on `.background`, not at launch, is the whole point.** `OpenInImport` keeps the
+    /// staging directory empty from #41 onward, but installs that predate it still hold copies iOS
+    /// left there — now invisible, because the browser filters that directory. A launch-time drain
+    /// would race `.onOpenURL`: launching the app *by opening a file* is exactly when a staged file
+    /// is sitting there waiting to be imported, and the two orderings are not guaranteed — the
+    /// session-restore comment above this type says so. Backgrounding cannot collide with a
+    /// hand-off, because iOS stages the file when the user shares it, which is after this ran.
+    ///
+    /// **Synchronous, and that is the correction that makes the placement true.** The first version
+    /// dispatched into a `Task`, and measured on the simulator the app suspended before that
+    /// continuation ever ran: the drain landed on the *next foreground* instead — reintroducing the
+    /// race it was placed here to avoid, because the next foreground is often the `.onOpenURL` that
+    /// follows the user sharing a file. Deleting a handful of directory entries on the main actor
+    /// costs less than the `session.json` write happening beside it on the same line.
+    ///
+    /// **An in-flight import outranks it.** `openFromFiles` runs the move detached, so it can still
+    /// be working on a file in that directory when the app backgrounds — a large file plus a user
+    /// who switches away is all it takes. Draining then would delete the file mid-import, losing it
+    /// and raising "Action Failed" for an open iOS had already accepted. Skipping is free: the
+    /// leftovers this clears are old, and the next backgrounding gets them.
+    ///
+    /// Failure is swallowed for the same reason it is in `OpenInImport`: not tidying a directory
+    /// the user cannot see must not surface as an error they cannot act on.
+    func scenePhaseChanged(_ phase: ScenePhase) {
+        player.scenePhaseChanged(phase)
+        guard phase == .background, !player.isImporting else { return }
+        try? fileManager.drainStagingDirectory()
     }
 
     // MARK: - Wiring

@@ -11,6 +11,14 @@ struct FileManagerClient: Sendable {
     var renameItem: @Sendable (URL, String) async throws -> Void
     var importFile: @Sendable (URL, URL?) async throws -> Void
     var getMetadata: @Sendable (URL) async throws -> AudioFile
+    /// Empties iOS's hand-off directory. See `ImportFilter.stagingDirectoryName` (#41).
+    ///
+    /// Synchronous on purpose — the only member here that does I/O without being `async`. Its
+    /// caller runs at `scenePhase == .background`, where an `async` hop is not merely slower: it
+    /// does not reliably run at all. Measured 2026-08-08: the app suspends before the continuation
+    /// is scheduled, and the work lands on the *next foreground* instead, which is exactly when an
+    /// `.onOpenURL` import may be in flight over the same directory.
+    var drainStagingDirectory: @Sendable () throws -> Void
     var documentsDirectory: @Sendable () -> URL = { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
 }
 
@@ -80,12 +88,15 @@ extension FileManagerClient {
 
                 let audioExtensions = ["mp3", "m4a", "wav", "aac", "flac", "aiff", "m4b", "mp4", "opus", "ogg"]
                 
+                // `Documents/Inbox` is iOS's hand-off queue, not a collection the user made — and
+                // it is not hidden, so `.skipsHiddenFiles` does not exclude it. Before #41 it
+                // surfaced on Home as a collection nobody created. (#41)
                 let contents = try FileManager.default.contentsOfDirectory(
                     at: targetPath,
                     includingPropertiesForKeys: [.isDirectoryKey, .creationDateKey, .fileSizeKey],
                     options: [.skipsHiddenFiles]
-                )
-                
+                ).filter { !ImportFilter.isStagingDirectory($0, under: documentsDirectory) }
+
                 return try await withThrowingTaskGroup(of: FileSystemItem?.self) { group in
                     for url in contents {
                         group.addTask {
@@ -219,6 +230,19 @@ extension FileManagerClient {
                 }
             },
             getMetadata: getMetadata,
+            // Deletes contents, not the directory: iOS owns `Inbox` and recreates it on the next
+            // hand-off, so removing it is a fight with the system for no gain. Everything in here
+            // is a copy iOS made — the user's original is wherever they keep it — which is what
+            // makes a delete the right operation and not a destructive one. (#41)
+            drainStagingDirectory: {
+                let staging = ImportFilter.stagingDirectory(under: documentsDirectory)
+                guard FileManager.default.fileExists(atPath: staging.path) else { return }
+                for item in try FileManager.default.contentsOfDirectory(
+                    at: staging, includingPropertiesForKeys: nil
+                ) {
+                    try FileManager.default.removeItem(at: item)
+                }
+            },
             documentsDirectory: { documentsDirectory }
         )
     }()

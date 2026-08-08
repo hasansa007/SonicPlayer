@@ -1,4 +1,6 @@
 import Foundation
+import SwiftUI          // ScenePhase
+import Synchronization  // Mutex — the drain closure is @Sendable
 import Testing
 
 @testable import SonicPlayer
@@ -137,7 +139,7 @@ struct AppViewModelTests {
     /// `.test` clients throughout, so constructing this touches no audio session and no real
     /// file system. `onboarding` is nil because every test here is past first launch.
     @MainActor
-    private func makeApp() -> AppViewModel {
+    private func makeApp(fileManager: FileManagerClient = .test) -> AppViewModel {
         var audioPlayer = AudioPlayerClient.test
         // Reached by `clearSessionIfAffected` — clearing the session must stop playback, not just
         // forget the track.
@@ -154,8 +156,68 @@ struct AppViewModelTests {
             recording: RecordingViewModel(audioRecorder: .test, audioPlayer: audioPlayer, fileManager: .test),
             settings: SettingsViewModel(),
             filesRoot: CollectionsViewModel(currentDirectory: nil, fileManager: .test),
-            onboarding: nil
+            onboarding: nil,
+            fileManager: fileManager
         )
+    }
+
+    // MARK: - Draining iOS's staging directory (#41)
+
+    /// Installs that predate #41 still hold copies iOS left in `Documents/Inbox`, and the browser
+    /// now filters that directory — so they are invisible as well as orphaned. This is what clears
+    /// them.
+    ///
+    /// The assertion has no `await` in it deliberately. The drain must have **finished** by the
+    /// time the handler returns, because after that the app may be suspended: an earlier version
+    /// dispatched into a `Task` and, measured on the simulator, ran on the next foreground instead
+    /// — which is where an `.onOpenURL` import can be in flight over the same directory. A test
+    /// that polled for the flag passed against that version too.
+    @MainActor
+    @Test func test_backgrounding_drainsTheStagingDirectory() {
+        let drained = Mutex(false)
+        var fileManager = FileManagerClient.test
+        fileManager.drainStagingDirectory = { drained.withLock { $0 = true } }
+        let app = makeApp(fileManager: fileManager)
+
+        app.scenePhaseChanged(.background)
+
+        #expect(drained.withLock { $0 }, "The drain must complete before the handler returns (#41).")
+    }
+
+    /// **The race this placement exists to avoid.** Launching the app *by opening a file* is
+    /// precisely when a staged file is sitting in `Inbox` waiting for `.onOpenURL`, and the
+    /// ordering of `.onOpenURL` against the launch path is not guaranteed. Draining on any phase
+    /// but `.background` could delete the file the user just asked to open.
+    /// `openFromFiles` runs its move detached, so it can still be working inside `Inbox` when the
+    /// app backgrounds. Draining then deletes the file mid-import — the import is lost, and the
+    /// user gets "Action Failed" for an open iOS already accepted.
+    @MainActor
+    @Test func test_backgrounding_doesNotDrainWhileAnImportIsInFlight() throws {
+        let drained = Mutex(false)
+        var fileManager = FileManagerClient.test
+        fileManager.drainStagingDirectory = { drained.withLock { $0 = true } }
+        let app = makeApp(fileManager: fileManager)
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DrainRace-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+
+        app.player.openFromFiles(dir.appendingPathComponent("Never Resolves.mp3"))
+        app.scenePhaseChanged(.background)
+
+        #expect(!drained.withLock { $0 }, "An in-flight import outranks the drain (#41).")
+    }
+
+    @MainActor
+    @Test func test_becomingActiveOrInactive_neverDrains() {
+        let drained = Mutex(false)
+        var fileManager = FileManagerClient.test
+        fileManager.drainStagingDirectory = { drained.withLock { $0 = true } }
+        let app = makeApp(fileManager: fileManager)
+
+        app.scenePhaseChanged(.active)
+        app.scenePhaseChanged(.inactive)
+
+        #expect(!drained.withLock { $0 }, "Only backgrounding may drain — anything earlier races the open (#41).")
     }
 
     private func audioFile(at url: URL) -> AudioFile {

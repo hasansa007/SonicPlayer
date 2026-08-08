@@ -127,8 +127,9 @@ struct OpenFromFilesTests {
         #expect(try Data(contentsOf: written) == Data(contentsOf: source))
     }
 
-    /// Preserved from the code this replaces: a name already present means already imported, so
-    /// it is returned untouched rather than copied a second time.
+    /// An import never overwrites what is already there. Since #41 a file that shares a name but
+    /// not its contents is a *different file*, so it lands beside the existing one rather than
+    /// being silently treated as it — the existing copy is still untouched either way.
     @Test func test_import_doesNotOverwriteAFileAlreadyThere() throws {
         let dir = try TempDir()
         let source = try dir.write("Track.mp3", in: dir.source, contents: "new")
@@ -136,8 +137,22 @@ struct OpenFromFilesTests {
 
         let written = try OpenInImport.run(url: source, into: dir.url)
 
+        #expect(try String(contentsOf: existing, encoding: .utf8) == "original", "The existing file is untouched.")
+        #expect(written == dir.url.appendingPathComponent("Track 2.mp3"), "The different file gets its own name.")
+        #expect(try String(contentsOf: written, encoding: .utf8) == "new", "…and it is the file the user opened.")
+    }
+
+    /// The same file re-opened is still one copy — identity is the bytes, so this is the case the
+    /// name check was always trying to catch and kept missing.
+    @Test func test_import_anIdenticalFileIsTreatedAsAlreadyImported() throws {
+        let dir = try TempDir()
+        let source = try dir.write("Track.mp3", in: dir.source, contents: "same audio")
+        let existing = try dir.write("Track.mp3", contents: "same audio")
+
+        let written = try OpenInImport.run(url: source, into: dir.url)
+
         #expect(written == existing)
-        #expect(try String(contentsOf: written, encoding: .utf8) == "original")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: dir.url.path).filter { $0.hasSuffix(".mp3") } == ["Track.mp3"])
     }
 
     @Test func test_import_throwsWhenTheSourceIsMissing() throws {
@@ -146,6 +161,131 @@ struct OpenFromFilesTests {
         #expect(throws: (any Error).self) {
             try OpenInImport.run(url: dir.source.appendingPathComponent("Gone.mp3"), into: dir.url)
         }
+    }
+
+    // MARK: - #41
+
+    /// The guard above only fires when the handed-over file still carries its original name, and
+    /// on a real device it does not.
+    ///
+    /// Despite `LSSupportsOpeningDocumentsInPlace`, a file opened from outside a file provider is
+    /// copied into `Documents/Inbox/` before the app is told about it — and iOS dedupes that name
+    /// **itself**, so the second open arrives as `Track-1.mp3`. `Documents/Track-1.mp3` does not
+    /// exist, so the "already imported" guard passes and a second copy is written. The guard meant
+    /// to prevent the duplicate is defeated by a rename that happens before the app sees the file.
+    @Test func test_import_openingTheSameFileTwiceLeavesOneCopy() throws {
+        let dir = try TempDir()
+        let inbox = dir.url.appendingPathComponent("Inbox")
+        try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+        let usersFile = try dir.write("Track.mp3", in: dir.source)
+
+        _ = try OpenInImport.run(url: try stage(usersFile, into: inbox), into: dir.url)
+        _ = try OpenInImport.run(url: try stage(usersFile, into: inbox), into: dir.url)
+
+        let imported = try FileManager.default
+            .contentsOfDirectory(atPath: dir.url.path)
+            .filter { ImportFilter.isAudio(URL(fileURLWithPath: $0)) }
+            .sorted()
+
+        #expect(
+            imported == ["Track.mp3"],
+            "Opening one file twice must leave one copy, not one per open (#41). Found: \(imported)"
+        )
+    }
+
+    /// What iOS does *before* `.onOpenURL` fires: copy the file into `Documents/Inbox`, deduping
+    /// the name against whatever is already queued there.
+    ///
+    /// The dedupe is the entire mechanism of #41, and note what it depends on — it only happens
+    /// when a previous hand-off was **left behind**. Hard-coding `Track-1.mp3` as the second
+    /// staged name (which this test did at first) bakes in the old bug's output and then asserts
+    /// against it: under the fix the queue is empty, so the second hand-off keeps its own name and
+    /// a `Track-1.mp3` could only be a *different file the user owns* — which must import
+    /// separately, not be swallowed as a duplicate.
+    private func stage(_ file: URL, into inbox: URL) throws -> URL {
+        let base = file.deletingPathExtension().lastPathComponent
+        let ext = file.pathExtension
+        var candidate = inbox.appendingPathComponent(file.lastPathComponent)
+        var suffix = 1
+        while FileManager.default.fileExists(atPath: candidate.path) {
+            candidate = inbox.appendingPathComponent("\(base)-\(suffix).\(ext)")
+            suffix += 1
+        }
+        try FileManager.default.copyItem(at: file, to: candidate)
+        return candidate
+    }
+
+    /// Draining the queue is what removes the *cause* of the rename: with `Inbox` empty, iOS has
+    /// nothing to dedupe against, so the next hand-off arrives under its own name and the
+    /// already-imported guard works as it always claimed to.
+    @Test func test_import_consumesTheStagedCopyInsteadOfLeavingIt() throws {
+        let dir = try TempDir()
+        let inbox = dir.url.appendingPathComponent("Inbox")
+        try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+        let staged = try dir.write("Track.mp3", in: inbox)
+
+        _ = try OpenInImport.run(url: staged, into: dir.url)
+
+        #expect(!FileManager.default.fileExists(atPath: staged.path), "The staged copy must be drained (#41).")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: inbox.path).isEmpty)
+    }
+
+    /// Re-opening something already imported must ALSO drain the queue — otherwise the staged copy
+    /// left behind by the no-op path is what renames the next one.
+    ///
+    /// The two files carry the *same* contents, because that is what "re-opening the same file"
+    /// means and it is the only case in which discarding the staged copy is safe. An earlier
+    /// version of this test wrote `"restaged"` against an imported `"original"` — two different
+    /// files — and asserted the staged one was deleted anyway. It passed, and it was asserting the
+    /// data loss that `test_import_neverDeletesADifferentFileThatSharesAName` now forbids.
+    @Test func test_import_drainsTheQueueEvenWhenTheFileIsAlreadyImported() throws {
+        let dir = try TempDir()
+        let inbox = dir.url.appendingPathComponent("Inbox")
+        try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+        try dir.write("Track.mp3", contents: "the same audio")
+        let staged = try dir.write("Track.mp3", in: inbox, contents: "the same audio")
+
+        let written = try OpenInImport.run(url: staged, into: dir.url)
+
+        #expect(written == dir.url.appendingPathComponent("Track.mp3"), "The imported copy wins.")
+        #expect(!FileManager.default.fileExists(atPath: staged.path), "The staged copy still has to go (#41).")
+    }
+
+    /// A name collision is not proof of identity. Two different files can share a name — a re-sent
+    /// lecture, a second `recording.m4a` — and the already-imported branch must neither destroy the
+    /// one the user just handed over nor play the older one in its place.
+    ///
+    /// This began as a guard that the staged file merely *survived*, because the first fix stopped
+    /// at not-deleting. Surviving in a directory the browser hides is not much better than deleted,
+    /// so it now asserts the real requirement: the user gets the file they opened.
+    @Test func test_import_neverSwallowsADifferentFileThatSharesAName() throws {
+        let dir = try TempDir()
+        let inbox = dir.url.appendingPathComponent("Inbox")
+        try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+        let alreadyImported = try dir.write("Song.mp3", contents: "already imported")
+        let staged = try dir.write("Song.mp3", in: inbox, contents: "the one just shared")
+
+        let written = try OpenInImport.run(url: staged, into: dir.url)
+
+        #expect(try String(contentsOf: written, encoding: .utf8) == "the one just shared", "#41")
+        #expect(written == dir.url.appendingPathComponent("Song 2.mp3"))
+        #expect(try String(contentsOf: alreadyImported, encoding: .utf8) == "already imported")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: inbox.path).isEmpty, "Consumed, not left.")
+    }
+
+    /// **The data-loss guard.** `LSSupportsOpeningDocumentsInPlace` is `true`, so the handed-over
+    /// URL is often the user's own file in iCloud Drive or on a USB drive. Consuming is only ever
+    /// correct for what iOS staged inside our own container; anything else must be COPIED, leaving
+    /// the original exactly where the user keeps it.
+    @Test func test_import_neverMovesAFileTheUserOwns() throws {
+        let dir = try TempDir()
+        let inPlace = try dir.write("Lecture 3.m4a", in: dir.source)
+
+        let written = try OpenInImport.run(url: inPlace, into: dir.url)
+
+        #expect(FileManager.default.fileExists(atPath: inPlace.path), "An in-place file must never be moved (#41).")
+        #expect(FileManager.default.fileExists(atPath: written.path))
+        #expect(try Data(contentsOf: written) == Data(contentsOf: inPlace))
     }
 
     // MARK: - Helpers
