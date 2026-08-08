@@ -381,56 +381,24 @@ struct PlayerView: View {
         }
     }
 
-    /// Left inline rather than extracted. It has exactly one consumer today, and #48 is the slice
-    /// that gives the shared Row a second — building it here would repeat the `AudioPlaying`
-    /// mistake of a boundary with nothing behind it.
+    /// #48 gave the shared Row its second and third consumers, so the queue row that slice 1
+    /// deliberately left inline is now `SonicRow` — which is exactly the sequence ADR 0002
+    /// describes: build the component in the slice where the second caller appears, not before.
     private func queueRow(index: Int, track: AudioFile) -> some View {
-        HStack(spacing: Spacing.md) {
-            Group {
-                if index == player.currentIndex {
-                    Image(systemName: "speaker.wave.3.fill")
-                        .foregroundColor(.sonicPrimary)
-                        .accessibilityLabel(Text("Now playing"))
-                } else {
-                    Text("\(index + 1)")
-                        .foregroundColor(.sonicTextSecondary)
-                        .monospacedDigit()
-                }
-            }
-            .font(.caption)
-            .frame(width: Spacing.xxl)
-
-            VStack(alignment: .leading, spacing: Spacing.xxs) {
-                Text(track.title)
-                    .font(.subheadline)
-                    .fontWeight(index == player.currentIndex ? .semibold : .regular)
-                    .foregroundColor(.sonicTextPrimary)
-                    .lineLimit(1)
-
-                Text(track.durationFormatted)
-                    .font(.caption2)
-                    .foregroundColor(.sonicTextSecondary)
-                    .monospacedDigit()
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, Spacing.md)
-        .padding(.vertical, Spacing.sm)
-        .background {
-            if index == player.currentIndex {
-                RoundedRectangle(cornerRadius: Radius.sm)
-                    .fill(Color.sonicPrimary.opacity(ControlTint.on))
-            }
-        }
-        .contentShape(Rectangle())
+        SonicRow(
+            leading: index == player.currentIndex
+                ? .marker(systemImage: "speaker.wave.3.fill", text: nil)
+                : .marker(systemImage: nil, text: "\(index + 1)"),
+            title: track.title,
+            secondary: .duration(track.durationFormatted),
+            isEmphasised: index == player.currentIndex,
+            isSelected: index == player.currentIndex
+        )
         .onTapGesture {
             if index != player.currentIndex {
                 player.jumpToTrack(index)
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(index == player.currentIndex ? [.isSelected] : [])
     }
 }
 

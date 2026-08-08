@@ -49,4 +49,9 @@ enum DisplayFont {
     /// 80 — the icon on an empty or error state. `EmptyStateView` defaults to 72; the player
     /// has always passed 80 explicitly, and that is the value kept.
     static let stateIcon: CGFloat = 80
+
+    /// 50 — the watermark glyph on a collection card (#48). One of the twelve fixed sizes; the
+    /// browser's is tokenised here because #48 owns that screen. Nine remain, in Recording,
+    /// Onboarding, About and Home — slices #49 to #51.
+    static let collectionCardGlyph: CGFloat = 50
 }
