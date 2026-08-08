@@ -152,10 +152,9 @@ they all pass literals.
 
 | Gap | Where |
 |---|---|
-| RTL flips are reasoned about, not measured | **#63** — `ScrubGeometry` inverts the scrub fraction on `isRightToLeft`, and that flip has never been checked against a real drag. #54 closed as not-a-bug precisely because the equivalent assumption there was wrong: **SwiftUI mirrors `.offset(x:)` under RTL**, measured, so a "fix" that flipped it again broke a working marquee. `ScrollingText`'s doc comment carries the numbers |
+| No UI tests, and RTL is where that bites | The 181 tests are unit tests; no screen is asserted on. Two RTL "bugs" (#54, #63) were filed on plausible reasoning and **both were false** — settled only by rendering on a device and measuring. SwiftUI mirrors `.offset(x:)` but **not** gesture `location.x`; the two look alike and behave oppositely. Numbers are in `ScrollingText` and `ScrubGeometry`'s doc comments. Any future RTL claim should be measured before it is filed |
 | Player does not fit at AX5 | **#55** — the portrait layout does not scroll |
 | Lint gate is advisory and scoped | `scripts/lint-magic-numbers.sh` checks only migrated screens; `--all` reports 298 literals still outstanding. Not in CI |
 | Nothing enforces the layering | No module boundary, no build-time check. The discipline is review and `ARCHITECTURE.md` |
-| No UI tests | The 181 tests are unit tests over view models and `Domain/`. No screen is asserted on |
 | `listItems` has no test | `FileManagerClient.live` is a `static let` with a hardcoded documents directory, so nothing can reach it. #41's staging filter is tested as a `Domain/` predicate; that the client *calls* it is unasserted |
 | `main` carries a commit `feat` does not | `c7e508e`, from 2026-04-11. `feat` → `main` will not fast-forward |

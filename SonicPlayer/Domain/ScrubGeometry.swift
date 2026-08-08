@@ -19,6 +19,18 @@ enum ScrubGeometry {
     /// Always in `0...1`. A non-positive width means the track has not been laid out yet, and the
     /// answer is the start rather than `NaN` — `progress * duration` feeds `seek(to:)` directly,
     /// and an `AVPlayer` seeked to `NaN` does not recover.
+    ///
+    /// **The `isRightToLeft` flip is correct, and was measured rather than argued (#63).** On a
+    /// physical iPhone in Arabic, touching the far LEFT end of the scrubber reported `x=3` of
+    /// `w=234` — so a `DragGesture`'s `location.x` is **not** mirrored: zero is the physical left
+    /// edge in both directions. The fill, being layout, *is* mirrored and grows from the right, so
+    /// the left end is the END of the track — which is exactly what `1 - fraction` returns, and the
+    /// seek landed at `45:13` of `45:45` with the bar full.
+    ///
+    /// Do not remove the flip on the reasoning that SwiftUI already mirrors coordinates. It mirrors
+    /// `.offset(x:)` — measured in #54, which is why `ScrollingText` must stay direction-agnostic —
+    /// and it does **not** mirror gesture locations. The two look alike and behave oppositely, which
+    /// is why #54 and #63 were both filed on plausible reasoning and both turned out to be wrong.
     static func progress(atX x: CGFloat, width: CGFloat, isRightToLeft: Bool) -> Double {
         guard width > 0 else { return 0 }
 
