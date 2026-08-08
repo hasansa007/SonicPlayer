@@ -10,8 +10,11 @@ struct SonicPlayerApp: App {
     @MainActor
     static let app = AppViewModel()
 
-    @AppStorage("appLanguage") private var appLanguage = "system"
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
+    init() {
+        Self.clearLegacyLanguageOverride()
+    }
 
     /// The unit-test bundle is hosted by this app, so the app launches during test runs. Building
     /// the root object here would start real work — session restore, the playback clock, the audio
@@ -27,28 +30,34 @@ struct SonicPlayerApp: App {
             if Self.isRunningTests {
                 EmptyView()
             } else {
+                // No `\.locale`, no `\.layoutDirection`, no `.id(appLanguage)` (#68). SwiftUI
+                // derives both from the localization `Bundle.main` resolved at launch, and that is
+                // now the only thing that decides the language — so an override could only ever
+                // disagree with the strings on screen. The `.id()` existed to discard the view tree
+                // when the in-app picker changed the language mid-session, which nothing can do any
+                // more.
                 AppView()
                     .environment(Self.app)
-                    .environment(\.locale, resolvedLocale)
-                    .environment(\.layoutDirection, resolvedLayoutDirection)
-                    .id(appLanguage)
             }
         }
     }
 
-    private var resolvedLayoutDirection: LayoutDirection {
-        let rtlLanguages = ["ar", "he", "fa", "ur"]
-        let lang = resolvedLocale.language.languageCode?.identifier ?? ""
-        return rtlLanguages.contains(lang) ? .rightToLeft : .leftToRight
-    }
+    /// Clears the `AppleLanguages` override the old in-app picker wrote (#68).
+    ///
+    /// Without this, anyone who chose a language before that picker was removed stays pinned to it
+    /// with no way back: the control that set it is gone, and the value sits in the app's own
+    /// defaults where iOS's per-app **Preferred Language** does not overrule it. That is a worse
+    /// trap than the bug being fixed, so the key goes and the user picks again in iOS Settings.
+    ///
+    /// Runs once. The flag is what stops it clearing a language the *system* legitimately resolved
+    /// on every subsequent launch.
+    private static func clearLegacyLanguageOverride() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: "didClearLegacyLanguageOverride") else { return }
 
-    private var resolvedLocale: Locale {
-        if appLanguage != "system" {
-            return Locale(identifier: appLanguage)
-        }
-
-        let preferredIdentifier = Bundle.main.preferredLocalizations.first ?? Locale.current.identifier
-        return Locale(identifier: preferredIdentifier)
+        defaults.removeObject(forKey: "AppleLanguages")
+        defaults.removeObject(forKey: "appLanguage")
+        defaults.set(true, forKey: "didClearLegacyLanguageOverride")
     }
 }
 

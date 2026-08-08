@@ -62,4 +62,17 @@ final class SettingsViewModel {
         }
         UIApplication.shared.open(url)
     }
+
+    /// Opens SonicPlayer's own page in iOS Settings, where the system's per-app **Preferred
+    /// Language** control lives.
+    ///
+    /// The app cannot do this itself and never could (#68). `Text` resolves through `Bundle.main`,
+    /// which fixes its localization when the process starts — so the picker this replaces mirrored
+    /// the layout instantly and translated nothing until the next launch. iOS offers the control
+    /// because the bundle ships nine `.lproj` localizations; it restarts the app, so strings,
+    /// locale and layout direction change together instead of disagreeing.
+    func openSystemLanguageSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+    }
 }

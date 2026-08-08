@@ -2,12 +2,10 @@ import SwiftUI
 
 struct SettingsView: View {
     @Bindable var viewModel: SettingsViewModel
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.systemID
-    private let supportedLanguages = AppLanguage.supportedLanguages
     @State private var expandedSection: ExpandableSection?
 
     private enum ExpandableSection {
-        case speed, skipDuration, theme, language
+        case speed, skipDuration, theme
     }
 
     var body: some View {
@@ -256,10 +254,12 @@ struct SettingsView: View {
 
                 Divider()
 
+                // Opens SonicPlayer's own page in iOS Settings rather than picking here. Only the
+                // system can change an app's language: `Text` resolves through `Bundle.main`, which
+                // fixes its localization when the process starts, so an in-app switch could mirror
+                // the layout instantly and never translate a single label. See #68.
                 Button {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        expandedSection = expandedSection == .language ? nil : .language
-                    }
+                    viewModel.openSystemLanguageSettings()
                 } label: {
                     SettingsRow(
                         icon: "globe",
@@ -267,11 +267,11 @@ struct SettingsView: View {
                         iconColor: .sonicPrimary
                     ) {
                         HStack(spacing: 4) {
-                            Text(selectedLanguage.displayName)
+                            Text(currentLanguageName)
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                                 .foregroundColor(.sonicPrimary)
-                            Image(systemName: expandedSection == .language ? "chevron.up" : "chevron.down")
+                            Image(systemName: "arrow.up.forward.app")
                                 .font(.caption2)
                                 .foregroundColor(.sonicTextMuted)
                         }
@@ -279,38 +279,7 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
 
-                if expandedSection == .language {
-                    VStack(spacing: 0) {
-                        ForEach(supportedLanguages) { language in
-                            Button {
-                                setLanguage(language)
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    expandedSection = nil
-                                }
-                            } label: {
-                                HStack {
-                                    Text(language.displayName)
-                                        .font(.subheadline)
-                                        .foregroundColor(.sonicTextPrimary)
-                                    Spacer()
-                                    if language.id == appLanguage {
-                                        Image(systemName: "checkmark")
-                                            .font(.caption)
-                                            .foregroundColor(.sonicPrimary)
-                                    }
-                                }
-                                .padding(.vertical, 8)
-                                .padding(.horizontal, 12)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.leading, 36)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-
-                Text("Language updates immediately.")
+                Text("Choose a language in iOS Settings. The app restarts to apply it.")
                     .font(.caption)
                     .foregroundColor(.sonicTextMuted)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -343,43 +312,11 @@ struct SettingsView: View {
         }
     }
 
-    private var selectedLanguage: AppLanguage {
-        supportedLanguages.first { $0.id == appLanguage } ?? .system
-    }
-
-    private func setLanguage(_ language: AppLanguage) {
-        appLanguage = language.id
-        if let code = language.code {
-            UserDefaults.standard.set([code], forKey: "AppleLanguages")
-        } else {
-            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
-        }
-    }
-}
-
-struct AppLanguage: Identifiable, Equatable {
-    static let systemID = "system"
-    static let system = AppLanguage(code: nil)
-    static let supportedLanguages: [AppLanguage] = [
-        .system,
-        AppLanguage(code: "en"),
-        AppLanguage(code: "zh-Hans"),
-        AppLanguage(code: "hi"),
-        AppLanguage(code: "es"),
-        AppLanguage(code: "fr"),
-        AppLanguage(code: "ar"),
-        AppLanguage(code: "bn"),
-        AppLanguage(code: "pt"),
-        AppLanguage(code: "ru"),
-    ]
-
-    let code: String?
-    var id: String { code ?? Self.systemID }
-
-    var displayName: String {
-        guard let code else { return NSLocalizedString("System", comment: "System language option") }
-        let locale = Locale(identifier: code)
-        return locale.localizedString(forLanguageCode: code) ?? code
+    /// Read from the bundle rather than from stored state: what the app is actually speaking is
+    /// what `Bundle.main` resolved at launch, which is the only thing that can be true here (#68).
+    private var currentLanguageName: String {
+        let code = Bundle.main.preferredLocalizations.first ?? Locale.current.identifier
+        return Locale.current.localizedString(forLanguageCode: code)?.capitalized ?? code
     }
 }
 
