@@ -22,12 +22,12 @@ Six features, all `@Observable` view models. No reducers, no `Store` — the TCA
 
 ## What is absent, and why
 
-There is **no Repository, no DataSource, no UseCase and no DTO layer.** That is a decision, not an
-omission — those layers solve problems this app does not have:
+There is **no DataSource, no UseCase and no DTO layer**, and exactly one Repository. That is a
+decision, not an omission — those layers solve problems this app does not have:
 
 | Layer | Why it is absent |
 |---|---|
-| Repository / DataSource | They hide *which source answered* — cache vs network. This app has one source: the filesystem. The clients already are that abstraction, substitutable by plain assignment. |
+| Repository / DataSource | They hide *which source answered* — cache vs network. This app has one source: the filesystem. The clients already are that abstraction, substitutable by plain assignment. **One exception, taken deliberately: `PlaybackRepository` — see below.** |
 | DTO | Wire formats drift from domain models. There is no wire. The only serialised type is `PlaybackSession`, whose JSON shape is pinned by test because it *is* the on-disk contract with existing installs. |
 | UseCase | They hold orchestration reusable across UIs. There is one UI, and the business rules are pure functions in `Domain/` — wrapping each in a protocol and a class to call one function is ceremony. |
 
@@ -38,9 +38,9 @@ The layers a Swift clean-architecture template usually prescribes, and where eac
 | Textbook layer | Here |
 |---|---|
 | Entity / Domain models | **present** — `Models/` (`AudioFile`, `FileSystemItem`, `PlaybackSpeed`) and `Domain/` (`QueueMath`, `PathMatching`, `SessionCodec`, `ScrubClamp`, `SelectionSet`, `ImportFilter`, `QuickAction`, …) |
-| Repository protocol | absent — see the trigger table below |
-| DataSources (remote / local) | **`Clients/` occupies this slot**, without the protocol |
-| Repository implementation | absent |
+| Repository protocol | **one** — `PlaybackRepository`, in Player only (#44). Absent everywhere else; see the trigger table below |
+| DataSources (remote / local) | **`Clients/` occupies this slot.** Three of the five have no protocol at all; `FileManagerClient` conforms to `FileManaging`, and `AudioPlayerClient` to `AudioPlaying` (#44) — see the note on those two below |
+| Repository implementation | **one** — `LivePlaybackRepository` |
 | UseCase / Interactor | absent |
 | ViewModel | **present** — all six features |
 | View | **present** |
@@ -87,6 +87,49 @@ it necessary, never because a feature feels important:
 
 By that test, every feature today is ViewModel + clients + `Domain/`: one source, no wire format.
 
+### The one Repository, and why it does not meet that trigger
+
+`PlaybackRepository` (#44) exists in Player, and **session restore has one source: the filesystem.**
+The trigger above is not met. This is the exception, taken knowingly, and it is recorded here so
+the next reader does not apply the table and conclude the code is wrong.
+
+What it bought is not indirection, it is a test seam. `restoreSession` used to resolve the saved
+session inline, calling `FileManager.default` twice while the view model held an injected
+`FileManagerClient` — so the branch deciding whether a user resumes where they left off could not
+be driven from a test. Behind the repository it can: `PlayerRestoreTests` leaves `fileManager` as
+`.test`, and any filesystem call during a restore now fails the test rather than silently reaching
+disk.
+
+What it cost: `LivePlaybackRepository` is the only conformer to its protocol, and it will stay that
+way until #7 or #9 introduces a second source. If those epics change shape and never do, this is
+the layer to reconsider first — a Repository with one implementation forever is a wrapper.
+
+### `FileManaging` and `AudioPlaying`, and the honest state of them
+
+Two clients carry a protocol; three do not. The two are the ones #44 named, and they are at
+different stages of paying for themselves:
+
+| Protocol | Callers today |
+|---|---|
+| `FileManaging` | one — `LivePlaybackRepository`, which needs `metadata(for:)` |
+| `AudioPlaying` | **none** |
+
+Neither is a replacement. `FileManagerClient` and `AudioPlayerClient` **conform**, so `.live` and
+`.test` are still client values and every `client.stop = { … }` line in the test target compiles
+unchanged — including `.test` reporting an issue for any closure a path reaches without stubbing,
+which a hand-written mock class would have had to reimplement member by member. That is the whole
+reason conformance was chosen over a protocol-plus-mock rewrite.
+
+The cost is a rename. A stored `var pause` and a `func pause()` cannot coexist on one type, so
+every requirement is named differently from the closure it forwards to (`pausePlayback()` → `pause`,
+`metadata(for:)` → `getMetadata`), and nothing in the type system stops a forward from reaching the
+wrong member. `ClientProtocolConformanceTests` is what does: it drives all 24 requirements against
+a client with exactly one closure stubbed. Until #7 and #9 arrive, that file is also the only
+consumer most of these forwards have.
+
+**If those epics never need a second implementation, `AudioPlaying` is the first thing to delete** —
+it is a declared boundary with nothing behind it. `FileManaging` earns its keep either way.
+
 **The StudyHub epics are where the full stack becomes correct**, and each for a different reason:
 
 | Epic | Layer it earns | Why |
@@ -102,10 +145,17 @@ Uniformity is not the goal; each layer paying for itself is.
 
 ## Known costs
 
-**Orchestration lives in view models.** `PlayerViewModel.restoreSession` and
-`PlayerViewModel.openFromFiles` are real business logic in the presentation layer. If a view model
-keeps growing, extract the orchestration into `Domain/` rather than reaching for the full layered
-stack.
+**Orchestration lives in view models.** `PlayerViewModel.openFromFiles` is real business logic in
+the presentation layer. If a view model keeps growing, extract the orchestration into `Domain/`
+rather than reaching for the full layered stack.
+
+`restoreSession` used to be the other example and is now the worked one: its decision went to
+`SessionRestorePlan` in `Domain/`, its I/O went to `PlaybackRepository`, and what stayed is the
+part that genuinely coordinates two things — claiming priority over a concurrent open, and the
+retry that follows (#44). Note what this did **not** buy: `PlayerViewModel` is 613 lines, down
+from 615. Splitting one method out of a six-concern type makes it testable, not smaller. The size
+is a separate problem and needs a separate cut — time observation and artwork are the next
+candidates.
 
 **`Domain/` is for logic you can state without I/O, not for everything that is not a view.**
 `openFromFiles` shows the limit: its I/O half went to `OpenInImport` in `Features/Files/`, for the
