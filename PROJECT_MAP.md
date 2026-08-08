@@ -17,7 +17,7 @@ wired up*.
 | State | `@Observable` MVVM. No reducers, no `Store` — TCA removed in #20 |
 | Persistence | `UserDefaults` (`@AppStorage`) for preferences; `SessionStore` → `session.json` for playback session |
 | Media | AVFoundation, MediaPlayer (lock screen / remote commands) |
-| Tests | Swift Testing (`@Suite`/`@Test`/`#expect`) — **never XCTest** (#27). 22 files, 180 cases |
+| Tests | Swift Testing (`@Suite`/`@Test`/`#expect`) — **never XCTest** (#27). 22 files, 181 cases |
 | Dependencies | **None.** `Package.resolved` pins zero packages |
 | Localization | `Localizable.xcstrings`, 144 keys × 9 languages (en, es, fr, ar, zh-Hans, hi, pt, ru, bn) |
 | Design system | `DesignSystem/Tokens.swift` + `Typography.swift` + `Components/` (#47). `ColorPalette`/`Theme` stay in `Utilities/` — ADR 0002 |
@@ -121,10 +121,17 @@ in the same slice.
 empty from here, and `AppViewModel.scenePhaseChanged` empties it wholesale on `.background` to
 clear what installs predating #41 still hold. `listItems` filters the directory out of the browser.
 
-Two constraints that are easy to undo by accident, both in ADR 0003: the drain runs on
-**`.background`** because a launch-time one races `.onOpenURL`, and it is **synchronous** because a
-`Task` does not run before the app suspends — measured, it landed on the next foreground instead,
-which is where an import may be in flight over the same directory.
+**"Already imported" now means the same BYTES, not the same name** — `FileManager.contentsEqual`
+against the same-named candidate, with a differing file landing beside it as `Track 2.m4a` via
+`UniqueNameResolver`. The name heuristic was wrong in both directions: it missed the same file
+re-opened (iOS had renamed it in staging, which *is* #41) and swallowed a different file that shared
+a name. This supersedes the behaviour #33 preserved as out of scope.
+
+Three constraints that are easy to undo by accident, all in ADR 0003: the drain runs on
+**`.background`** because a launch-time one races `.onOpenURL`; it is **synchronous** because a
+`Task` does not run before the app suspends — measured, it landed on the next foreground instead;
+and it **skips while `player.isImporting`**, because the import runs detached and can still be
+moving a file out of that directory.
 
 ### Pending in this epic
 
@@ -149,7 +156,6 @@ they all pass literals.
 | Player does not fit at AX5 | **#55** — the portrait layout does not scroll |
 | Lint gate is advisory and scoped | `scripts/lint-magic-numbers.sh` checks only migrated screens; `--all` reports 298 literals still outstanding. Not in CI |
 | Nothing enforces the layering | No module boundary, no build-time check. The discipline is review and `ARCHITECTURE.md` |
-| No UI tests | The 180 tests are unit tests over view models and `Domain/`. No screen is asserted on |
+| No UI tests | The 181 tests are unit tests over view models and `Domain/`. No screen is asserted on |
 | `listItems` has no test | `FileManagerClient.live` is a `static let` with a hardcoded documents directory, so nothing can reach it. #41's staging filter is tested as a `Domain/` predicate; that the client *calls* it is unasserted |
-| A shared filename is treated as the same file | Opening a *different* file that happens to share a name with an imported one plays the imported one. Predates #41 — `OpenInImport`'s contract has always been "a name already present is treated as already imported". #41 made the collision non-destructive (`contentsEqual` guards the delete) but did not make it correct; fixing it means content identity for every import or a unique-name import, and both change #33's behaviour |
 | `main` carries a commit `feat` does not | `c7e508e`, from 2026-04-11. `feat` → `main` will not fast-forward |

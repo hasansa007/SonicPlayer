@@ -113,24 +113,32 @@ set synchronously before the task is created, so `.onOpenURL` returning already 
 in flight, and `scenePhaseChanged` skips the drain while it is. Skipping costs nothing — the
 leftovers are old, and the next backgrounding clears them.
 
-### A shared name is not proof of identity
+### Identity is the bytes, not the name
 
-The already-imported branch removes the staged copy, and it must first confirm the two files
-actually *are* the same. Two different files can arrive under one name — a re-sent lecture, a second
-`recording.m4a` — and by then the queue is empty, so iOS does not rename the incoming one. Without a
-contents comparison that branch deletes the file the user just asked to open and plays the older one
-silently. `FileManager.contentsEqual` guards it, at the cost of a read over two files on the
-duplicate-open path only, off the main actor.
+`OpenInImport`'s contract had always been *"a name already present is treated as already imported"*,
+and that heuristic is wrong in **both** directions:
 
-Caught in review, after being introduced by this branch: before it, that branch was a no-op that
-merely left the staged file behind. Turning a filename heuristic into a delete is what made the
-imprecision destructive.
+| | Old behaviour | Why it is wrong |
+|---|---|---|
+| Same file, re-opened | not recognised | iOS renamed it in the staging directory first, so the name never matched — this is #41 itself |
+| Different file, same name | treated as a duplicate | the user opens one thing and hears another; and once this branch began deleting the staged copy, the newer file was destroyed outright |
 
-**Still imprecise, and left that way:** opening a *different* file that shares a name with an
-imported one plays the imported one. That predates this branch (`OpenInImport`'s contract has always
-been "a name already present is treated as already imported"), and fixing it means either content
-identity for every import or a unique-name import, both of which change #33's behaviour. Recorded as
-a known gap, not fixed here.
+So the test is now `FileManager.contentsEqual` against the same-named candidate, and it is the only
+test for "already imported". It costs nothing when the slot is free — `contentsEqual` returns false
+without reading if the destination does not exist — and it runs off the main actor either way.
+
+A file that shares a name but not its contents lands beside the existing one as `Track 2.m4a`, via
+the same `UniqueNameResolver` the rest of the app names files with, so the `probe 2.m4a` shape is
+already familiar on disk.
+
+**This changes #33's stated behaviour and that is deliberate.** #33 preserved "a name already
+present means already imported" as pre-existing behaviour it was not scoped to revisit. #41 is
+scoped to exactly that heuristic, because the heuristic is the bug.
+
+The destructive half was caught in review, after being introduced by this branch: beforehand that
+path was a no-op that merely left the staged file behind. Turning a filename heuristic into a delete
+is what made the imprecision destructive, and is what made it worth fixing properly rather than
+guarding.
 
 ## Consequences
 

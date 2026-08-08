@@ -127,8 +127,9 @@ struct OpenFromFilesTests {
         #expect(try Data(contentsOf: written) == Data(contentsOf: source))
     }
 
-    /// Preserved from the code this replaces: a name already present means already imported, so
-    /// it is returned untouched rather than copied a second time.
+    /// An import never overwrites what is already there. Since #41 a file that shares a name but
+    /// not its contents is a *different file*, so it lands beside the existing one rather than
+    /// being silently treated as it — the existing copy is still untouched either way.
     @Test func test_import_doesNotOverwriteAFileAlreadyThere() throws {
         let dir = try TempDir()
         let source = try dir.write("Track.mp3", in: dir.source, contents: "new")
@@ -136,8 +137,22 @@ struct OpenFromFilesTests {
 
         let written = try OpenInImport.run(url: source, into: dir.url)
 
+        #expect(try String(contentsOf: existing, encoding: .utf8) == "original", "The existing file is untouched.")
+        #expect(written == dir.url.appendingPathComponent("Track 2.mp3"), "The different file gets its own name.")
+        #expect(try String(contentsOf: written, encoding: .utf8) == "new", "…and it is the file the user opened.")
+    }
+
+    /// The same file re-opened is still one copy — identity is the bytes, so this is the case the
+    /// name check was always trying to catch and kept missing.
+    @Test func test_import_anIdenticalFileIsTreatedAsAlreadyImported() throws {
+        let dir = try TempDir()
+        let source = try dir.write("Track.mp3", in: dir.source, contents: "same audio")
+        let existing = try dir.write("Track.mp3", contents: "same audio")
+
+        let written = try OpenInImport.run(url: source, into: dir.url)
+
         #expect(written == existing)
-        #expect(try String(contentsOf: written, encoding: .utf8) == "original")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: dir.url.path).filter { $0.hasSuffix(".mp3") } == ["Track.mp3"])
     }
 
     @Test func test_import_throwsWhenTheSourceIsMissing() throws {
@@ -236,22 +251,26 @@ struct OpenFromFilesTests {
         #expect(!FileManager.default.fileExists(atPath: staged.path), "The staged copy still has to go (#41).")
     }
 
-    /// A name collision is not proof of identity. Two different files can share a name — a
-    /// re-sent lecture, a second `recording.m4a` — and the already-imported branch must not
-    /// destroy the one the user just handed over.
-    @Test func test_import_neverDeletesADifferentFileThatSharesAName() throws {
+    /// A name collision is not proof of identity. Two different files can share a name — a re-sent
+    /// lecture, a second `recording.m4a` — and the already-imported branch must neither destroy the
+    /// one the user just handed over nor play the older one in its place.
+    ///
+    /// This began as a guard that the staged file merely *survived*, because the first fix stopped
+    /// at not-deleting. Surviving in a directory the browser hides is not much better than deleted,
+    /// so it now asserts the real requirement: the user gets the file they opened.
+    @Test func test_import_neverSwallowsADifferentFileThatSharesAName() throws {
         let dir = try TempDir()
         let inbox = dir.url.appendingPathComponent("Inbox")
         try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
-        try dir.write("Song.mp3", contents: "already imported")
+        let alreadyImported = try dir.write("Song.mp3", contents: "already imported")
         let staged = try dir.write("Song.mp3", in: inbox, contents: "the one just shared")
 
-        _ = try OpenInImport.run(url: staged, into: dir.url)
+        let written = try OpenInImport.run(url: staged, into: dir.url)
 
-        #expect(
-            FileManager.default.fileExists(atPath: staged.path),
-            "A staged file whose contents differ from the imported one must not be deleted (#41)."
-        )
+        #expect(try String(contentsOf: written, encoding: .utf8) == "the one just shared", "#41")
+        #expect(written == dir.url.appendingPathComponent("Song 2.mp3"))
+        #expect(try String(contentsOf: alreadyImported, encoding: .utf8) == "already imported")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: inbox.path).isEmpty, "Consumed, not left.")
     }
 
     /// **The data-loss guard.** `LSSupportsOpeningDocumentsInPlace` is `true`, so the handed-over
