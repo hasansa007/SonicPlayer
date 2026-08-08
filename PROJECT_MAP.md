@@ -17,7 +17,7 @@ wired up*.
 | State | `@Observable` MVVM. No reducers, no `Store` — TCA removed in #20 |
 | Persistence | `UserDefaults` (`@AppStorage`) for preferences; `SessionStore` → `session.json` for playback session |
 | Media | AVFoundation, MediaPlayer (lock screen / remote commands) |
-| Tests | Swift Testing (`@Suite`/`@Test`/`#expect`) — **never XCTest** (#27). 22 files, 176 cases |
+| Tests | Swift Testing (`@Suite`/`@Test`/`#expect`) — **never XCTest** (#27). 22 files, 178 cases |
 | Dependencies | **None.** `Package.resolved` pins zero packages |
 | Localization | `Localizable.xcstrings`, 144 keys × 9 languages (en, es, fr, ar, zh-Hans, hi, pt, ru, bn) |
 | Design system | `DesignSystem/Tokens.swift` + `Typography.swift` + `Components/` (#47). `ColorPalette`/`Theme` stay in `Utilities/` — ADR 0002 |
@@ -115,13 +115,16 @@ in the same slice.
 | `ColorPalette` / `Theme` outside `DesignSystem/` | Deliberate deferral, ADR 0002. Revisit at epic end |
 | `FileManaging` — 8 of 9 members | Only `metadata(for:)` has a caller (`LivePlaybackRepository`). The rest are exercised by `ClientProtocolConformanceTests` and nothing else |
 
-### Deferred by #41 — staged files already on disk
+### Resolved by #41 — iOS's staging directory
 
-`OpenInImport` now drains `Documents/Inbox` on every open, so the staging directory stays empty
-from here. **Files staged there before #41 are not swept**, and `listItems` now filters that
-directory out — so they consume space and the user can no longer see or delete them through the
-app. That is a worse position than the bug for an existing install, and it is deliberate: a
-one-time drain at launch is a delete, and deletes are not done uninvited. ADR 0003 records it.
+`OpenInImport` consumes what iOS stages rather than copying out of it, so `Documents/Inbox` stays
+empty from here, and `AppViewModel.scenePhaseChanged` empties it wholesale on `.background` to
+clear what installs predating #41 still hold. `listItems` filters the directory out of the browser.
+
+Two constraints that are easy to undo by accident, both in ADR 0003: the drain runs on
+**`.background`** because a launch-time one races `.onOpenURL`, and it is **synchronous** because a
+`Task` does not run before the app suspends — measured, it landed on the next foreground instead,
+which is where an import may be in flight over the same directory.
 
 ### Pending in this epic
 
@@ -146,6 +149,6 @@ they all pass literals.
 | Player does not fit at AX5 | **#55** — the portrait layout does not scroll |
 | Lint gate is advisory and scoped | `scripts/lint-magic-numbers.sh` checks only migrated screens; `--all` reports 298 literals still outstanding. Not in CI |
 | Nothing enforces the layering | No module boundary, no build-time check. The discipline is review and `ARCHITECTURE.md` |
-| No UI tests | The 176 tests are unit tests over view models and `Domain/`. No screen is asserted on |
+| No UI tests | The 178 tests are unit tests over view models and `Domain/`. No screen is asserted on |
 | `listItems` has no test | `FileManagerClient.live` is a `static let` with a hardcoded documents directory, so nothing can reach it. #41's staging filter is tested as a `Domain/` predicate; that the client *calls* it is unasserted |
 | `main` carries a commit `feat` does not | `c7e508e`, from 2026-04-11. `feat` → `main` will not fast-forward |

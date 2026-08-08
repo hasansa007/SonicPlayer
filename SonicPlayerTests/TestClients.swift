@@ -100,6 +100,7 @@ extension FileManagerClient {
                 creationDate: Date()
             )
         },
+        drainStagingDirectory: {},
         documentsDirectory: { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
     )
 }

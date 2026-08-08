@@ -135,7 +135,7 @@ struct AppView: View {
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
-            player.scenePhaseChanged(newPhase)
+            app.scenePhaseChanged(newPhase)
         }
         .onOpenURL { url in
             app.openedFromFiles(url)

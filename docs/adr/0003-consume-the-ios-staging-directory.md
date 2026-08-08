@@ -75,12 +75,41 @@ briefly encoded in the first version of the reproduction test, which hard-coded 
 second hand-off and therefore asserted that a distinct file must be swallowed. The test was wrong,
 not the code; it now models iOS's staging rule instead of the old bug's output.
 
+## Clearing what is already on disk
+
+The above keeps the staging directory empty from here, but installs that predate it still hold
+copies iOS left there — and the browser now filters that directory, so those files are **invisible
+as well as orphaned**. That is a worse position than the bug for an existing install, so the drain
+is not optional.
+
+`AppViewModel.scenePhaseChanged` empties the directory on `scenePhase == .background`, through a new
+`FileManagerClient.drainStagingDirectory`.
+
+**Why `.background` and not launch.** A launch-time drain races `.onOpenURL`. Launching the app *by
+opening a file* is precisely when a staged file is sitting in `Inbox` waiting to be imported, and
+the ordering of `.onOpenURL` against the launch path is not guaranteed — the same non-determinism
+`restoreSession` already has to defend against (#33). Backgrounding cannot collide with a hand-off,
+because iOS stages the file when the user shares it, which is after the drain has run.
+
+**Why synchronous.** The first version dispatched into a `Task`, and it was wrong for a reason only
+running it revealed. Measured on the simulator 2026-08-08: backgrounding the app left
+`Inbox/probe.m4a` in place, and the file disappeared only when the app was **re-foregrounded**. The
+app suspends before the continuation is scheduled, so the drain landed on the next foreground —
+which is exactly the `.onOpenURL` that follows a user sharing a file, reintroducing the race the
+`.background` placement exists to avoid. A synchronous delete is guaranteed to finish inside the
+background window, and costs less than the `session.json` write happening beside it on the same
+line. `drainStagingDirectory` is the only synchronous member of `FileManagerClient` for this reason.
+
+The unit test asserts the flag with no `await`, because "drained by the time the handler returns" is
+the actual requirement — a test that polled for it passed against the broken version too.
+
 ## Consequences
 
 Opening the same file twice leaves one copy. The staging directory is drained on every open,
-including the no-op one, so it cannot re-arm the rename. Home no longer shows an `Inbox` collection.
+including the no-op one, so it cannot re-arm the rename, and emptied wholesale the next time the app
+is backgrounded. Home no longer shows an `Inbox` collection.
 
-**Not addressed: staged files already on disk from before this change.** They are now filtered from
-the browser, which means they consume space and the user can no longer see or delete them through
-the app. A one-time drain at launch would clear them, and it is a delete, so it is deliberately not
-done here. Recorded in `PROJECT_MAP.md` → ORPHANS & PENDING.
+`AppViewModel` now holds a `FileManagerClient`. It is the first client that type has taken, and it
+is held for this alone — the drain is housekeeping for the app, which no feature owns. `AppView`'s
+`.onChange(of: scenePhase)` now calls the coordinator instead of the player directly; the player
+still receives the phase, forwarded.
