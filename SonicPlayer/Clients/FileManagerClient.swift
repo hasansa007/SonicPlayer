@@ -80,12 +80,15 @@ extension FileManagerClient {
 
                 let audioExtensions = ["mp3", "m4a", "wav", "aac", "flac", "aiff", "m4b", "mp4", "opus", "ogg"]
                 
+                // `Documents/Inbox` is iOS's hand-off queue, not a collection the user made — and
+                // it is not hidden, so `.skipsHiddenFiles` does not exclude it. Before #41 it
+                // surfaced on Home as a collection nobody created. (#41)
                 let contents = try FileManager.default.contentsOfDirectory(
                     at: targetPath,
                     includingPropertiesForKeys: [.isDirectoryKey, .creationDateKey, .fileSizeKey],
                     options: [.skipsHiddenFiles]
-                )
-                
+                ).filter { !ImportFilter.isStagingDirectory($0, under: documentsDirectory) }
+
                 return try await withThrowingTaskGroup(of: FileSystemItem?.self) { group in
                     for url in contents {
                         group.addTask {

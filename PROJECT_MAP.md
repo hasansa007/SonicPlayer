@@ -17,7 +17,7 @@ wired up*.
 | State | `@Observable` MVVM. No reducers, no `Store` — TCA removed in #20 |
 | Persistence | `UserDefaults` (`@AppStorage`) for preferences; `SessionStore` → `session.json` for playback session |
 | Media | AVFoundation, MediaPlayer (lock screen / remote commands) |
-| Tests | Swift Testing (`@Suite`/`@Test`/`#expect`) — **never XCTest** (#27). 20 files, 157 cases |
+| Tests | Swift Testing (`@Suite`/`@Test`/`#expect`) — **never XCTest** (#27). 22 files, 176 cases |
 | Dependencies | **None.** `Package.resolved` pins zero packages |
 | Localization | `Localizable.xcstrings`, 144 keys × 9 languages (en, es, fr, ar, zh-Hans, hi, pt, ru, bn) |
 | Design system | `DesignSystem/Tokens.swift` + `Typography.swift` + `Components/` (#47). `ColorPalette`/`Theme` stay in `Utilities/` — ADR 0002 |
@@ -115,12 +115,20 @@ in the same slice.
 | `ColorPalette` / `Theme` outside `DesignSystem/` | Deliberate deferral, ADR 0002. Revisit at epic end |
 | `FileManaging` — 8 of 9 members | Only `metadata(for:)` has a caller (`LivePlaybackRepository`). The rest are exercised by `ClientProtocolConformanceTests` and nothing else |
 
+### Deferred by #41 — staged files already on disk
+
+`OpenInImport` now drains `Documents/Inbox` on every open, so the staging directory stays empty
+from here. **Files staged there before #41 are not swept**, and `listItems` now filters that
+directory out — so they consume space and the user can no longer see or delete them through the
+app. That is a worse position than the bug for an existing install, and it is deliberate: a
+one-time drain at launch is a delete, and deletes are not done uninvited. ADR 0003 records it.
+
 ### Pending in this epic
 
 | Slice | Screen | State |
 |---|---|---|
-| #47 | Player + foundation | **in progress** — this branch |
-| #48 | Files / Collections | **in progress** — `SonicRow` built, with the browser, Home's recent list and the player's queue as its three consumers |
+| #47 | Player + foundation | **merged** (PR #56) |
+| #48 | Files / Collections | **merged** (PR #58) — `SonicRow` built, with the browser, Home's recent list and the player's queue as its three consumers |
 | #49 | Recording + editor | not started. Largest surface (915 lines) |
 | #50 | Settings / About / Help | not started |
 | #51 | Home | not started. Removes the last inline layout, from `App/AppView.swift` |
@@ -138,5 +146,6 @@ they all pass literals.
 | Player does not fit at AX5 | **#55** — the portrait layout does not scroll |
 | Lint gate is advisory and scoped | `scripts/lint-magic-numbers.sh` checks only migrated screens; `--all` reports 298 literals still outstanding. Not in CI |
 | Nothing enforces the layering | No module boundary, no build-time check. The discipline is review and `ARCHITECTURE.md` |
-| No UI tests | The 157 tests are unit tests over view models and `Domain/`. No screen is asserted on |
+| No UI tests | The 176 tests are unit tests over view models and `Domain/`. No screen is asserted on |
+| `listItems` has no test | `FileManagerClient.live` is a `static let` with a hardcoded documents directory, so nothing can reach it. #41's staging filter is tested as a `Domain/` predicate; that the client *calls* it is unasserted |
 | `main` carries a commit `feat` does not | `c7e508e`, from 2026-04-11. `feat` → `main` will not fast-forward |

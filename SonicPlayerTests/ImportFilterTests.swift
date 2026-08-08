@@ -29,6 +29,43 @@ struct ImportFilterTests {
         #expect(!ImportFilter.isAudio(URL(fileURLWithPath: "/x/no-extension")))
     }
 
+    // MARK: - iOS's staging directory (#41)
+
+    private let documents = URL(fileURLWithPath: "/Container/Documents")
+
+    @Test func test_theStagingDirectoryIsRecognised() {
+        #expect(ImportFilter.isStagingDirectory(documents.appendingPathComponent("Inbox"), under: documents))
+    }
+
+    /// The browser must hide iOS's queue and nothing else. A user is entitled to a collection
+    /// called `Inbox` one level down, and it is theirs.
+    @Test func test_onlyTheRootInboxIsTheStagingDirectory() {
+        #expect(!ImportFilter.isStagingDirectory(documents.appendingPathComponent("Lectures"), under: documents))
+        #expect(!ImportFilter.isStagingDirectory(documents.appendingPathComponent("Lectures/Inbox"), under: documents))
+        #expect(!ImportFilter.isStagingDirectory(documents.appendingPathComponent("Inbox Recordings"), under: documents))
+    }
+
+    @Test func test_aFileInsideTheStagingDirectoryIsStaged() {
+        #expect(ImportFilter.isStaged(documents.appendingPathComponent("Inbox/Track.mp3"), under: documents))
+        #expect(ImportFilter.isStaged(documents.appendingPathComponent("Inbox/Track-1.mp3"), under: documents))
+    }
+
+    /// The data-loss guard. `LSSupportsOpeningDocumentsInPlace` means the handed-over URL is often
+    /// the user's own file in iCloud Drive — treating it as staged would MOVE it out of their
+    /// storage, so every one of these must be false.
+    @Test func test_aFileOutsideTheStagingDirectoryIsNotStaged() {
+        #expect(!ImportFilter.isStaged(documents.appendingPathComponent("Track.mp3"), under: documents))
+        #expect(!ImportFilter.isStaged(documents.appendingPathComponent("Lectures/Track.mp3"), under: documents))
+        #expect(!ImportFilter.isStaged(URL(fileURLWithPath: "/Elsewhere/iCloud/Track.mp3"), under: documents))
+    }
+
+    /// The prefix trap `PathMatching` exists to avoid, reached through this door: a sibling
+    /// directory whose name merely *starts* with `Inbox` is not the staging area, and a file in it
+    /// is the user's.
+    @Test func test_aSiblingWhoseNameStartsWithInboxIsNotStaged() {
+        #expect(!ImportFilter.isStaged(documents.appendingPathComponent("Inbox Recordings/Track.mp3"), under: documents))
+    }
+
     /// The extension is matched whole. A file called `song.mp3.bak` is not audio, and one called
     /// `.mp3` — an extensionless dotfile — is not either.
     @Test func test_theExtensionIsMatchedWhole() {
