@@ -42,22 +42,37 @@ struct SonicPlayerApp: App {
         }
     }
 
-    /// Clears the `AppleLanguages` override the old in-app picker wrote (#68).
+    /// Clears the `AppleLanguages` override the old in-app picker wrote (#68), and **only** that
+    /// one (#70).
     ///
     /// Without this, anyone who chose a language before that picker was removed stays pinned to it
     /// with no way back: the control that set it is gone, and the value sits in the app's own
-    /// defaults where iOS's per-app **Preferred Language** does not overrule it. That is a worse
-    /// trap than the bug being fixed, so the key goes and the user picks again in iOS Settings.
+    /// defaults. So the key has to go — but it cannot go unconditionally.
     ///
-    /// Runs once. The flag is what stops it clearing a language the *system* legitimately resolved
-    /// on every subsequent launch.
+    /// **`AppleLanguages` is not ours alone.** It is the same key iOS's per-app *Preferred
+    /// Language* writes into — the control this app now sends people to. Deleting it on sight would
+    /// wipe a live choice the user made in Settings, on the first launch after updating, once and
+    /// unrepairably. That is worse than the bug it was meant to fix.
+    ///
+    /// `appLanguage` is the discriminator, because **only** the removed picker ever wrote it. Its
+    /// presence proves the override is ours; its absence means whatever is in `AppleLanguages`
+    /// belongs to the system and must be left alone. That makes this correct without having to
+    /// answer "who wrote this value?", which nothing inside the app can answer reliably.
+    ///
+    /// Skipped under test: `init()` runs before the `isRunningTests` guard on `body`, so without
+    /// this the app's test host would mutate `UserDefaults.standard` on every run — the global
+    /// mutable state `CLAUDE.md` singles out, and exactly what `isRunningTests` exists to prevent.
     private static func clearLegacyLanguageOverride() {
+        guard !isRunningTests else { return }
+
         let defaults = UserDefaults.standard
         guard !defaults.bool(forKey: "didClearLegacyLanguageOverride") else { return }
-
-        defaults.removeObject(forKey: "AppleLanguages")
-        defaults.removeObject(forKey: "appLanguage")
         defaults.set(true, forKey: "didClearLegacyLanguageOverride")
+
+        guard defaults.object(forKey: "appLanguage") != nil else { return }
+
+        defaults.removeObject(forKey: "appLanguage")
+        defaults.removeObject(forKey: "AppleLanguages")
     }
 }
 
