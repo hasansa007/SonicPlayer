@@ -1,0 +1,135 @@
+# PROJECT_MAP
+
+A navigation aid, created on slice 1 of epic #6 (#47). `ARCHITECTURE.md` says *why* the code is
+shaped this way and wins on any conflict; this file says *where things are* and *what is not
+wired up*.
+
+**Version 2.3.0 (build 21) · iOS 18.0+ · zero third-party dependencies**
+
+---
+
+## TECH_STACK
+
+| | |
+|---|---|
+| Language | Swift 5, async/await throughout — **no Combine anywhere** |
+| UI | SwiftUI only. No UIKit views; three `UIViewRepresentable` bridges (`VolumeView`, `ShareSheet`, waveform capture) |
+| State | `@Observable` MVVM. No reducers, no `Store` — TCA removed in #20 |
+| Persistence | `UserDefaults` (`@AppStorage`) for preferences; `SessionStore` → `session.json` for playback session |
+| Media | AVFoundation, MediaPlayer (lock screen / remote commands) |
+| Tests | Swift Testing (`@Suite`/`@Test`/`#expect`) — **never XCTest** (#27). 20 files, 157 cases |
+| Dependencies | **None.** `Package.resolved` pins zero packages |
+| Localization | `Localizable.xcstrings`, 144 keys × 9 languages (en, es, fr, ar, zh-Hans, hi, pt, ru, bn) |
+| Design system | `DesignSystem/Tokens.swift` + `Typography.swift` + `Components/` (#47). `ColorPalette`/`Theme` stay in `Utilities/` — ADR 0002 |
+
+Xcode 27 locally; the release runner pins 26.3. See `docs/deploy-and-staging.md`.
+
+---
+
+## SYSTEM_FLOW
+
+```
+SonicPlayerApp                    static `app` — AppDelegate needs it for quick actions
+  └── AppViewModel                composition root: owns every view model, wires every edge
+        ├── HomeViewModel         suggestions, recently added
+        ├── CollectionsViewModel  browser — one instance per navigation depth
+        ├── PlayerViewModel       playback, queue, session, open-from-Files
+        ├── RecordingViewModel    capture (+ EditRecordingViewModel for trimming)
+        ├── SettingsViewModel     preferences
+        └── OnboardingViewModel   first-launch carousel
+```
+
+**One screen.** Home is the app; player / recording / import are **sheets**, settings is
+**pushed** via `.navigationDestination` over a plain `[URL]` path. No tab bar — see
+`docs/adr/0001-navigation-stays-single-screen.md`.
+
+**Cross-feature edges travel through closures wired once in `AppViewModel.wire()`**, never by
+reading another feature's state. The one exception is `.onOpenURL`, which calls
+`app.openedFromFiles(url)` directly because the URL only exists at the call site.
+
+### Layers, and where each lives
+
+| Layer | Directory | Count |
+|---|---|---|
+| Views | `Features/*/`, `App/` | 12 |
+| View models | `Features/*/`, `App/` | 8 |
+| Clients (structs of closures, `.live` + `.test`) | `Clients/` | 5 + 2 protocols |
+| Pure decision logic (Foundation only) | `Domain/` | 14 |
+| Plain data | `Models/` | 3 |
+| Design system | `DesignSystem/`, `DesignSystem/Components/` | 2 + 3 |
+| Legacy shared UI | `Utilities/` | 10 |
+
+### A track, from tap to sound
+
+```
+CollectionsView tap
+  → CollectionsViewModel.select
+  → (closure wired in AppViewModel)
+  → PlayerViewModel.loadTrack        sets currentTrack + isLoadingTrack, resolves queue via QueueMath
+  → AudioPlayerClient.play           → AudioPlayerManager → AVPlayer
+  → trackLoaded()                    isLoadingTrack = false, starts the time observer
+  → SessionStore.save                session.json, so the next launch resumes
+```
+
+### Session restore, on launch
+
+```
+AppView.onAppear → PlayerViewModel.restoreSession
+  → PlaybackRepository.restore       which files still exist (the only Repository in the app)
+  → SessionRestorePlan.resolve       pure: what to play, which queue, which index
+  → sessionLoaded / clearSession
+```
+
+An explicit `.onOpenURL` open **outranks** a restore that lands later — claimed synchronously
+before any `await` (#33).
+
+---
+
+## ORPHANS & PENDING
+
+Things that exist and are not wired up. Recorded rather than deleted, because each is a decision
+somebody has to make.
+
+### Unreferenced code
+
+| File | State |
+|---|---|
+| `Utilities/ShareSheet.swift` | **Zero references.** A `UIActivityViewController` bridge nothing presents. `AppView` was documented as owning a share sheet; it no longer does |
+| `Utilities/SwipeToDelete.swift` | **Zero references.** `SwipeToDeleteRow` — the browser uses the system swipe actions instead |
+
+Both are candidates for deletion in #48, which is the slice that owns the browser and would be
+the only plausible caller.
+
+### Declared but unconsumed
+
+| Thing | State |
+|---|---|
+| `AudioPlaying` protocol | No caller. Declared in #44 alongside `FileManaging`; waits for #7 / #9. `ARCHITECTURE.md` names it as the first thing to delete if those never arrive |
+| 12 fixed `.system(size:)` values | Five in `RecordingView`, three in `OnboardingView`, one each in `AboutView`, `CollectionsView`, `CollectionsSection`, `AppView`. None scales under Dynamic Type. Slices #49–#51 own them; the player's was fixed in #47 |
+| `ColorPalette` / `Theme` outside `DesignSystem/` | Deliberate deferral, ADR 0002. Revisit at epic end |
+| `FileManaging` — 8 of 9 members | Only `metadata(for:)` has a caller (`LivePlaybackRepository`). The rest are exercised by `ClientProtocolConformanceTests` and nothing else |
+
+### Pending in this epic
+
+| Slice | Screen | State |
+|---|---|---|
+| #47 | Player + foundation | **in progress** — this branch |
+| #48 | Files / Collections | not started. Owns the shared Row — the player's queue row is inline until then, per ADR 0002's second-consumer rule |
+| #49 | Recording + editor | not started. Largest surface (915 lines) |
+| #50 | Settings / About / Help | not started |
+| #51 | Home | not started. Removes the last inline layout, from `App/AppView.swift` |
+
+`EmptyStateView` stays and is **improved rather than replaced**: #47 changed its `title`/`message`
+to `LocalizedStringKey`, because `Text(String)` binds to the non-localizing overload and every
+empty state in the app was rendering English in all nine languages. No caller had to change —
+they all pass literals.
+
+### Known gaps
+
+| Gap | Where |
+|---|---|
+| `ScrollingText` scrolls left-only | RTL languages scroll the wrong way — **#54**, not fixed in #47 |
+| Lint gate is advisory and scoped | `scripts/lint-magic-numbers.sh` checks only migrated screens; `--all` reports 298 literals still outstanding. Not in CI |
+| Nothing enforces the layering | No module boundary, no build-time check. The discipline is review and `ARCHITECTURE.md` |
+| No UI tests | The 157 tests are unit tests over view models and `Domain/`. No screen is asserted on |
+| `main` carries a commit `feat` does not | `c7e508e`, from 2026-04-11. `feat` → `main` will not fast-forward |

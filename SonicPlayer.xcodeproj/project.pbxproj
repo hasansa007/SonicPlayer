@@ -70,6 +70,12 @@
 		AC000002000000000000001 /* FileManaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000011000000000000001 /* FileManaging.swift */; };
 		AC000003000000000000001 /* PlaybackRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000012000000000000001 /* PlaybackRepository.swift */; };
 		AC000004000000000000001 /* AudioPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000013000000000000001 /* AudioPlaying.swift */; };
+		AC000005000000000000001 /* ScrubGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000014000000000000001 /* ScrubGeometry.swift */; };
+		AC000006000000000000001 /* Tokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000015000000000000001 /* Tokens.swift */; };
+		AC000007000000000000001 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000016000000000000001 /* Typography.swift */; };
+		AC000008000000000000001 /* IconControlButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000017000000000000001 /* IconControlButton.swift */; };
+		AC000009000000000000001 /* ArtworkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000018000000000000001 /* ArtworkView.swift */; };
+		AC00000A000000000000001 /* SonicScrubber.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000019000000000000001 /* SonicScrubber.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -150,6 +156,12 @@
 		AC000011000000000000001 /* FileManaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileManaging.swift; sourceTree = "<group>"; };
 		AC000012000000000000001 /* PlaybackRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRepository.swift; sourceTree = "<group>"; };
 		AC000013000000000000001 /* AudioPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlaying.swift; sourceTree = "<group>"; };
+		AC000014000000000000001 /* ScrubGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrubGeometry.swift; sourceTree = "<group>"; };
+		AC000015000000000000001 /* Tokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tokens.swift; sourceTree = "<group>"; };
+		AC000016000000000000001 /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
+		AC000017000000000000001 /* IconControlButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconControlButton.swift; sourceTree = "<group>"; };
+		AC000018000000000000001 /* ArtworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkView.swift; sourceTree = "<group>"; };
+		AC000019000000000000001 /* SonicScrubber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonicScrubber.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -212,6 +224,7 @@
 				A1000045000000000000001 /* Clients */,
 				A1000046000000000000001 /* Models */,
 				A9000020000000000000001 /* Domain */,
+				AC000030000000000000001 /* DesignSystem */,
 				A1000047000000000000001 /* Utilities */,
 				A1000048000000000000001 /* Resources */,
 			);
@@ -275,6 +288,26 @@
 				A1000030000000000000003 /* FileSystemItem.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		AC000031000000000000001 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				AC000017000000000000001 /* IconControlButton.swift */,
+				AC000018000000000000001 /* ArtworkView.swift */,
+				AC000019000000000000001 /* SonicScrubber.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		AC000030000000000000001 /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				AC000031000000000000001 /* Components */,
+				AC000015000000000000001 /* Tokens.swift */,
+				AC000016000000000000001 /* Typography.swift */,
+			);
+			path = DesignSystem;
 			sourceTree = "<group>";
 		};
 		A1000047000000000000001 /* Utilities */ = {
@@ -348,6 +381,7 @@
 				A9000016000000000000001 /* RecordingFilename.swift */,
 				A9000015000000000000001 /* SessionRestorePolicy.swift */,
 				AC000010000000000000001 /* SessionRestorePlan.swift */,
+				AC000014000000000000001 /* ScrubGeometry.swift */,
 				A9000014000000000000001 /* SessionCodec.swift */,
 				A9000013000000000000001 /* PlaybackSession.swift */,
 				A9000012000000000000001 /* QueueMath.swift */,
@@ -534,6 +568,12 @@
 				AC000002000000000000001 /* FileManaging.swift in Sources */,
 				AC000003000000000000001 /* PlaybackRepository.swift in Sources */,
 				AC000004000000000000001 /* AudioPlaying.swift in Sources */,
+				AC000005000000000000001 /* ScrubGeometry.swift in Sources */,
+				AC000006000000000000001 /* Tokens.swift in Sources */,
+				AC000007000000000000001 /* Typography.swift in Sources */,
+				AC000008000000000000001 /* IconControlButton.swift in Sources */,
+				AC000009000000000000001 /* ArtworkView.swift in Sources */,
+				AC00000A000000000000001 /* SonicScrubber.swift in Sources */,
 				A9000005000000000000001 /* SessionCodec.swift in Sources */,
 				A9000004000000000000001 /* PlaybackSession.swift in Sources */,
 				A9000003000000000000001 /* QueueMath.swift in Sources */,
