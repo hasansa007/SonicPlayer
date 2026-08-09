@@ -43,6 +43,8 @@ enum Radius {
     static let md: CGFloat = 12
     /// 16 — full-size artwork.
     static let lg: CGFloat = 16
+    /// 18 — a card sheet rising over the canvas. Larger than `lg` because the surface is larger.
+    static let sheet: CGFloat = 18
 }
 
 /// Control and artwork dimensions.
@@ -100,6 +102,18 @@ enum Sizing {
     /// 64 — one `SonicRow`. Home reserves this per row because its list is inside a fixed-height
     /// frame with scrolling disabled, so it has to know the height in advance.
     static let rowHeight: CGFloat = 64
+
+    // The rotary wheel. **None of these scale with Dynamic Type**, and that is the point: the wheel
+    // is a physical control, and one that moves under the thumb between accessibility settings is
+    // worse than one that stays put. Everything *above* it scales normally.
+
+    /// 168 — the wheel's outer diameter.
+    static let wheelDiameter: CGFloat = 168
+    /// 70 — the hub, which is the contextual primary action.
+    static let wheelHub: CGFloat = 70
+    /// 200 — the band at the bottom of the canvas the wheel owns. Nothing is drawn over it, except
+    /// while capturing audio, which is the one stated exception in the design.
+    static let wheelZone: CGFloat = 200
 }
 
 /// A shadow, as one value rather than four loose arguments at the call site.
@@ -150,6 +164,12 @@ enum Motion {
     static let selection: Animation = .easeInOut(duration: 0.15)
     /// Entering or leaving selection mode, which moves the whole toolbar and every row's inset.
     static let selectionMode: Animation = .easeInOut(duration: 0.2)
+
+    /// The wheel's lit arc catching up to the thumb. Shorter than `scrub` because the arc chases a
+    /// finger that is still moving — anything slower reads as lag rather than as smoothing.
+    static let detent: Animation = .linear(duration: 0.06)
+    /// The transient value pill arriving and leaving.
+    static let hudFade: Animation = .easeOut(duration: 0.25)
 
     /// The playing-waveform bars. `index` staggers them so they do not pulse in unison.
     ///
