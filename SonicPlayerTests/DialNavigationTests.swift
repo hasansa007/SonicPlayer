@@ -221,6 +221,31 @@ struct DialNavigationTests {
         #expect(byChip.screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS", "EDIT"])
     }
 
+    /// **The invariant that keeps `.doublePress` reachable at all.**
+    ///
+    /// The test above sends `.doublePress` on its own, and every screen test does — but a view
+    /// cannot know a second press is coming. The first integration fired `.press` immediately and
+    /// `.doublePress` afterwards as an escalation, which meant the navigator only ever saw the
+    /// double *after* the single had already opened the recording. The guard recognising it no
+    /// longer held, so the gesture did nothing on a device while all 331 tests passed.
+    ///
+    /// `defersPress` is the fix: the one screen with a second meaning waits to find out which press
+    /// it got, and every other press fires instantly. This test is what stops that flag drifting
+    /// away from the screens `doublePress()` actually handles — if they ever disagree again, the
+    /// gesture dies silently a second time.
+    @Test func onlyAScreenWithASecondMeaningDefersItsPress() {
+        let library = DialSample.navigator()
+        #expect(!library.screen.ring.defersPress, "the library has no double-press meaning")
+
+        var recordings = DialSample.inRecordings()
+        #expect(recordings.screen.ring.defersPress, "a highlighted recording can be edited")
+
+        // Opening that recording lands somewhere with no second meaning, so presses go back to
+        // being instant — the 300ms is paid on exactly one screen, not carried around.
+        _ = recordings.receive(.press)
+        #expect(!recordings.screen.ring.defersPress)
+    }
+
     /// A gesture with no meaning here is silent rather than a limit: nothing was pushed against.
     @Test func aDoublePressWithNoMeaningIsSilent() {
         var navigator = DialSample.navigator()

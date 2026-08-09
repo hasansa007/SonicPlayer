@@ -19,6 +19,8 @@ struct DialRing: View {
 
     let ticks: DialScreen.Ticks
     let hub: DialScreen.Hub
+    /// See `registerPress`. True only where a double-press means something.
+    var defersPress: Bool = false
     let onCommand: (DialCommand) -> Void
 
     /// A reference box rather than `@State var tracker = RotaryTracker()`. The tracker is a gesture
@@ -32,7 +34,9 @@ struct DialRing: View {
     @State private var isHubPressed = false
     @State private var didHold = false
     @State private var holdTask: Task<Void, Never>?
-    @State private var lastPressAt: Date?
+    /// A single press held back while we find out whether a second one is coming. Only ever
+    /// non-nil on a screen whose `defersPress` is true.
+    @State private var pendingPress: Task<Void, Never>?
 
     /// 36 ticks, one every 10°. A count, not a dimension — it never becomes a layout token because
     /// nothing else in the app can share it.
@@ -319,24 +323,36 @@ struct DialRing: View {
             }
     }
 
-    /// **The press fires immediately and a double-press escalates it.**
+    /// **A press waits only on the screens that have a second meaning for it.**
     ///
-    /// The alternative is to hold every press for `doublePressWindow` to find out whether a second
-    /// one is coming, which puts 300ms of lag on the single most-used gesture in the app to serve
-    /// the rarest. So `.press` goes out on the first release, and a second release inside the
-    /// window sends `.doublePress` rather than another `.press`.
+    /// The first version fired `.press` immediately and sent `.doublePress` afterwards as an
+    /// escalation, to avoid putting 300ms of lag on the app's most-used gesture. That looked right
+    /// and was silently broken: the navigator only recognises a double-press *while the recording
+    /// row is still highlighted*, and the immediate `.press` had already opened it. The gesture did
+    /// nothing on a device, and all 331 tests passed, because the suite fed `.doublePress` alone.
     ///
-    /// The navigator therefore sees `press` then `doublePress`, and must read the second as
-    /// *escalate what the first did* — on 1b, open the recording, then open its editor. That reads
-    /// the same way the gesture feels. **Flagged to the navigator's author: if `doublePress` is
-    /// expected to arrive alone, this is the half that has to change.**
+    /// `defersPress` is how the cost lands where the feature is. On the one screen that
+    /// distinguishes them, the press waits `doublePressWindow` to find out which it was. Everywhere
+    /// else — every list, every action, every play/pause — it fires on release, instantly.
     private func registerPress() {
-        let now = Date()
-        if let lastPressAt, now.timeIntervalSince(lastPressAt) <= DialCommand.doublePressWindow {
-            self.lastPressAt = nil
+        guard defersPress else {
+            onCommand(.press)
+            return
+        }
+
+        // A second release inside the window means this was a double-press all along, so the
+        // pending single press is cancelled before it is ever sent.
+        if let pendingPress {
+            pendingPress.cancel()
+            self.pendingPress = nil
             onCommand(.doublePress)
-        } else {
-            lastPressAt = now
+            return
+        }
+
+        pendingPress = Task {
+            try? await Task.sleep(for: .seconds(DialCommand.doublePressWindow))
+            guard !Task.isCancelled else { return }
+            pendingPress = nil
             onCommand(.press)
         }
     }

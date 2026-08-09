@@ -230,7 +230,14 @@ extension DialNavigator {
     // MARK: - Ring
 
     private var ring: DialScreen.Ring {
-        DialScreen.Ring(ticks: ticks, hub: hub)
+        DialScreen.Ring(ticks: ticks, hub: hub, defersPress: defersPress)
+    }
+
+    /// True only where `doublePress()` has something to do — which today is a highlighted recording.
+    /// Everywhere else a press is instant, because there is no second meaning to wait for.
+    private var defersPress: Bool {
+        guard case .recordings = route else { return false }
+        return content.recordings.indices.contains(level.highlighted)
     }
 
     private var ticks: DialScreen.Ticks {

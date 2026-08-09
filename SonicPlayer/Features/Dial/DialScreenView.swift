@@ -138,7 +138,12 @@ struct DialScreenView: View {
 
     private var dial: some View {
         VStack(spacing: Spacing.sm) {
-            DialRing(ticks: screen.ring.ticks, hub: screen.ring.hub, onCommand: onCommand)
+            DialRing(
+                ticks: screen.ring.ticks,
+                hub: screen.ring.hub,
+                defersPress: screen.ring.defersPress,
+                onCommand: onCommand
+            )
 
             Text(screen.hint)
                 .font(.caption2)

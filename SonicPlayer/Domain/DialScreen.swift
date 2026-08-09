@@ -158,6 +158,21 @@ struct DialScreen: Equatable {
     struct Ring: Equatable {
         var ticks: Ticks
         var hub: Hub
+
+        /// Whether this screen distinguishes a press from a double-press — and therefore whether
+        /// the ring must wait `DialCommand.doublePressWindow` before reporting the first one.
+        ///
+        /// **This field exists because the two halves of the dial disagreed without it.** The view
+        /// cannot know a second press is coming, so it either delays *every* press by 300ms to find
+        /// out, or fires immediately and sends `.doublePress` afterwards as an escalation. The
+        /// first puts lag on the most-used gesture in the app to serve the rarest; the second means
+        /// the navigator receives `.doublePress` only *after* a `.press` has already navigated
+        /// away, so the guard that recognises it no longer holds. That shipped as a silently dead
+        /// gesture, and every test passed, because the suite fed `.doublePress` on its own.
+        ///
+        /// Naming it makes the cost land where the feature is: exactly one screen waits, and every
+        /// other press is instant.
+        var defersPress: Bool = false
     }
 
     /// What the ring's tick marks are showing. The design uses a different set per screen —
