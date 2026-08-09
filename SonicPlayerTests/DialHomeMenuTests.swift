@@ -6,7 +6,7 @@ import Testing
 /// The home menu's shape, and the two rules that decide it (#6).
 ///
 /// Split from `DialScreenshotTests` because that suite pins the *design's* eight screens against the
-/// spec, and these pin the rules that survive the design changing — where Import lives, and what
+/// spec, and these pin the rules that survive the design changing — where things live, and what
 /// makes a row a card.
 @Suite
 struct DialHomeMenuTests {
@@ -50,7 +50,7 @@ struct DialHomeMenuTests {
     @Test func aShortRecordingsListIsNotCards() {
         let navigator = DialSample.inRecordings(recordingCount: 2)
 
-        #expect(list(navigator)?.rows.count == 3, "two recordings and the Import row")
+        #expect(list(navigator)?.rows.count == 2)
         #expect(list(navigator)?.isProminent == false, "two recordings are a list, not a menu")
     }
 
@@ -61,18 +61,18 @@ struct DialHomeMenuTests {
         #expect(list(navigator)?.isProminent == false)
     }
 
-    // MARK: - Import moved onto the library
+    // MARK: - Import left the dial
 
-    @Test func importIsARowOnTheLibrary_notOnHome() {
+    /// It was a card, then a chip, then a row, and is now none of them. iOS already offers two ways
+    /// in that need no screen of ours — the Files share sheet and the Open-in handler.
+    @Test func importIsNowhereInTheDial() {
         let home = DialSample.navigator()
-        #expect(
-            !home.screen.actions.contains { $0.id == "import" },
-            "home is a menu of destinations, not of file operations"
-        )
-        #expect(
-            list(home)?.rows.contains { $0.id == "import" } == false,
-            "and not a row there either — it moved to the library it operates on"
-        )
+        #expect(!home.screen.actions.contains { $0.id == "import" })
+        #expect(list(home)?.rows.contains { $0.id == "import" } == false)
+
+        let library = DialSample.inRecordings()
+        #expect(!library.screen.actions.contains { $0.id == "import" })
+        #expect(list(library)?.rows.contains { $0.id == "import" } == false)
     }
 
     /// **The corner label follows you down, which is why it outlived the row that replaced it.**

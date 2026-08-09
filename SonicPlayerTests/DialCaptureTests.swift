@@ -23,8 +23,7 @@ struct DialCaptureTests {
         )
         _ = navigator.receive(.tick(1))
         _ = navigator.receive(.press)
-        // The empty list's hub imports now; `Record` is the chip beside it.
-        _ = navigator.receive(.action("record"))
+        _ = navigator.receive(.press)
 
         let effects = navigator.receive(.tick(2))
 
@@ -157,12 +156,8 @@ struct DialCaptureTests {
     }
 
     /// Root at the recordings list, then a double-press into the editor on the first row.
-    // The tick before each `doublePress` steps off Import, which is row 0 of this list — a
-    // double-press there has no second meaning and returns nothing at all.
-
     private static func inEditor(markers: [TimeInterval] = []) -> DialNavigator {
         var navigator = DialNavigator(content: content(editing: editable(markers: markers)), root: .recordings)
-        _ = navigator.receive(.tick(1))
         _ = navigator.receive(.doublePress)
         return navigator
     }
@@ -171,7 +166,6 @@ struct DialCaptureTests {
     /// has to load and hand the material over.
     private static func editorOpenedBeforeTheMaterialLoads(thenLoad: Bool = true) -> DialNavigator {
         var navigator = DialNavigator(content: content(editing: nil), root: .recordings)
-        _ = navigator.receive(.tick(1))
         _ = navigator.receive(.doublePress)
         if thenLoad {
             navigator.update(content(editing: editable(markers: [])))

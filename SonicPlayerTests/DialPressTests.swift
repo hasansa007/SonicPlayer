@@ -68,26 +68,12 @@ struct DialPressTests {
         #expect(navigator.route == .recordings)
     }
 
-    /// **The empty list's hub imports, and no longer records.** It was the message screen's hub and
-    /// the message is gone: an empty library is the Import row alone, and pressing a row does what
-    /// the row says. `Record` is the chip beside it, which is why that chip survived the change.
-    @Test func pressingOnTheEmptyStateImports() {
-        var navigator = DialSample.navigator(recordingCount: 0)
+    @Test func pressingOnTheEmptyStateStartsRecording() {
+        var navigator = DialSample.navigator(recordingCount: 0, playback: nil)
         _ = navigator.receive(.tick(1))
         _ = navigator.receive(.press)          // opens the recordings list, which is empty
 
         let effects = navigator.receive(.press)
-
-        #expect(effects == [.importFiles, .feedback(.commit)])
-        #expect(navigator.route == .recordings)
-    }
-
-    @Test func theRecordChipOnTheEmptyStateStartsRecording() {
-        var navigator = DialSample.navigator(recordingCount: 0, playback: nil)
-        _ = navigator.receive(.tick(1))
-        _ = navigator.receive(.press)
-
-        let effects = navigator.receive(.action("record"))
 
         #expect(effects == [.startRecording, .feedback(.commit)])
         #expect(navigator.route == .recording)

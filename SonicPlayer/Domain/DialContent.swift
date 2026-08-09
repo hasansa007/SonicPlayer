@@ -21,9 +21,6 @@ struct DialContent: Equatable {
         var title: String
         var count: Int?
         var destination: DialRoute?
-        /// What pressing it *does*, for a section that is an action rather than a place. Import is
-        /// the first of these: it opens a picker and stays where it is.
-        var effect: DialEffect?
         /// A second line, e.g. what a section contains.
         var subtitle: String?
     }

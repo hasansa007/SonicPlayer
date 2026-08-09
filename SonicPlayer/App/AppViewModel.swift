@@ -324,7 +324,6 @@ final class AppViewModel {
         // **Drives the recorder directly rather than presenting the old sheet.** Raising
         // `isRecordingSheetPresented` here put the legacy recording UI *over* the dial's own
         // recording screen, so the level meter was unreachable even once the route was.
-        dial.onImportFiles = { [weak self] in self?.isImportSheetPresented = true }
         dial.onOpenSettings = { [weak self] in self?.isSettingsPresented = true }
         dial.onStartRecording = { [recording] in recording.startRecordingTapped() }
         dial.onStopRecording = { [recording] in recording.stopRecordingTapped() }

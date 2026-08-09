@@ -76,11 +76,14 @@ enum DialRoute: Equatable {
     }
 
     /// Whether `1 of 12` is worth drawing. It is a property of the screen rather than of the row
-    /// count: the library has five rows and does not want it, the actions list has five and does —
-    /// a menu is a place, a list is a position within one.
+    /// count: a menu is a place, a list is a position within one.
+    ///
+    /// **The recordings list dropped it.** The ring's lit tick already shows where you are in the
+    /// list, so the line was a second answer to a question already on screen — and it took a row's
+    /// worth of height at the bottom of the card to give it.
     var countsRows: Bool {
         switch self {
-        case .recordings, .actions: true
+        case .actions: true
         default: false
         }
     }

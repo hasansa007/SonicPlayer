@@ -260,24 +260,16 @@ struct DialNavigator {
             guard let section = content.sections[safe: level.highlighted] else {
                 return [.feedback(.limit)]
             }
-            // A section either goes somewhere or does something. Import does something and stays
-            // put, which is why it cannot be modelled as a route.
-            if let destination = section.destination { return open(destination) }
-            if let effect = section.effect { return [effect, .feedback(.commit)] }
-            return [.feedback(.limit)]
+            // **Every section is a place now.** There used to be a second kind — a section carrying
+            // a `DialEffect` that did something and stayed put — and Import was its only instance.
+            // With Import gone from the dial the mechanism had no setter left, so it went with it
+            // rather than sitting here waiting for a second first user.
+            guard let destination = section.destination else { return [.feedback(.limit)] }
+            return open(destination)
 
         case .recordings:
-            switch RecordingsRow.at(level.highlighted, recordings: content.recordings.count) {
-            case .importFiles:
-                // Stays put. The picker belongs to the host and the files land in this very list,
-                // so navigating away would be a round trip back to where you already are.
-                return [.importFiles, .feedback(.commit)]
-            case .recording(let index):
-                guard let item = content.recordings[safe: index] else { return [.feedback(.limit)] }
-                return playItem(item, at: index)
-            case nil:
-                return [.feedback(.limit)]
-            }
+            guard let item = content.recordings[safe: level.highlighted] else { return startRecording() }
+            return playItem(item, at: level.highlighted)
 
         case .nowPlaying:
             content.playback?.isPlaying.toggle()
@@ -314,9 +306,7 @@ struct DialNavigator {
     /// exists and would not move, and a double-press on the library is not pushing against
     /// anything at all. Buzzing there would teach the gesture is available everywhere.
     private mutating func doublePress() -> [DialEffect] {
-        guard case .recordings = route,
-              case .recording(let index)? = RecordingsRow.at(level.highlighted, recordings: content.recordings.count),
-              content.recordings.indices.contains(index) else {
+        guard case .recordings = route, content.recordings[safe: level.highlighted] != nil else {
             return []
         }
         return openEditor()
@@ -359,8 +349,7 @@ struct DialNavigator {
         case (.recordings, "edit"):
             return doublePress()
         case (.recordings, "more"):
-            guard case .recording(let index)? = RecordingsRow.at(level.highlighted, recordings: content.recordings.count),
-                  let item = content.recordings[safe: index] else { return [.feedback(.limit)] }
+            guard let item = content.recordings[safe: level.highlighted] else { return [.feedback(.limit)] }
             return open(.actions(itemID: item.id))
         case (.recordings, "record"):
             return startRecording()
@@ -415,8 +404,7 @@ struct DialNavigator {
     }
 
     private mutating func openEditor() -> [DialEffect] {
-        guard case .recording(let index)? = RecordingsRow.at(level.highlighted, recordings: content.recordings.count),
-              let item = content.recordings[safe: index] else { return [.feedback(.limit)] }
+        guard let item = content.recordings[safe: level.highlighted] else { return [.feedback(.limit)] }
         return openEditor(itemID: item.id)
     }
 
@@ -479,7 +467,7 @@ struct DialNavigator {
         switch route {
         case .chooseMode: 2
         case .library: content.sections.count
-        case .recordings: RecordingsRow.rowCount(recordings: content.recordings.count)
+        case .recordings: content.recordings.count
         case .actions: DialItemAction.allCases.count
         case .nowPlaying, .recording, .edit: 0
         }

@@ -45,7 +45,6 @@ final class DialViewModel {
     var onSeek: ((TimeInterval) -> Void)?
     var onSelectTrack: ((Int) -> Void)?
     var onStartRecording: (() -> Void)?
-    var onImportFiles: (() -> Void)?
     var onOpenSettings: (() -> Void)?
     var onStopRecording: (() -> Void)?
     var onTogglePause: (() -> Void)?
@@ -121,12 +120,13 @@ final class DialViewModel {
     ) {
         var content = DialContent()
 
-        // **Home is a menu of two or three cards, and Import is not one of them.**
+        // **Home is two cards, and Import is not one of them — nor is it anywhere else in the dial.**
         //
-        // It was first here on the argument that it is the only way audio the app did not record
-        // itself gets in. True, and still not a reason for it to outrank the two things this screen
-        // exists to offer — it is a *file operation on the library*, so it moved to the library,
-        // where `DialNavigatorScreen` makes it a chip on both the full and the empty state.
+        // It was a card here, then a chip on the library, then a row in it. Each move cost
+        // something: as a card it outranked the two things this screen exists to offer, as a chip it
+        // made a menu of one, and as a row it put an index offset on every read of the highlight.
+        // iOS already provides two ways in that need no screen of ours — the Files share sheet and
+        // the Open-in handler — so the dial stopped competing with them.
         content.sections = [
             DialContent.Section(
                 id: "recordings",
@@ -136,8 +136,8 @@ final class DialViewModel {
                 destination: .recordings,
                 // What is inside, not how much — the count is already the row's trailing value, and
                 // a card that says `12` and "12 recordings" is one fact wearing two hats. Short
-                // because the card also carries a count and a chevron: "Recordings · Imported
-                // files" truncated to "Recordings · Import…" at the default text size.
+                // because the card also carries a count and a chevron: the longer form truncated to
+                // "Recordings · Import…" at the default text size.
                 subtitle: String(localized: "Recordings · Imports")
             ),
             DialContent.Section(
@@ -292,8 +292,6 @@ final class DialViewModel {
             onSeek?(time)
         case .selectTrack(let index):
             onSelectTrack?(index)
-        case .importFiles:
-            onImportFiles?()
         case .openSettings:
             onOpenSettings?()
         case .startRecording:

@@ -49,12 +49,12 @@ struct DialScreenshotTests {
         let screen = navigator.screen
 
         #expect(screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS"])
-        // Thirteen rows, and the helper has ticked past Import onto the first recording.
-        #expect(rows(navigator)?.position == "2 of 13")
-        #expect(rows(navigator)?.rows.first?.id == "import")
-        #expect(rows(navigator)?.rows.dropFirst().first?.trailing == "01:00")
-        #expect(rows(navigator)?.rows.dropFirst().first?.subtitle == "Today 14:02 · 2 markers")
-        #expect(rows(navigator)?.rows.dropFirst(2).first?.subtitle == nil)
+        // No counter here any more — the ring's lit tick already says where you are, and the line
+        // cost a row's height at the bottom of the card to repeat it.
+        #expect(rows(navigator)?.position == nil)
+        #expect(rows(navigator)?.rows.first?.trailing == "01:00")
+        #expect(rows(navigator)?.rows.first?.subtitle == "Today 14:02 · 2 markers")
+        #expect(rows(navigator)?.rows.dropFirst().first?.subtitle == nil)
         // Back moved to the top bar. Edit came off the stick's right nudge and into the actions
         // menu as its top row, leaving one nudge — upward, because a lone sideways one on a
         // four-way stick reads as though the others are broken.
@@ -67,12 +67,15 @@ struct DialScreenshotTests {
         #expect(screen.hint == "rotate to scroll · press to open · double-press to edit")
     }
 
+    /// The actions menu is the only screen still counting, and it is the one where counting means
+    /// something: a fixed menu of verbs where "1 of 5" says how much you have not seen yet.
     @Test func theCountedPositionFollowsTheHighlight() {
         var navigator = DialSample.inRecordings()
+        _ = navigator.receive(.action("more"))
 
-        _ = navigator.receive(.tick(6))
+        _ = navigator.receive(.tick(2))
 
-        #expect(rows(navigator)?.position == "8 of 13")
+        #expect(rows(navigator)?.position == "3 of 5")
     }
 
     // MARK: - 1c Now playing
@@ -196,26 +199,22 @@ struct DialScreenshotTests {
         _ = navigator.receive(.press)
         let screen = navigator.screen
 
-        // **The empty state is a one-row list now, not a message.** Import has to be reachable when
-        // there is nothing else, and a row cannot live inside a message. What the message *said*
-        // survives on that row's second line.
-        guard case .list(let list) = screen.content else {
-            Issue.record("expected the one-row list, got \(screen.content)")
+        guard case .message(let message) = screen.content else {
+            Issue.record("expected the empty state, got \(screen.content)")
             return
         }
-        #expect(list.rows.map(\.id) == ["import"])
-        #expect(list.rows.first?.subtitle == "No recordings yet · bring audio in")
+        #expect(message.icon == .recording)
+        #expect(message.title == "No recordings yet")
 
         #expect(screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS"])
-        // `Record` stays, and is now the *only* way to start one from here — the hub imports.
         #expect(screen.actions.map(\.id) == ["record"])
         #expect(screen.chrome.canGoBack)
         // Destructive, not primary. It is the obvious action on this screen *and* the one you
         // cannot casually undo, and the design draws it red for that reason — `.primary` renders
         // in the accent, which would make starting a recording look like opening a playlist.
         #expect(screen.actions.last?.emphasis == .destructive)
-        #expect(screen.ring.hub == .label("IMPORT"))
-        #expect(screen.hint == "press to import · or use Record below")
+        #expect(screen.ring.hub == .label("RECORD"))
+        #expect(screen.hint == "press to start recording · nothing to scroll yet")
     }
 
     // MARK: - 1h Listen vs record
@@ -252,24 +251,20 @@ struct DialScreenshotTests {
 
         navigator.update(DialSample.content(recordingCount: 3))
 
-        #expect(rows(navigator)?.highlighted == 3, "Import plus three recordings is four rows")
-        #expect(rows(navigator)?.position == "4 of 4")
+        #expect(rows(navigator)?.highlighted == 2)
+        #expect(rows(navigator)?.position == nil)
     }
 
-    /// A list that empties is now a one-row list rather than a message, and the row is Import.
-    /// The clamp still has to pull the highlight all the way back onto it.
-    @Test func aListThatEmptiesLeavesOnlyTheImportRow() {
+    @Test func aListThatEmptiesFallsBackToTheEmptyState() {
         var navigator = DialSample.inRecordings()
         _ = navigator.receive(.tick(5))
 
         navigator.update(DialSample.content(recordingCount: 0))
 
-        guard case .list(let list) = navigator.screen.content else {
-            Issue.record("expected the one-row list, got \(navigator.screen.content)")
+        guard case .message = navigator.screen.content else {
+            Issue.record("expected the empty state, got \(navigator.screen.content)")
             return
         }
-        #expect(list.rows.map(\.id) == ["import"])
-        #expect(list.highlighted == 0)
-        #expect(navigator.screen.ring.hub == .label("IMPORT"))
+        #expect(navigator.screen.ring.hub == .label("RECORD"))
     }
 }
