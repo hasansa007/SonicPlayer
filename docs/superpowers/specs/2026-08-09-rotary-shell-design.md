@@ -210,8 +210,14 @@ touch → RotaryWheel (view)
 3. **Residual accumulator** — slow drags must not drop sub-detent fractions.
 4. **Acceleration** — a fast spin must cover a long list without changing the fine step.
 
-**Reused unchanged:** `ScrubClamp` (seek bounds) · `QueueMath` (track stepping) · `ScrubGeometry`
-(drag-to-position) · `SonicRow` (sheet rows — its fourth consumer) · `SonicScrubber`.
+**Reused unchanged:** `QueueMath` (track stepping) · `ScrubGeometry` (drag-to-position) ·
+`SonicRow` (sheet rows — its fourth consumer) · `SonicScrubber` (the coarse half of the pair).
+
+**Extended, not reused as-is: `ScrubClamp`.** An earlier draft of this spec said it already provided
+seek bounds. It does not — it is the *recording editor's* clamp, and both its functions are built
+around a fixed `interval: TimeInterval = 15`. It gains one bounds function,
+`position(_:duration:)`, because "what are the bounds of a scrub position" should have exactly one
+answer in this codebase and that type is already where the answer lives.
 
 ### `Clients/HapticsClient`
 
