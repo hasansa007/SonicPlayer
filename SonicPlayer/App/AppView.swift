@@ -38,6 +38,13 @@ struct AppView: View {
                     }
                     .navigationDestination(isPresented: isSettingsPresented) {
                         SettingsView(viewModel: app.settings)
+                            // **Explicit, not inherited.** The dial root hides the navigation bar,
+                            // and a pushed screen that inherits that has no back button — which is
+                            // a trap rather than a style choice. Stating it here means Settings
+                            // cannot be reached and then not left.
+                            .toolbar(.visible, for: .navigationBar)
+                            .navigationTitle("Settings")
+                            .navigationBarTitleDisplayMode(.inline)
                     }
                     .alert("Delete \(filesRoot.pendingDeleteCount) \(filesRoot.pendingDeleteCount == 1 ? "item" : "items")?",
                            isPresented: $filesRoot.isConfirmingDelete) {

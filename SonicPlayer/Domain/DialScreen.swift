@@ -38,6 +38,14 @@ struct DialScreen: Equatable {
         /// Drives the pulsing dot. Separate from `status` because it animates.
         var isRecording: Bool = false
 
+        /// Whether the top-right corner offers Settings.
+        ///
+        /// It replaced the `20:34 ▸ playing` label that used to sit there. That label was doing two
+        /// jobs badly: saying what was playing, in a space too small to name it, and being the only
+        /// way to reach Now Playing. Both moved to a row in the library, which has room for a title
+        /// — and the corner went to the one thing that had nowhere to live at all.
+        var showsSettings: Bool = false
+
         /// Whether there is a level to pop to.
         ///
         /// Back lives in the top bar rather than the action row because it is *navigation*, not one

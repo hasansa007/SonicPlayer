@@ -52,4 +52,7 @@ enum DialEffect: Equatable {
     /// Open the system file picker. The only way into the app for audio it did not record itself,
     /// and with Home gone there was no longer anywhere else to ask for it.
     case importFiles
+
+    /// Open Settings. Still a push rather than a dial route — when it becomes one, this goes.
+    case openSettings
 }

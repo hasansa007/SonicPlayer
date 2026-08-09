@@ -23,6 +23,7 @@ final class DialViewModel {
     var onSelectTrack: ((Int) -> Void)?
     var onStartRecording: (() -> Void)?
     var onImportFiles: (() -> Void)?
+    var onOpenSettings: (() -> Void)?
     var onStopRecording: (() -> Void)?
     var onTogglePause: (() -> Void)?
     var onAddMarker: (() -> Void)?
@@ -104,10 +105,6 @@ final class DialViewModel {
                 count: recentFiles.count,
                 destination: .recordings
             ),
-            // **No "Now Playing" row.** It is not a place you go — it is where the app rests, and a
-            // list of places that includes the thing you are already doing is a category error. It
-            // is also useless exactly half the time, since there is nothing to go to when nothing
-            // plays. The chrome's status line is the way in, and `hold` still works from anywhere.
             DialContent.Section(
                 id: "record",
                 icon: .recording,
@@ -116,6 +113,26 @@ final class DialViewModel {
                 destination: .recording
             )
         ]
+
+        // **Now Playing is a row again, but only when there is something to go to.**
+        //
+        // It was removed for being a place that is not a place, and that argument was right about
+        // the *list* and wrong about the need — the corner label replacing it could say `20:34 ▸
+        // playing` and never *what*. A row can name the track, and it disappears when nothing is
+        // loaded, so it is never the dead entry that made it wrong the first time.
+        if let track = player.currentTrack {
+            content.sections.insert(
+                DialContent.Section(
+                    id: "nowPlaying",
+                    icon: .session,
+                    title: String(localized: "Now Playing"),
+                    count: nil,
+                    destination: .nowPlaying,
+                    subtitle: track.title
+                ),
+                at: 2
+            )
+        }
 
         content.recordings = recentFiles.map { file in
             DialContent.Item(
@@ -246,6 +263,8 @@ final class DialViewModel {
             onSelectTrack?(index)
         case .importFiles:
             onImportFiles?()
+        case .openSettings:
+            onOpenSettings?()
         case .startRecording:
             onStartRecording?()
         case .stopRecording:

@@ -339,6 +339,9 @@ struct DialNavigator {
         case (_, "nowPlaying"):
             return hold()
 
+        case (_, "settings"):
+            return [.openSettings, .feedback(.commit)]
+
         // The stick's vertical axis. These had no handler at all — the nudge fired, the navigator
         // shrugged, and nothing moved. A command with no case is silent, which is why the
         // command/handler pair wants to be added in one breath.

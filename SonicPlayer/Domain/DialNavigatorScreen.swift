@@ -27,12 +27,15 @@ extension DialNavigator {
             breadcrumb: stack.compactMap { $0.route.crumb(in: content) },
             status: status,
             isRecording: content.capture.map { !$0.isPaused } ?? false,
+            showsSettings: stack.count == 1,
             canGoBack: stack.count > 1
         )
     }
 
-    /// `20:34 ▸ playing`, and nothing at all on the two screens that own the transport — repeating
-    /// the elapsed time three inches above a bigger copy of it is noise.
+    /// **Nothing, now that the corner is Settings.**
+    ///
+    /// Kept as a field rather than deleted because the recorder may yet want a word up there, and
+    /// because removing it from the contract would touch every screenshot test to prove a negative.
     private var status: String? {
         switch route {
         case .nowPlaying, .recording:
@@ -168,7 +171,13 @@ extension DialNavigator {
             let trailing = section.count.map { count in
                 section.destination == nil ? "\(count)" : "\(count) ▸"
             }
-            return .init(id: section.id, icon: section.icon, title: section.title, trailing: trailing)
+            return .init(
+                id: section.id,
+                icon: section.icon,
+                title: section.title,
+                trailing: trailing,
+                subtitle: section.subtitle
+            )
         }
     }
 
