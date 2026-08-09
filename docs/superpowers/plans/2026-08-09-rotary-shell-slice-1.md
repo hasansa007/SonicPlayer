@@ -2035,8 +2035,13 @@ remain visible above the wheel, and that the wheel itself has not moved or resiz
 
 - [ ] **Step 5: Commit any fixes and record the evidence**
 
+**Stage by path, never `git add -A`.** This is a shared checkout and it currently has an unrelated
+modification to `SonicPlayer/Clients/AudioPlayerClient.swift` that is not part of this work. Run
+`git status --short` first and stage only the files you changed.
+
 ```bash
-git add -A
+git status --short
+git add <the specific files you changed>
 git commit -m "fix: RTL, VoiceOver and AX5 corrections from the slice 1 evidence pass (#6)"
 ```
 
