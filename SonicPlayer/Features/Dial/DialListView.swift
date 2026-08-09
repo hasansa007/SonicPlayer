@@ -1,0 +1,184 @@
+import SwiftUI
+
+/// A highlighted row in a vertical list — the dial's fundamental gesture, and therefore four of the
+/// eight screens (#6).
+///
+/// **It does not scroll.** The navigator hands over the rows that fit and moves `highlighted`
+/// within them; windowing a long list is a decision, and decisions are not made here. A scroll view
+/// would also give the finger a second way to move the highlight, which is the thing this
+/// navigation model is trying not to have.
+///
+/// **Two rows or fewer render prominently.** The listen/record chooser and a twelve-item recording
+/// list are the same `DialScreen.List` in the contract, so the count is the only signal available
+/// for "this is a choice between two things" versus "this is a list to scroll" — and it is the
+/// right signal, because that *is* the difference.
+struct DialListView: View {
+
+    let list: DialScreen.List
+    /// The rows are inert; the dial moves the highlight and the hub opens it. A tap is the touch
+    /// equal of pressing the hub on that row, which is what keeps the two input surfaces peers.
+    let onSelect: (Int) -> Void
+
+    private static let prominentRowLimit = 2
+
+    private var isProminent: Bool { list.rows.count <= Self.prominentRowLimit }
+
+    /// Whether rows without an icon still hold the leading column open.
+    ///
+    /// `DialScreen.Icon` has a `.none` case and the item-actions screen uses it, so a list can be
+    /// part-iconned. Letting those rows close the column ragged-edges the titles against their
+    /// neighbours; reserving it for everyone in a list where *anything* has an icon keeps one left
+    /// margin, and costs nothing in a list where nothing does.
+    private var reservesIconColumn: Bool {
+        list.rows.contains { DialIcon.systemImage(for: $0.icon) != nil }
+    }
+
+    var body: some View {
+        VStack(spacing: isProminent ? Spacing.md : Spacing.xxs) {
+            if isProminent { Spacer(minLength: 0) }
+
+            ForEach(Array(list.rows.enumerated()), id: \.element.id) { index, row in
+                Button {
+                    onSelect(index)
+                } label: {
+                    DialRowView(
+                        row: row,
+                        isHighlighted: index == list.highlighted,
+                        isProminent: isProminent,
+                        reservesIconColumn: reservesIconColumn
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            Spacer(minLength: 0)
+
+            if let position = list.position {
+                Text(position)
+                    .font(.caption2)
+                    .monospacedDigit()
+                    .foregroundColor(.sonicTextMuted)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+}
+
+/// One row. Split out because the highlighted and plain forms differ in five properties at once,
+/// and a chain of ternaries inside the list was unreadable by the third.
+private struct DialRowView: View {
+
+    let row: DialScreen.List.Row
+    let isHighlighted: Bool
+    let isProminent: Bool
+    let reservesIconColumn: Bool
+
+    private var isDestructive: Bool { DialIcon.isDestructive(row.icon) }
+
+    var body: some View {
+        HStack(spacing: Spacing.md) {
+            icon
+
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                // Two lines and tail truncation, **not** the middle truncation `SonicRow` uses.
+                // That mode is right for a filename, where the extension is the informative end;
+                // here it turned "Recordings" into "R…gs" at AX5. A second line costs nothing at
+                // ordinary sizes, where these titles are one line anyway.
+                Text(row.title)
+                    .font(titleFont)
+                    .fontWeight(isHighlighted || isProminent ? .semibold : .regular)
+                    .foregroundColor(titleColor)
+                    .lineLimit(2)
+
+                if let subtitle = row.subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(secondaryColor)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: Spacing.sm)
+
+            if let trailing = row.trailing {
+                Text(trailing)
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundColor(secondaryColor)
+            }
+        }
+        .padding(.horizontal, Spacing.md)
+        .padding(.vertical, isProminent ? Spacing.xl : Spacing.md)
+        .background(background)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isHighlighted ? [.isSelected] : [])
+    }
+
+    @ViewBuilder
+    private var icon: some View {
+        if let systemImage = DialIcon.systemImage(for: row.icon) {
+            if isProminent {
+                Image(systemName: systemImage)
+                    .font(.title2)
+                    .foregroundColor(isHighlighted ? .white : .sonicPrimary)
+                    .frame(width: Sizing.dialChoiceTile, height: Sizing.dialChoiceTile)
+                    .background(
+                        Color.white.opacity(isHighlighted ? ControlTint.on : 0),
+                        in: RoundedRectangle(cornerRadius: Radius.lg)
+                    )
+                    .background(
+                        Color.sonicPrimary.opacity(isHighlighted ? 0 : ControlTint.on),
+                        in: RoundedRectangle(cornerRadius: Radius.lg)
+                    )
+                    .accessibilityHidden(true)
+            } else {
+                Image(systemName: systemImage)
+                    .font(.subheadline)
+                    .foregroundColor(iconColor)
+                    .frame(width: Spacing.xxl)
+                    .accessibilityHidden(true)
+            }
+        } else if reservesIconColumn && !isProminent {
+            Color.clear.frame(width: Spacing.xxl, height: 0)
+        }
+    }
+
+    @ViewBuilder
+    private var background: some View {
+        if isHighlighted {
+            RoundedRectangle(cornerRadius: isProminent ? Radius.sheet : Radius.md)
+                .fill(DialSurface.fill)
+                .sonicShadow(Elevation.control)
+        } else if isProminent {
+            // A prominent row that is not highlighted still needs an edge, or the chooser reads as
+            // one card and an orphaned label.
+            RoundedRectangle(cornerRadius: Radius.sheet)
+                .fill(Color.sonicPrimary.opacity(ControlTint.off))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.sheet)
+                        .strokeBorder(Color.sonicBorder)
+                )
+        }
+    }
+
+    private var titleFont: Font { isProminent ? .title3 : .body }
+
+    private var titleColor: Color {
+        if isHighlighted { return .white }
+        if isDestructive { return .red }
+        return .sonicTextPrimary
+    }
+
+    private var iconColor: Color {
+        if isHighlighted { return .white }
+        if isDestructive { return .red }
+        return .sonicTextSecondary
+    }
+
+    private var secondaryColor: Color {
+        isHighlighted ? Color.white.opacity(Self.onFillSecondary) : .sonicTextSecondary
+    }
+
+    private static let onFillSecondary: Double = 0.75
+}
