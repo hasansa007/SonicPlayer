@@ -145,7 +145,9 @@ struct DialPressTests {
 
         let effects = navigator.receive(.action("preview"))
 
-        #expect(effects == [.previewTrim, .feedback(.commit)])
+        // Bounded on the way out, like `commitTrim` — the selection is the whole file until a
+        // handle is nudged, and `DialSample.editable` is ten minutes long.
+        #expect(effects == [.previewTrim(itemID: "rec-0", start: 0, end: 600), .feedback(.commit)])
         // Preview must not steal the selection from the handle the wheel is nudging.
         #expect(navigator.axis == .trimStart)
     }

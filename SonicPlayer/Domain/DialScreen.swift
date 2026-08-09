@@ -145,6 +145,16 @@ struct DialScreen: Equatable {
         case podcast
         case stats
         case marker
+        // Roles the gear stick's directions need. Named for what they do, not for the symbol, so
+        // the view still owns every glyph choice.
+        case volumeUp
+        case volumeDown
+        case previous
+        case next
+        case pause
+        case play
+        case edit
+        case more
         case share
         /// Writing a copy out of the app. Distinct from `share`, which hands the existing file to
         /// another app — reusing `share` put the same glyph on two rows of one list, which reads
@@ -203,13 +213,41 @@ struct DialScreen: Equatable {
         /// other press is instant.
         var defersPress: Bool = false
 
-        /// The current output level, `0...1`, when this screen's hub can set volume. `nil` means
-        /// the hub is press-only and has no directions.
+        /// What the gear stick's four nudges do **on this screen**. `nil` leaves the hub press-only.
         ///
-        /// Its presence is what turns the hub into a gear stick: nudge it up or down for volume,
-        /// left or right for track. One control does all of it, which is why the segments beside
-        /// the wheel are gone — three controls to drive one player was two too many.
-        var volume: Double?
+        /// Contextual for the same reason `hub` is: one control, and what it means comes from where
+        /// you are. Now Playing puts volume on the vertical axis and track on the horizontal; the
+        /// recorder puts a marker up and pause left; a list puts Edit and its menu on the sides.
+        ///
+        /// **This is what let the chip row go.** Those chips were a second control surface sitting
+        /// above the only one that mattered, and every screen paid for them in height. Folding them
+        /// into the stick keeps the promise the dial makes — there is one thing to touch.
+        var directions: Directions?
+
+        /// Whether the dial's border is alive: it cycles while something is playing or recording,
+        /// and holds still when nothing is. The only motion on the screen, and it means one thing.
+        var isLive: Bool = false
+    }
+
+    /// The gear stick's four ways out. Any of them may be absent, and an absent one does nothing —
+    /// a screen with only `up` is a perfectly good screen.
+    struct Directions: Equatable {
+        var up: Direction?
+        var down: Direction?
+        var left: Direction?
+        var right: Direction?
+    }
+
+    /// One nudge: what it is called, what it looks like, and what it sends.
+    ///
+    /// It carries an action `id` rather than a command, so the navigator handles a nudge and a tap
+    /// on the same chip through one path — which is what stops the two drifting apart the way
+    /// press and double-press did.
+    struct Direction: Equatable {
+        var id: String
+        var icon: Icon
+        /// What VoiceOver says. The glyph is a legend; this is the name.
+        var label: String
     }
 
     /// What the ring's tick marks are showing. The design uses a different set per screen —

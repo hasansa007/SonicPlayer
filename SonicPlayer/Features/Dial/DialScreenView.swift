@@ -151,7 +151,8 @@ struct DialScreenView: View {
             ticks: screen.ring.ticks,
             hub: screen.ring.hub,
             defersPress: screen.ring.defersPress,
-            volume: screen.ring.volume,
+            directions: screen.ring.directions,
+            isLive: screen.ring.isLive,
             onCommand: onCommand
         )
         // The hint is no longer drawn, but it is still the sentence that explains the gestures —

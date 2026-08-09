@@ -88,7 +88,12 @@ struct DialScreenshotTests {
         // only chip left is the way out.
         #expect(screen.actions.isEmpty, "the wheel seeks, the segments do the rest, Back is chrome")
         #expect(screen.chrome.canGoBack)
-        #expect(screen.ring.volume != nil, "a hub with directions needs its volume")
+        // The chip row is gone: every action it held moved onto the stick's four nudges.
+        #expect(screen.ring.directions?.up?.id == "volumeUp")
+        #expect(screen.ring.directions?.down?.id == "volumeDown")
+        #expect(screen.ring.directions?.left?.id == "previous")
+        #expect(screen.ring.directions?.right?.id == "next")
+        #expect(screen.ring.isLive, "the border moves while audio moves")
         #expect(screen.ring.hub == .glyph("pause.fill"))
         // The hint is no longer drawn — it is the dial's accessibility hint now — but it is still
         // produced, and it is still what a VoiceOver user is told.

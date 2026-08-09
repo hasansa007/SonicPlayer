@@ -53,6 +53,13 @@ extension AudioPlayerClient {
 // was never producing unimplemented behaviour for them.
 
 extension AudioRecorderClient {
+    /// The one client whose closures stay silent rather than reporting. That is inherited: it
+    /// stubbed every closure explicitly under the macro too, so reporting here would be a new
+    /// behaviour rather than a restored one.
+    ///
+    /// `isInputGainSettable` answers **false**, which is what the simulator and every built-in
+    /// iPhone mic answer. A suite exercising the gain axis has to say so — which is the point, since
+    /// that axis exists only where the hardware has gain to give.
     static let test = Self(
         checkPermissions: { true },
         requestPermissions: { true },
@@ -60,7 +67,12 @@ extension AudioRecorderClient {
         stopRecording: { nil },
         currentTime: { 0 },
         peakPower: { 0 },
-        isRecording: { false }
+        isRecording: { false },
+        pauseRecording: {},
+        resumeRecording: { true },
+        isInputGainSettable: { false },
+        inputGain: { 1 },
+        setInputGain: { _ in false }
     )
 }
 

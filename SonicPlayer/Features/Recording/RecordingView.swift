@@ -543,8 +543,7 @@ struct RecordingWaveformView: View {
     }
 
     private func updateBars(peak: Float) {
-        let normalized = max(0, min(1, (peak + 50) / 50))
-        let height = CGFloat(normalized)
+        let height = CGFloat(MeterLevel.fraction(ofPeak: peak))
         bars.removeFirst()
         bars.append(height)
     }

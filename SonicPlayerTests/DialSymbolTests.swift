@@ -13,12 +13,9 @@ import UIKit
 @Suite
 struct DialSymbolTests {
 
-    @Test func everyDirectionMarkResolves() {
-        for direction in DialRing.directions {
-            #expect(
-                UIImage(systemName: direction.glyph) != nil,
-                "no SF Symbol named \(direction.glyph)"
-            )
+    @Test func everyHubGlyphResolves() {
+        for symbol in DialScreen.Hub.allDialGlyphs {
+            #expect(UIImage(systemName: symbol) != nil, "no SF Symbol named \(symbol)")
         }
     }
 
@@ -30,12 +27,26 @@ struct DialSymbolTests {
     }
 }
 
+private extension DialScreen.Hub {
+    /// The raw SF Symbol names the navigator can put in the hub.
+    ///
+    /// `Hub.glyph` carries a **string** rather than an `Icon`, so `DialIcon` never sees these and
+    /// `everyIconRoleResolves` cannot reach them. They are the one remaining place a misspelling
+    /// renders as an empty hub. Direction marks used to be that place too; since the gear stick
+    /// they resolve through `DialIcon.systemImage(for:)` and are covered by the icon test instead.
+    ///
+    /// Listed by hand for the same reason `allDialCases` is: forgetting to add one costs only
+    /// this test.
+    static let allDialGlyphs: [String] = ["play.fill", "pause.fill"]
+}
+
 private extension DialScreen.Icon {
     /// The contract's `Icon` is not `CaseIterable` — it does not need to be for its own sake, and
     /// adding the conformance to the shared file to serve one test would be the test leaking into
     /// the design. Listed here instead, where forgetting to add a case costs only this test.
     static let allDialCases: [DialScreen.Icon] = [
-        .playlist, .recording, .session, .podcast, .stats,
-        .marker, .share, .export, .rename, .delete, .add, .none
+        .playlist, .recording, .session, .podcast, .stats, .marker,
+        .volumeUp, .volumeDown, .previous, .next, .pause, .play, .edit, .more,
+        .share, .export, .rename, .delete, .add, .none
     ]
 }

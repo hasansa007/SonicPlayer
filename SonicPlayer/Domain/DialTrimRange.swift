@@ -33,14 +33,33 @@ struct DialTrimRange: Equatable {
     /// a handle already against the wall is silent.
     @discardableResult
     mutating func moveStart(by delta: TimeInterval) -> Bool {
-        let ceiling = max(0, end - Self.minimumLength)
-        return assign(&start, to: min(ScrubClamp.position(start + delta, duration: duration), ceiling))
+        setStart(to: start + delta)
     }
 
     @discardableResult
     mutating func moveEnd(by delta: TimeInterval) -> Bool {
+        setEnd(to: end + delta)
+    }
+
+    /// Places a handle at an exact time, subject to the same bounds a nudge obeys.
+    ///
+    /// **Snapping needs this rather than `moveStart(by: target - start)` (#74.)** A detent is 0.1s,
+    /// which is not representable, so a handle walked there in tenths sits a few ulps off — and
+    /// arriving *near* a marker is the failure snapping exists to prevent. Assigning the target
+    /// makes the equality that decides whether the snap took a real one instead of a coin flip.
+    ///
+    /// The relative moves above are written in terms of these, so there is one clamp rather than
+    /// two that agree today.
+    @discardableResult
+    mutating func setStart(to time: TimeInterval) -> Bool {
+        let ceiling = max(0, end - Self.minimumLength)
+        return assign(&start, to: min(ScrubClamp.position(time, duration: duration), ceiling))
+    }
+
+    @discardableResult
+    mutating func setEnd(to time: TimeInterval) -> Bool {
         let floor = min(duration, start + Self.minimumLength)
-        return assign(&end, to: max(ScrubClamp.position(end + delta, duration: duration), floor))
+        return assign(&end, to: max(ScrubClamp.position(time, duration: duration), floor))
     }
 
     /// What survives the trim.

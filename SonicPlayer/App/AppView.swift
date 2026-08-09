@@ -213,6 +213,11 @@ private extension AppView {
             .onChange(of: app.home.recentFiles) { _, _ in app.refreshDial() }
             .onChange(of: app.recording.isRecording) { _, _ in app.refreshDial() }
             .onChange(of: app.recording.peakLevel) { _, _ in app.refreshDial() }
+            // Pausing stops the meter, so `peakLevel` stops changing — without this the screen
+            // would keep the running state it had at the moment the take was paused (#75).
+            .onChange(of: app.recording.isPaused) { _, _ in app.refreshDial() }
+            // A marker must appear under the thumb, not up to a meter interval later.
+            .onChange(of: app.recording.markers) { _, _ in app.refreshDial() }
             .toolbar(.hidden, for: .navigationBar)
     }
 

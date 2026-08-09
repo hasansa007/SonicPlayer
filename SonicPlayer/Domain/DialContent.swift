@@ -66,6 +66,10 @@ struct DialContent: Equatable {
         var gain: Double
         var markers: [Marker]
         var isPaused: Bool = false
+        /// Whether this hardware has an input gain at all. Defaults to **false**, which is what
+        /// every built-in iPhone mic reports — so the wheel refuses the gain axis unless something
+        /// has said otherwise, rather than turning freely against nothing (#75).
+        var isGainSettable: Bool = false
 
         var level: Double { min(max(0, levels.last ?? 0), 1) }
     }
@@ -77,6 +81,10 @@ struct DialContent: Equatable {
         var title: String
         var waveform: [Double]
         var duration: TimeInterval
+        /// The points both trim inputs snap to, dropped while this was being captured (#74).
+        /// Sorted, because `MarkerSnap` breaks ties toward the earlier one and `RecordingMarkers`
+        /// is what fills this in.
+        var markers: [TimeInterval] = []
     }
 
     var sections: [Section] = []

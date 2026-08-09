@@ -156,8 +156,13 @@ struct DialNavigator {
         return [.selectTrack(index: target), .feedback(.detent)]
     }
 
+    /// **Hardware with no input gain is a wall, not a broken wheel.** `isGainSettable` is false on
+    /// every built-in iPhone mic, so this is the ordinary case rather than the exotic one — and
+    /// without the check the navigator would move its own copy of the number, report a detent, and
+    /// emit a `.setGain` the recorder silently drops. That is the control that appears to work and
+    /// does not, which is the thing #6 set out to avoid.
     private mutating func setGain(by delta: Double) -> [DialEffect] {
-        guard var capture = content.capture else { return [.feedback(.limit)] }
+        guard var capture = content.capture, capture.isGainSettable else { return [.feedback(.limit)] }
 
         let target = min(max(0, capture.gain + delta), 1)
         guard target != capture.gain else { return [.feedback(.limit)] }
@@ -168,13 +173,60 @@ struct DialNavigator {
     }
 
     private mutating func nudgeTrim(by delta: TimeInterval) -> [DialEffect] {
-        guard var trim = level.trim else { return [.feedback(.limit)] }
+        guard var trim = currentTrim else { return [.feedback(.limit)] }
 
-        let moved = axis == .trimStart ? trim.moveStart(by: delta) : trim.moveEnd(by: delta)
+        let isStart = axis == .trimStart
+        let before = isStart ? trim.start : trim.end
+        let moved = isStart ? trim.moveStart(by: delta) : trim.moveEnd(by: delta)
         guard moved else { return [.feedback(.limit)] }
 
+        let landed = isStart ? trim.start : trim.end
+        let snapped = snap(&trim, isStart: isStart, from: before, landing: landed)
+
         stack[stack.count - 1].trim = trim
-        return [.setTrim(start: trim.start, end: trim.end), .feedback(.detent)]
+        return [.setTrim(start: trim.start, end: trim.end), .feedback(snapped ? .snap : .detent)]
+    }
+
+    /// Pulls a handle onto a nearby marker, and reports whether it took.
+    ///
+    /// The correction is applied **through `moveStart`/`moveEnd` rather than by assignment**, so a
+    /// marker sitting inside the minimum-length gap cannot do what no other input can: cross the
+    /// handles. That the range refuses such a marker is why the return value checks where the
+    /// handle actually ended up rather than trusting the move.
+    private func snap(
+        _ trim: inout DialTrimRange, isStart: Bool, from before: TimeInterval, landing: TimeInterval
+    ) -> Bool {
+        guard let target = MarkerSnap.target(
+            for: landing,
+            from: before,
+            markers: content.editing?.markers ?? [],
+            // One detent, per §5 — the wheel's half of "tolerance scales with the input". The
+            // finger's half is wider and arrives with the waveform that can measure it in points.
+            tolerance: WheelRouter.secondsPerDetent
+        ) else { return false }
+
+        if isStart {
+            trim.setStart(to: target)
+            return trim.start == target
+        } else {
+            trim.setEnd(to: target)
+            return trim.end == target
+        }
+    }
+
+    /// The editor's selection — the one this level holds, or a whole-file range derived from the
+    /// material when it has none yet.
+    ///
+    /// **The fallback is the normal path, not a defensive one.** `push` can only build a range when
+    /// `content.editing` is already loaded, and it never is: the host learns *which* item to load
+    /// from the route the push creates, so the material always arrives one `update(_:)` later. With
+    /// only `level.trim` to read, the range therefore stayed nil for the life of the screen and
+    /// every tick of the wheel was a limit. `DialNavigatorScreen` has always fallen back this way
+    /// for rendering, which is what made the bug so quiet — the picture moved and the value did not.
+    private var currentTrim: DialTrimRange? {
+        if let trim = level.trim { return trim }
+        guard let editing = content.editing else { return nil }
+        return DialTrimRange(start: 0, end: editing.duration, duration: editing.duration)
     }
 
     // MARK: - Press
@@ -205,7 +257,12 @@ struct DialNavigator {
             return [.stopRecording, .feedback(.commit)]
 
         case .edit(let itemID):
-            let trim = level.trim ?? DialTrimRange(start: 0, end: 0, duration: 0)
+            // **Refusing beats committing an empty range.** The old fallback was
+            // `DialTrimRange(start: 0, end: 0, duration: 0)`, so pressing the hub before the
+            // material had loaded asked the host to keep nothing at all — and the host is about to
+            // rewrite a real file. Nothing loaded is a screen that says so, and a hub that says the
+            // same rather than destroying a lecture.
+            guard let trim = currentTrim else { return [.feedback(.limit)] }
             pop()
             return [.commitTrim(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
 
@@ -284,8 +341,12 @@ struct DialNavigator {
             content.capture?.isPaused.toggle()
             return [.toggleRecordingPause, .feedback(.commit)]
 
-        case (.edit, "preview"):
-            return [.previewTrim, .feedback(.commit)]
+        case (.edit(let itemID), "preview"):
+            guard let trim = currentTrim else { return [.feedback(.limit)] }
+            return [
+                .previewTrim(itemID: itemID, start: trim.start, end: trim.end),
+                .feedback(.commit)
+            ]
 
         default:
             return []

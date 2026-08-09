@@ -21,9 +21,10 @@ struct DialRing: View {
     let hub: DialScreen.Hub
     /// See `registerPress`. True only where a double-press means something.
     var defersPress: Bool = false
-    /// Present when the hub is a gear stick — nudge left/right for track, up/down for volume.
-    /// `nil` leaves it a plain press.
-    var volume: Double?
+    /// What the four nudges do here. `nil` leaves the hub a plain press.
+    var directions: DialScreen.Directions?
+    /// Whether the border cycles. See `liveBorder`.
+    var isLive: Bool = false
     let onCommand: (DialCommand) -> Void
 
     /// A reference box rather than `@State var tracker = RotaryTracker()`. The tracker is a gesture
@@ -40,6 +41,9 @@ struct DialRing: View {
     /// How far the gear stick has been pushed, and in which direction.
     @State private var nudge: CGSize = .zero
     @State private var didNudge = false
+    /// The live border's rotation. Driven by a repeating animation rather than a timer, so it costs
+    /// nothing when it is not running.
+    @State private var spin: Double = 0
     /// A single press held back while we find out whether a second one is coming. Only ever
     /// non-nil on a screen whose `defersPress` is true.
     @State private var pendingPress: Task<Void, Never>?
@@ -67,7 +71,7 @@ struct DialRing: View {
     private static let neighbourTick: Double = 0.4
     private static let plateTint: Double = 0.12
 
-    private var hasDirections: Bool { volume != nil }
+    private var hasDirections: Bool { directions != nil }
 
     var body: some View {
         ZStack {
@@ -107,12 +111,56 @@ struct DialRing: View {
                     endRadius: Sizing.dialDiameter
                 )
             )
-            .overlay(
-                Circle().strokeBorder(Color.sonicBorder, lineWidth: Sizing.hairlineTrackHeight / 2)
-            )
+            .overlay(liveBorder)
             .sonicShadow(Elevation.artwork)
             .accessibilityHidden(true)
     }
+
+    /// The plate's edge: a still hairline when nothing is happening, and a slowly turning band of
+    /// colour when something is.
+    ///
+    /// **It replaced a chip that said "Now playing".** A label telling you the state is a thing to
+    /// read; a border that only moves while audio moves is a thing you notice without looking. It
+    /// is also the only motion anywhere on the screen, which is what lets it mean exactly one
+    /// thing — if a second thing ever animates, this stops working.
+    ///
+    /// The colours are `ColorPalette`'s, not a literal rainbow: the app already owns five hues and
+    /// borrowing them keeps the dial inside the palette instead of beside it.
+    private var liveBorder: some View {
+        Circle()
+            .strokeBorder(
+                isLive
+                    ? AnyShapeStyle(AngularGradient(
+                        colors: Self.liveHues,
+                        center: .center,
+                        angle: .degrees(spin)
+                      ))
+                    : AnyShapeStyle(Color.sonicBorder),
+                lineWidth: isLive ? Sizing.wheelArcWidth : Sizing.hairlineTrackHeight / 2
+            )
+            .onChange(of: isLive) { _, live in
+                guard live else { return }
+                withAnimation(.linear(duration: Self.spinPeriod).repeatForever(autoreverses: false)) {
+                    spin = 360
+                }
+            }
+            .onAppear {
+                guard isLive else { return }
+                withAnimation(.linear(duration: Self.spinPeriod).repeatForever(autoreverses: false)) {
+                    spin = 360
+                }
+            }
+    }
+
+    /// Closes the loop — the first hue repeats last so the seam does not read as a join.
+    private static let liveHues: [Color] = [
+        .sonicPrimary, .sonicGreen, .sonicBlue, .sonicPurple, .sonicOrange, .sonicPrimary
+    ]
+
+    /// One turn every eight seconds. Slow enough to read as breathing rather than spinning — this
+    /// sits under the thumb for a whole listening session, and anything faster becomes something to
+    /// look away from.
+    private static let spinPeriod: Double = 8
 
     private var tickMarks: some View {
         ForEach(0 ..< Self.tickCount, id: \.self) { index in
@@ -184,31 +232,29 @@ struct DialRing: View {
 
     /// The gear stick's four ways out, drawn just outside the hub.
     ///
-    /// They are the only thing announcing that the hub moves at all, which matters more now that
-    /// the caption under the dial is gone. Small and dim on purpose: they are a legend, not four
-    /// more buttons — the thing you touch is the hub.
+    /// **They come from the screen**, so the recorder shows a bookmark up and a pause left where
+    /// Now Playing shows volume and track. They are the only thing announcing that the hub moves at
+    /// all, which matters more since the chip row went — small and dim on purpose, because they are
+    /// a legend, not four more buttons. The thing you touch is the hub.
     private var directionMarks: some View {
-        ForEach(Self.directions, id: \.glyph) { mark in
-            Image(systemName: mark.glyph)
-                .font(.system(size: DialFont.directionMark, weight: .semibold))
-                .foregroundColor(.sonicTextMuted)
-                .offset(x: mark.x * Self.markRadius, y: mark.y * Self.markRadius)
+        ZStack {
+            mark(directions?.up, x: 0, y: -1)
+            mark(directions?.down, x: 0, y: 1)
+            mark(directions?.left, x: -1, y: 0)
+            mark(directions?.right, x: 1, y: 0)
         }
         .accessibilityHidden(true)
     }
 
-    /// Volume marks rather than chevrons.
-    ///
-    /// A chevron says "there is a direction here" and nothing about what it does, which left the
-    /// vertical axis unlabelled in practice — the horizontal marks named their action and the
-    /// vertical ones did not. `speaker.plus` / `speaker.minus` say it outright, and stay legible at
-    /// this size where a wave count would not.
-    static let directions: [(glyph: String, x: CGFloat, y: CGFloat)] = [
-        ("speaker.plus.fill", 0, -1),
-        ("speaker.minus.fill", 0, 1),
-        ("backward.end.fill", -1, 0),
-        ("forward.end.fill", 1, 0)
-    ]
+    @ViewBuilder
+    private func mark(_ direction: DialScreen.Direction?, x: CGFloat, y: CGFloat) -> some View {
+        if let direction, let glyph = DialIcon.systemImage(for: direction.icon) {
+            Image(systemName: glyph)
+                .font(.system(size: DialFont.directionMark, weight: .semibold))
+                .foregroundColor(.sonicTextMuted)
+                .offset(x: x * Self.markRadius, y: y * Self.markRadius)
+        }
+    }
 
     /// Just outside the hub, just inside the ticks.
     private static var markRadius: CGFloat { Sizing.dialHub / 2 + Spacing.lg }
@@ -380,26 +426,29 @@ struct DialRing: View {
                 nudge = .zero
 
                 guard !didHold else { return }
-                if hasDirections, let command = Self.direction(of: value.translation) {
-                    onCommand(command)
+                if let id = directionID(for: value.translation) {
+                    onCommand(.action(id))
                     return
                 }
                 registerPress()
             }
     }
 
-    /// Which way the stick went, or `nil` for a tap.
+    /// Which of *this screen's* directions the stick reached, or `nil` for a tap.
     ///
     /// **The dominant axis wins**, so a diagonal is read as whichever it is mostly — a stick that
-    /// demanded a pure axis would feel broken far more often than it would feel precise.
-    private static func direction(of translation: CGSize) -> DialCommand? {
+    /// demanded a pure axis would feel broken far more often than it would feel precise. A nudge
+    /// toward a direction the screen does not define falls through to a press, which is better than
+    /// swallowing the gesture.
+    private func directionID(for translation: CGSize) -> String? {
+        guard let directions else { return nil }
         let dx = translation.width, dy = translation.height
-        guard max(abs(dx), abs(dy)) >= nudgeThreshold else { return nil }
+        guard max(abs(dx), abs(dy)) >= Self.nudgeThreshold else { return nil }
         if abs(dx) >= abs(dy) {
-            return .action(dx > 0 ? "next" : "previous")
+            return (dx > 0 ? directions.right : directions.left)?.id
         }
-        // Screen y grows downward, so up — the negative direction — is volume *up*.
-        return .volumeTick(dy < 0 ? 1 : -1)
+        // Screen y grows downward, so up is the negative direction.
+        return (dy < 0 ? directions.up : directions.down)?.id
     }
 
     private static func bounded(_ value: CGFloat) -> CGFloat {

@@ -39,11 +39,15 @@ enum DialSample {
         queueCount: 9
     )
 
+    /// `isGainSettable` is **true** here, which is not the default: the gain axis only exists on
+    /// hardware that has one, so a sample meant to exercise it has to say so. `DialCaptureTests`
+    /// covers the ordinary iPhone, where it is false and the wheel refuses.
     static let capture = DialContent.Capture(
         elapsed: 727.4,
         levels: [0.2, 0.5, 0.8, 0.42],
         gain: 0.5,
-        markers: [.init(id: "m1", label: "Marker 1", time: 62)]
+        markers: [.init(id: "m1", label: "Marker 1", time: 62)],
+        isGainSettable: true
     )
 
     static let editable = DialContent.Editable(

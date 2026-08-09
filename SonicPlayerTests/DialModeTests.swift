@@ -133,7 +133,9 @@ struct DialModeTests {
         #expect(effects == [.setVolume(0.64), .feedback(.detent)])
         // The ring keeps showing *position* — volume moved to its own segment, and the whole point
         // is that turning the wheel no longer changes what the wheel means.
-        #expect(navigator.screen.ring.volume == 0.64)
+        // Volume is no longer a field on the ring — the stick's vertical axis is, and what it
+        // changes is proved by the effect above rather than by a mirror of it on the screen.
+        #expect(navigator.screen.ring.directions?.up?.id == "volumeUp")
         guard case .position = navigator.screen.ring.ticks else {
             Issue.record("the ring must still show position, got \(navigator.screen.ring.ticks)")
             return

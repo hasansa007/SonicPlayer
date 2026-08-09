@@ -23,14 +23,27 @@ final class DialViewModel {
     var onSelectTrack: ((Int) -> Void)?
     var onStartRecording: (() -> Void)?
     var onStopRecording: (() -> Void)?
+    var onTogglePause: (() -> Void)?
+    var onAddMarker: (() -> Void)?
+    var onSetGain: ((Double) -> Void)?
+    var onPreviewTrim: ((String, TimeInterval, TimeInterval) -> Void)?
+    var onCommitTrim: ((String, TimeInterval, TimeInterval) -> Void)?
+
+    /// The five rows of the actions screen. Declared and **not wired** — see `apply(_:)`.
+    var onItemAction: ((DialItemAction, String) -> Void)?
+
+    /// Asks the host to feed this type again, because something it renders finished loading
+    /// asynchronously. Only the waveform needs it — every other input is state the host can already
+    /// see change.
+    var onNeedsRefresh: (() -> Void)?
 
     private var navigator: DialNavigator
     private let haptics: HapticsClient
-    /// The live waveform's bar history. See `refresh`.
-    private var levels: [Double] = []
-    /// Input gain, `0...1`. Held here because nothing else in the app has a notion of it yet —
-    /// `setGain` is inert until the recorder gains one.
-    private var gain: Double = 0.7
+
+    /// Extracted waveforms, keyed by file. Extraction reads the whole asset, and `refresh` runs on
+    /// every tick of the player's clock, so re-running it there would cost a decode per second.
+    private var waveforms: [URL: [Double]] = [:]
+    private var waveformsLoading: Set<URL> = []
 
     init(haptics: HapticsClient = .live) {
         self.navigator = DialNavigator()
@@ -50,7 +63,12 @@ final class DialViewModel {
     /// Called whenever the underlying data moves. The navigator re-clamps every level's highlight
     /// against the new content, so a list shrinking under a screen you are not looking at cannot
     /// leave a highlight pointing past the end.
-    func refresh(recentFiles: [AudioFile], player: PlayerViewModel, recorder: RecordingViewModel) {
+    func refresh(
+        recentFiles: [AudioFile],
+        player: PlayerViewModel,
+        recorder: RecordingViewModel,
+        markers: MarkerRegistry
+    ) {
         var content = DialContent()
 
         content.sections = [
@@ -103,30 +121,100 @@ final class DialViewModel {
             )
         }
 
-        // The live capture, which is what turns the ring into a level meter. `peakLevel` is a
-        // single instantaneous value, so the bar history is kept here — the navigator holds a
-        // snapshot and has nowhere to accumulate one.
-        if recorder.isRecording {
-            levels.append(Double(max(0, min(1, recorder.peakLevel))))
-            if levels.count > Self.levelHistory { levels.removeFirst(levels.count - Self.levelHistory) }
-            content.capture = DialContent.Capture(
-                elapsed: recorder.recordingTime,
-                levels: levels,
-                gain: gain,
-                markers: [],
-                isPaused: false
-            )
-        } else {
-            levels.removeAll()
-        }
+        content.capture = capture(from: recorder)
+        content.editing = editable(from: recentFiles, markers: markers)
 
         navigator.update(content)
     }
 
-    /// How many bars the live waveform keeps. Enough to read as movement, few enough that each one
-    /// is still wide enough to see.
-    private static let levelHistory = 40
+    // MARK: - Content
 
+    /// **`nil` unless a take is actually open**, which is what makes the recording screen say "not
+    /// recording" rather than showing a frozen clock, and what makes the gain axis refuse.
+    ///
+    /// The bar history is read from the recorder rather than accumulated here, and that is a
+    /// correctness point rather than tidiness: this method runs on *every* refresh — the player's
+    /// clock, the recents list, the track — so appending a sample per call would push several
+    /// copies of one meter reading through the waveform and make it scroll at a rate that has
+    /// nothing to do with time. `RecordingViewModel` appends once per `meterInterval`, which is the
+    /// rate the waveform is supposed to move at.
+    private func capture(from recorder: RecordingViewModel) -> DialContent.Capture? {
+        guard recorder.isRecording else { return nil }
+
+        return DialContent.Capture(
+            elapsed: recorder.recordingTime,
+            levels: recorder.levels,
+            gain: recorder.gain,
+            markers: recorder.markers.times.enumerated().map { index, time in
+                DialContent.Capture.Marker(
+                    id: "marker-\(index)",
+                    label: String(localized: "Marker \(index + 1)"),
+                    time: time
+                )
+            },
+            isPaused: recorder.isPaused,
+            isGainSettable: recorder.isGainSettable
+        )
+    }
+
+    /// The material behind the edit screen, taken from the item the **route** names.
+    ///
+    /// The route is the input rather than a selection held here, because the navigator is what
+    /// decides where you are. It also means the material necessarily arrives one refresh *after*
+    /// the push, which is exactly what `DialNavigator.currentTrim` is written to absorb.
+    private func editable(
+        from recentFiles: [AudioFile], markers: MarkerRegistry
+    ) -> DialContent.Editable? {
+        guard case .edit(let itemID) = navigator.route,
+              let file = recentFiles.first(where: { $0.url.absoluteString == itemID })
+        else { return nil }
+
+        return DialContent.Editable(
+            id: itemID,
+            title: file.title,
+            waveform: waveform(for: file.url),
+            duration: file.duration,
+            markers: markers.markers(for: file.url).times
+        )
+    }
+
+    /// The cached samples, or an empty waveform plus a load that will ask for another refresh.
+    ///
+    /// An empty array is a legitimate first frame rather than a failure: the screen draws its
+    /// handles and its scale from the duration, and the wheel already moves them. Only the picture
+    /// behind them is late.
+    private func waveform(for url: URL) -> [Double] {
+        if let cached = waveforms[url] { return cached }
+        guard !waveformsLoading.contains(url) else { return [] }
+
+        waveformsLoading.insert(url)
+        Task { [weak self] in
+            let samples = await AudioWaveformExtractor.extract(url: url)
+            self?.adoptWaveform(samples.map(Double.init), for: url)
+        }
+        return []
+    }
+
+    private func adoptWaveform(_ samples: [Double], for url: URL) {
+        waveforms[url] = samples
+        waveformsLoading.remove(url)
+        onNeedsRefresh?()
+    }
+
+    /// Drops a file's cached samples, so an edited recording is not drawn against the shape of the
+    /// audio it replaced.
+    func forgetWaveform(for url: URL) {
+        waveforms.removeValue(forKey: url)
+    }
+
+    // MARK: - Effects
+
+    /// **Every case is named, and that is the point of this method.** It used to end in
+    /// `default: break` under a comment saying recording and trimming were deliberately inert. Two
+    /// things were wrong with that: the default swallowed more cases than the comment described —
+    /// volume and the whole actions screen went the same way, silently — and a `default` cannot
+    /// distinguish an effect nobody has wired yet from one somebody forgot. Listing them makes the
+    /// compiler raise the next addition instead of absorbing it.
     private func apply(_ effect: DialEffect) {
         switch effect {
         case .feedback(let event):
@@ -140,20 +228,41 @@ final class DialViewModel {
         case .selectTrack(let index):
             onSelectTrack?(index)
         case .startRecording:
-            levels.removeAll()
             onStartRecording?()
         case .stopRecording:
             onStopRecording?()
+        case .toggleRecordingPause:
+            onTogglePause?()
+        case .addMarker:
+            onAddMarker?()
         case .setGain(let value):
-            // Held locally: the recorder has no gain control yet, so this moves the meter's
-            // reference without pretending to change the hardware.
-            gain = min(max(0, value), 1)
+            onSetGain?(value)
+        case .previewTrim(let itemID, let start, let end):
+            onPreviewTrim?(itemID, start, end)
+        case .commitTrim(let itemID, let start, let end):
+            onCommitTrim?(itemID, start, end)
 
-        // Recording and trimming are slices of their own. Their effects are deliberately inert
-        // rather than faked — a control that appears to work and does not is worse than one that
-        // visibly does nothing yet.
-        default:
+        case .setTrim:
+            // **Already applied, not ignored.** The navigator writes the moved handles into its own
+            // level before emitting this, and the edit screen is derived from that level — so the
+            // waveform carries the new selection on the same frame. The effect exists for a host
+            // that wants to hear about it; nothing here does, and calling something would apply the
+            // change twice.
             break
+
+        case .setVolume:
+            // Volume belongs to `MPVolumeView`, which owns the system slider and publishes no
+            // setter worth having. `AppViewModel.wire()` records the same decision for the shell's
+            // `onVolumeBy`: an effect that silently does nothing beats one that fights the hardware
+            // buttons.
+            break
+
+        case .item(let action, let itemID):
+            // Share, rename and delete are the browser's flows, and the actions screen is its own
+            // slice. Named rather than defaulted so a new effect cannot join it by accident, and
+            // routed through a closure so wiring it later is one line in `wire()` rather than a
+            // change here.
+            onItemAction?(action, itemID)
         }
     }
 }

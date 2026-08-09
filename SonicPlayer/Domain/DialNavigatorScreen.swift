@@ -198,12 +198,10 @@ extension DialNavigator {
             return []
 
         case .library:
-            // The visible partner for `.hold`, which nothing on screen would otherwise announce.
-            return [.init(
-                id: "nowPlaying",
-                label: "Now playing",
-                emphasis: content.playback == nil ? .disabled : .plain
-            )]
+            // The "Now playing" chip is gone: the dial's border says it now, by moving while
+            // audio moves. `Now Playing` is also a row in this very list, so the chip was a second
+            // door to a room already on screen.
+            return []
 
         case .recordings:
             guard !content.recordings.isEmpty else {
@@ -212,7 +210,8 @@ extension DialNavigator {
                 return [.init(id: "record", label: "Record", emphasis: .destructive)]
             }
             // `Edit` is the visible partner for `.doublePress`; the contract requires one.
-            return [.init(id: "edit", label: "Edit"), .init(id: "more", label: "•••")]
+            // Both moved onto the stick — right nudges to Edit, left to the actions menu.
+            return []
 
         // Nothing at all: the wheel seeks, the segments do volume and track, and Back is in the
         // top bar. A screen can legitimately have no chips.
@@ -221,10 +220,9 @@ extension DialNavigator {
 
         case .recording:
             let paused = content.capture?.isPaused ?? false
-            return [
-                .init(id: "marker", label: "＋ Marker"),
-                .init(id: "pause", label: paused ? "Resume" : "Pause", emphasis: .primary)
-            ]
+            // Both moved onto the stick — up adds a marker, left pauses.
+            _ = paused
+            return []
 
         case .edit:
             return modeChips + [.init(id: "preview", label: "Preview")]
@@ -256,7 +254,8 @@ extension DialNavigator {
             ticks: ticks,
             hub: hub,
             defersPress: defersPress,
-            volume: route == .nowPlaying ? content.playback?.volume : nil
+            directions: directions,
+            isLive: isLive
         )
     }
 
@@ -265,6 +264,51 @@ extension DialNavigator {
     private var defersPress: Bool {
         guard case .recordings = route else { return false }
         return content.recordings.indices.contains(level.highlighted)
+    }
+
+    /// What the gear stick does here.
+    ///
+    /// **This is where the chip row went.** Each screen's most-used actions moved onto the four
+    /// nudges, which is why `actions` is empty on the three screens below — one control surface
+    /// instead of two, and the height the chips took back for content.
+    private var directions: DialScreen.Directions? {
+        switch route {
+        case .nowPlaying:
+            guard content.playback != nil else { return nil }
+            return DialScreen.Directions(
+                up: .init(id: "volumeUp", icon: .volumeUp, label: "Volume up"),
+                down: .init(id: "volumeDown", icon: .volumeDown, label: "Volume down"),
+                left: .init(id: "previous", icon: .previous, label: "Previous track"),
+                right: .init(id: "next", icon: .next, label: "Next track")
+            )
+
+        case .recording:
+            guard let capture = content.capture else { return nil }
+            return DialScreen.Directions(
+                up: .init(id: "marker", icon: .marker, label: "Add marker"),
+                left: .init(
+                    id: "pause",
+                    icon: capture.isPaused ? .play : .pause,
+                    label: capture.isPaused ? "Resume" : "Pause"
+                )
+            )
+
+        case .recordings:
+            guard !content.recordings.isEmpty else { return nil }
+            return DialScreen.Directions(
+                left: .init(id: "more", icon: .more, label: "More actions"),
+                right: .init(id: "edit", icon: .edit, label: "Edit")
+            )
+
+        default:
+            return nil
+        }
+    }
+
+    /// The border cycles while audio is moving, and only then.
+    private var isLive: Bool {
+        if let capture = content.capture { return !capture.isPaused }
+        return content.playback?.isPlaying == true && route == .nowPlaying
     }
 
     private var ticks: DialScreen.Ticks {

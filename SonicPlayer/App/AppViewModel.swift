@@ -56,6 +56,15 @@ final class AppViewModel {
     /// the landscape design lands, since it is still what compact height falls back to.
     let dial: DialViewModel
 
+    /// Which markers belong to which recording (#75). Owned here for the same reason `fileManager`
+    /// is: no single feature owns it. The recorder *produces* markers and the editor *reads* them,
+    /// and they never exist at the same time — the take is saved and gone before the editor opens.
+    let markers = MarkerRegistry()
+
+    /// Bounded playback for the trim editor's preview chip (#74). Separate from `player` because it
+    /// plays a *range*, and because a preview must not become part of the listening session.
+    let trimPreview: TrimPreview
+
     /// Non-`let` because completing onboarding discards it, which is what `store.onboarding != nil`
     /// expressed before #14.
     var onboarding: OnboardingViewModel?
@@ -67,6 +76,11 @@ final class AppViewModel {
     /// Held for one reason: draining iOS's hand-off directory (#41). No feature owns that — it is
     /// housekeeping for the app, not state any screen shows.
     private let fileManager: FileManagerClient
+
+    /// Held so committing the dial editor's trim can reach it (#74). The dial has no view model of
+    /// its own for the edit screen — the navigator holds the selection — so the commit is wired
+    /// here like every other cross-feature edge.
+    private let audioTrimmer: AudioTrimmerClient
 
     /// The live composition. Separate from the designated initialiser below because a default
     /// argument expression is evaluated in a *nonisolated* context, and every one of these
@@ -88,7 +102,9 @@ final class AppViewModel {
         filesRoot: CollectionsViewModel,
         onboarding: OnboardingViewModel?,
         fileManager: FileManagerClient = .live,
-        haptics: HapticsClient = .live
+        haptics: HapticsClient = .live,
+        audioPlayer: AudioPlayerClient = .live,
+        audioTrimmer: AudioTrimmerClient = .live
     ) {
         self.player = player
         self.recording = recording
@@ -96,6 +112,8 @@ final class AppViewModel {
         self.filesRoot = filesRoot
         self.onboarding = onboarding
         self.fileManager = fileManager
+        self.audioTrimmer = audioTrimmer
+        self.trimPreview = TrimPreview(audioPlayer: audioPlayer)
         // Home holds the *same* player instance — that is what let `HomeFeature`'s three mirrored
         // playback properties be deleted rather than ported (#16), so it cannot be defaulted
         // independently of `player`.
@@ -220,8 +238,16 @@ final class AppViewModel {
         filesRoot.onPlay = { [player] file, queue, source in
             player.loadTrack(file, queue: queue, source: source)
         }
-        filesRoot.onWillRemoveItems = { [player] items in
+        filesRoot.onWillRemoveItems = { [weak self] items in
+            guard let self else { return }
             player.clearSessionIfAffected(by: items.map(\.url))
+            // A path can be reused: delete `Recording 3.m4a` and record another, and
+            // `UniqueNameResolver` may hand out that exact name again. Without this the new take
+            // inherits the dead one's markers (#75).
+            for url in items.map(\.url) {
+                markers.forget(url)
+                dial.forgetWaveform(for: url)
+            }
         }
         // Any reload of the root browser refreshes Home's recents, which are drawn from it.
         filesRoot.onItemsLoaded = { [home] in home.loadRecentFiles() }
@@ -256,11 +282,76 @@ final class AppViewModel {
         // recording screen, so the level meter was unreachable even once the route was.
         dial.onStartRecording = { [recording] in recording.startRecordingTapped() }
         dial.onStopRecording = { [recording] in recording.stopRecordingTapped() }
+
+        // Capture (#75). The recorder owns the hardware and the take; the dial owns where you are.
+        dial.onTogglePause = { [recording] in recording.togglePauseTapped() }
+        dial.onAddMarker = { [recording] in recording.addMarker() }
+        dial.onSetGain = { [recording] value in recording.setGain(value) }
+
+        // The take's markers are filed under the name it actually landed as, which
+        // `UniqueNameResolver` only settles at save time.
+        recording.onSaved = { [weak self] url in
+            guard let self else { return }
+            markers.set(recording.markers, for: url)
+        }
+
+        // Trimming (#74).
+        dial.onPreviewTrim = { [weak self] itemID, start, end in
+            guard let self,
+                  let file = home.recentFiles.first(where: { $0.url.absoluteString == itemID })
+            else { return }
+            // The preview takes the shared engine, so the transport must stop claiming it is
+            // playing something it no longer owns.
+            if player.isPlaying { player.playPauseTapped() }
+            trimPreview.play(url: file.url, from: start, to: end)
+        }
+        dial.onCommitTrim = { [weak self] itemID, start, end in
+            guard let self,
+                  let file = home.recentFiles.first(where: { $0.url.absoluteString == itemID })
+            else { return }
+            commitTrim(on: file.url, start: start, end: end)
+        }
+
+        // `onItemAction` is deliberately unwired. Share, rename and delete are the browser's flows
+        // and the actions screen is its own slice — the closure exists so wiring it is one line
+        // here rather than a change inside `DialViewModel`.
+
+        // The waveform is the one input the dial loads for itself, so it is the one that has to ask
+        // to be fed again.
+        dial.onNeedsRefresh = { [weak self] in self?.refreshDial() }
+    }
+
+    /// Rewrites a recording to what its trim keeps, then tells everything that draws it to look
+    /// again.
+    ///
+    /// **The staging discipline is `TrimCommit`'s**, not this method's — a failed export must leave
+    /// the recording untouched, and `AudioTrimmerClient.trimAudio` on its own does not promise that.
+    /// What belongs here is the part that is genuinely cross-feature: the browser and Home both
+    /// draw this file, and the dial has a picture of its old shape cached.
+    private func commitTrim(on url: URL, start: TimeInterval, end: TimeInterval) {
+        trimPreview.stop()
+        Task { [weak self, audioTrimmer] in
+            guard let self else { return }
+            do {
+                _ = try await TrimCommit.run(
+                    url: url, start: start, end: end, trimmer: audioTrimmer
+                )
+            } catch {
+                print("Failed to commit trim: \(error.localizedDescription)")
+                return
+            }
+            dial.forgetWaveform(for: url)
+            filesRoot.refreshFiles()
+            home.loadRecentFiles()
+            refreshDial()
+        }
     }
 
     /// Re-feeds the dial from the app's current state. Called wherever the data it renders moves,
     /// because the navigator holds a snapshot rather than reaching back into the view models.
     func refreshDial() {
-        dial.refresh(recentFiles: home.recentFiles, player: player, recorder: recording)
+        dial.refresh(
+            recentFiles: home.recentFiles, player: player, recorder: recording, markers: markers
+        )
     }
 }
