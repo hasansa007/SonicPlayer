@@ -1,0 +1,240 @@
+import Foundation
+import Testing
+
+@testable import SonicPlayer
+
+/// The data the eight screens in the design are drawn from, so every dial suite starts from the
+/// same library rather than inventing its own.
+///
+/// A file-level type in the test target: visible to every `Dial*Tests` file, and not shipped.
+enum DialSample {
+
+    static func recordings(_ count: Int = 12) -> [DialContent.Item] {
+        (0..<count).map { index in
+            DialContent.Item(
+                id: "rec-\(index)",
+                title: "Recording \(index + 1)",
+                duration: TimeInterval(60 * (index + 1)),
+                subtitle: index == 0 ? "Today 14:02 · 2 markers" : nil
+            )
+        }
+    }
+
+    static let sections: [DialContent.Section] = [
+        .init(id: "playlists", icon: .playlist, title: "Playlists", count: 6),
+        .init(id: "recordings", icon: .recording, title: "Recordings", count: 12, destination: .recordings),
+        .init(id: "sessions", icon: .session, title: "Focus Sessions", count: 24),
+        .init(id: "podcasts", icon: .podcast, title: "Podcasts", count: 9),
+        .init(id: "stats", icon: .stats, title: "Stats")
+    ]
+
+    static let playback = DialContent.Playback(
+        title: "Deep Work, Chapter 4",
+        subtitle: "Cal Newport",
+        position: 1234,
+        duration: 2745,
+        isPlaying: true,
+        volume: 0.6,
+        queueIndex: 2,
+        queueCount: 9
+    )
+
+    static let capture = DialContent.Capture(
+        elapsed: 727.4,
+        levels: [0.2, 0.5, 0.8, 0.42],
+        gain: 0.5,
+        markers: [.init(id: "m1", label: "Marker 1", time: 62)]
+    )
+
+    static let editable = DialContent.Editable(
+        id: "rec-0",
+        title: "Recording 1",
+        waveform: [0.1, 0.9, 0.4, 0.7],
+        duration: 600
+    )
+
+    static func content(
+        recordingCount: Int = 12,
+        playback: DialContent.Playback? = DialSample.playback,
+        capture: DialContent.Capture? = nil,
+        editing: DialContent.Editable? = DialSample.editable
+    ) -> DialContent {
+        DialContent(
+            sections: sections,
+            recordings: recordings(recordingCount),
+            playback: playback,
+            capture: capture,
+            editing: editing
+        )
+    }
+
+    static func navigator(
+        root: DialRoute = .library,
+        recordingCount: Int = 12,
+        playback: DialContent.Playback? = DialSample.playback,
+        capture: DialContent.Capture? = nil
+    ) -> DialNavigator {
+        DialNavigator(
+            content: content(recordingCount: recordingCount, playback: playback, capture: capture),
+            root: root
+        )
+    }
+
+    /// Drills library → recordings, which is the starting point of most of the deeper tests.
+    static func inRecordings(recordingCount: Int = 12) -> DialNavigator {
+        var navigator = navigator(recordingCount: recordingCount)
+        _ = navigator.receive(.tick(1))     // Playlists → Recordings
+        _ = navigator.receive(.press)
+        return navigator
+    }
+
+    /// Library → an empty recordings list → a capture in progress (1d).
+    static func whileRecording() -> DialNavigator {
+        var navigator = navigator(recordingCount: 0, capture: capture)
+        _ = navigator.receive(.tick(1))
+        _ = navigator.receive(.press)       // opens the empty list
+        _ = navigator.receive(.press)       // which starts a recording
+        return navigator
+    }
+
+    /// Library → recordings → the trim editor (1e).
+    static func whileEditing() -> DialNavigator {
+        var navigator = inRecordings()
+        _ = navigator.receive(.doublePress)
+        return navigator
+    }
+}
+
+/// The stack, and the breadcrumb derived from it (#6).
+@Suite
+struct DialNavigationTests {
+
+    // `#expect` captures its expression in a closure, so a `mutating` call written inside one fails
+    // to compile against an immutable copy. Every result below is bound to a local first.
+
+    @Test func theRootIsTheLibrary() {
+        let navigator = DialSample.navigator()
+
+        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY"])
+    }
+
+    @Test func drillingInPushesACrumb() {
+        let navigator = DialSample.inRecordings()
+
+        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS"])
+    }
+
+    /// The point of deriving it: three levels deep, nothing had to store its own header.
+    @Test func theBreadcrumbGrowsWithTheStack() {
+        var navigator = DialSample.inRecordings()
+
+        _ = navigator.receive(.action("more"))
+
+        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS", "RECORDING 1"])
+    }
+
+    @Test func backPopsALevel() {
+        var navigator = DialSample.inRecordings()
+
+        let effects = navigator.receive(.action("back"))
+
+        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY"])
+        #expect(effects.contains(.feedback(.commit)))
+    }
+
+    /// There is nothing above the root, and turning against that must be felt.
+    @Test func backAtTheRootIsALimit() {
+        var navigator = DialSample.navigator()
+
+        let effects = navigator.receive(.action("back"))
+
+        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY"])
+        #expect(effects == [.feedback(.limit)])
+    }
+
+    /// Coming back to a list you had scrolled and finding it at the top is the classic loss.
+    @Test func poppingRestoresTheHighlightYouLeft() {
+        var navigator = DialSample.inRecordings()
+        _ = navigator.receive(.tick(4))
+        _ = navigator.receive(.press)          // opens row 4 → now playing
+
+        _ = navigator.receive(.action("back"))
+
+        guard case .list(let list) = navigator.screen.content else {
+            Issue.record("expected the recordings list back")
+            return
+        }
+        #expect(list.highlighted == 4)
+    }
+
+    @Test func aSectionWithNowhereToGoIsALimit() {
+        var navigator = DialSample.navigator()
+        _ = navigator.receive(.tick(4))        // Stats, which drills nowhere
+
+        let effects = navigator.receive(.press)
+
+        #expect(effects == [.feedback(.limit)])
+        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY"])
+    }
+
+    // MARK: - Hold
+
+    @Test func holdingJumpsToNowPlayingFromAnywhere() {
+        var navigator = DialSample.inRecordings()
+
+        _ = navigator.receive(.hold)
+
+        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS", "NOW PLAYING"])
+    }
+
+    @Test func holdingWithNothingPlayingIsALimit() {
+        var navigator = DialSample.navigator(playback: nil)
+
+        let effects = navigator.receive(.hold)
+
+        #expect(effects == [.feedback(.limit)])
+    }
+
+    /// Holding twice must not stack two copies of the same screen.
+    @Test func holdingWhileAlreadyThereDoesNotPushAgain() {
+        var navigator = DialSample.navigator()
+        _ = navigator.receive(.hold)
+
+        _ = navigator.receive(.hold)
+
+        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY", "NOW PLAYING"])
+    }
+
+    // MARK: - Touch and wheel are equals
+
+    /// The contract's rule: every double-press must also be reachable as a chip, and both must
+    /// arrive at the same code.
+    @Test func theEditChipAndTheDoublePressAgree() {
+        var byChip = DialSample.inRecordings()
+        var byWheel = DialSample.inRecordings()
+
+        let chipEffects = byChip.receive(.action("edit"))
+        let wheelEffects = byWheel.receive(.doublePress)
+
+        #expect(chipEffects == wheelEffects)
+        #expect(byChip.screen == byWheel.screen)
+        #expect(byChip.screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS", "EDIT"])
+    }
+
+    /// A gesture with no meaning here is silent rather than a limit: nothing was pushed against.
+    @Test func aDoublePressWithNoMeaningIsSilent() {
+        var navigator = DialSample.navigator()
+
+        let effects = navigator.receive(.doublePress)
+
+        #expect(effects.isEmpty)
+    }
+
+    @Test func anUnknownChipIsSilent() {
+        var navigator = DialSample.navigator()
+
+        let effects = navigator.receive(.action("nonsense"))
+
+        #expect(effects.isEmpty)
+    }
+}

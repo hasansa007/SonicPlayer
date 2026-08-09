@@ -1,0 +1,164 @@
+import Foundation
+import Testing
+
+@testable import SonicPlayer
+
+/// One hub, eight meanings (#6).
+///
+/// There is only one button, so what it does has to come from where you are. These are that table.
+@Suite
+struct DialPressTests {
+
+    // `#expect` captures its expression in a closure, so a `mutating` call written inside one fails
+    // to compile against an immutable copy. Every result below is bound to a local first.
+
+    @Test func pressingASectionOpensIt() {
+        var navigator = DialSample.navigator()
+        _ = navigator.receive(.tick(1))
+
+        let effects = navigator.receive(.press)
+
+        #expect(effects == [.feedback(.commit)])
+        #expect(navigator.route == .recordings)
+    }
+
+    @Test func pressingARecordingPlaysItAndOpensNowPlaying() {
+        var navigator = DialSample.inRecordings()
+        _ = navigator.receive(.tick(2))
+
+        let effects = navigator.receive(.press)
+
+        #expect(effects == [.play(itemID: "rec-2"), .feedback(.commit)])
+        #expect(navigator.route == .nowPlaying)
+    }
+
+    /// The pushed screen must be right on the frame it appears, not blank until the host answers.
+    @Test func openingATrackFillsInNowPlayingImmediately() {
+        var navigator = DialSample.inRecordings()
+        _ = navigator.receive(.tick(2))
+
+        _ = navigator.receive(.press)
+
+        guard case .nowPlaying(let playing) = navigator.screen.content else {
+            Issue.record("expected the now playing screen")
+            return
+        }
+        #expect(playing.title == "Recording 3")
+        #expect(playing.elapsed == "00:00")
+        #expect(playing.isPlaying)
+    }
+
+    @Test func pressingOnNowPlayingPausesAndTheHubFollows() {
+        var navigator = DialSample.navigator()
+        _ = navigator.receive(.hold)
+
+        let effects = navigator.receive(.press)
+
+        #expect(effects == [.togglePlayPause, .feedback(.commit)])
+        #expect(navigator.screen.ring.hub == .glyph("play.fill"))
+        #expect(navigator.screen.hint.contains("press to play"))
+    }
+
+    @Test func pressingWhileRecordingStopsAndComesBack() {
+        var navigator = DialSample.whileRecording()
+
+        let effects = navigator.receive(.press)
+
+        #expect(effects == [.stopRecording, .feedback(.commit)])
+        #expect(navigator.route == .recordings)
+    }
+
+    @Test func pressingOnTheEmptyStateStartsRecording() {
+        var navigator = DialSample.navigator(recordingCount: 0)
+        _ = navigator.receive(.tick(1))
+        _ = navigator.receive(.press)          // opens the recordings list, which is empty
+
+        let effects = navigator.receive(.press)
+
+        #expect(effects == [.startRecording, .feedback(.commit)])
+        #expect(navigator.route == .recording)
+    }
+
+    @Test func pressingOnTheEditorCommitsTheTrimAndComesBack() {
+        var navigator = DialSample.whileEditing()
+        _ = navigator.receive(.tick(10))       // nudge the start handle a second in
+
+        let effects = navigator.receive(.press)
+
+        #expect(effects == [.commitTrim(itemID: "rec-0", start: 1, end: 600), .feedback(.commit)])
+        #expect(navigator.route == .recordings)
+    }
+
+    @Test func pressingAnItemActionConfirmsItAndComesBack() {
+        var navigator = DialSample.inRecordings()
+        _ = navigator.receive(.action("more"))
+        _ = navigator.receive(.tick(4))        // Delete, the last row
+
+        let effects = navigator.receive(.press)
+
+        #expect(effects == [.item(.delete, itemID: "rec-0"), .feedback(.commit)])
+        #expect(navigator.route == .recordings)
+    }
+
+    // MARK: - The fork
+
+    @Test func choosingListenOpensTheLibrary() {
+        var navigator = DialSample.navigator(root: .chooseMode)
+
+        let effects = navigator.receive(.press)
+
+        #expect(effects == [.feedback(.commit)])
+        #expect(navigator.route == .library)
+    }
+
+    @Test func choosingRecordStartsRecording() {
+        var navigator = DialSample.navigator(root: .chooseMode)
+        _ = navigator.receive(.tick(1))
+
+        let effects = navigator.receive(.press)
+
+        #expect(effects == [.startRecording, .feedback(.commit)])
+        #expect(navigator.route == .recording)
+    }
+
+    // MARK: - The chips that are not modes
+
+    @Test func theMarkerChipAddsAMarker() {
+        var navigator = DialSample.whileRecording()
+
+        let effects = navigator.receive(.action("marker"))
+
+        #expect(effects == [.addMarker, .feedback(.commit)])
+    }
+
+    @Test func thePauseChipTogglesAndRelabelsItself() {
+        var navigator = DialSample.whileRecording()
+
+        let effects = navigator.receive(.action("pause"))
+
+        #expect(effects == [.toggleRecordingPause, .feedback(.commit)])
+        #expect(navigator.screen.actions.last?.label == "Resume")
+    }
+
+    @Test func thePreviewChipIsAnActionRatherThanAMode() {
+        var navigator = DialSample.whileEditing()
+
+        let effects = navigator.receive(.action("preview"))
+
+        #expect(effects == [.previewTrim, .feedback(.commit)])
+        // Preview must not steal the selection from the handle the wheel is nudging.
+        #expect(navigator.axis == .trimStart)
+    }
+
+    /// Now Playing's action row is three modes and no Back chip, so the command has to work anyway
+    /// or the screen is a trap.
+    @Test func backWorksOnAScreenThatShowsNoBackChip() {
+        var navigator = DialSample.navigator()
+        _ = navigator.receive(.hold)
+        #expect(!navigator.screen.actions.contains { $0.id == "back" })
+
+        _ = navigator.receive(.action("back"))
+
+        #expect(navigator.route == .library)
+    }
+}

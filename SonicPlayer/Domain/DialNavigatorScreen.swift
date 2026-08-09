@@ -1,0 +1,322 @@
+import Foundation
+
+/// The projection half of `DialNavigator`: state in, `DialScreen` out (#6).
+///
+/// Split from the state machine because the two grow for different reasons — the machine grows a
+/// case when a *command* means something new, this file grows one when a *screen* looks different.
+/// `PlayerViewModel` reached 633 lines by keeping both kinds of growth in one type.
+///
+/// Everything here is derived. There is no stored copy of a breadcrumb, a hint, a hub label or a
+/// row count, so no two of them can disagree about what screen this is.
+extension DialNavigator {
+
+    var screen: DialScreen {
+        DialScreen(
+            chrome: chrome,
+            content: screenContent,
+            actions: actions,
+            ring: ring,
+            hint: hint
+        )
+    }
+
+    // MARK: - Chrome
+
+    private var chrome: DialScreen.Chrome {
+        DialScreen.Chrome(
+            breadcrumb: stack.compactMap { $0.route.crumb(in: content) },
+            status: status,
+            isRecording: content.capture.map { !$0.isPaused } ?? false
+        )
+    }
+
+    /// `20:34 ▸ playing`, and nothing at all on the two screens that own the transport — repeating
+    /// the elapsed time three inches above a bigger copy of it is noise.
+    private var status: String? {
+        switch route {
+        case .nowPlaying, .recording:
+            return nil
+        default:
+            guard let playback = content.playback else { return nil }
+            let state = playback.isPlaying ? "playing" : "paused"
+            return "\(DialTimeFormat.clock(playback.position)) ▸ \(state)"
+        }
+    }
+
+    // MARK: - Content
+
+    private var screenContent: DialScreen.Content {
+        switch route {
+        case .chooseMode:
+            return .list(list(rows: chooserRows))
+
+        case .library:
+            return .list(list(rows: libraryRows))
+
+        case .recordings:
+            guard !content.recordings.isEmpty else {
+                return .message(.init(
+                    icon: .recording,
+                    title: "No recordings yet",
+                    body: "Press the hub to record the first one."
+                ))
+            }
+            return .list(list(rows: recordingRows))
+
+        case .nowPlaying:
+            guard let playback = content.playback else {
+                return .message(.init(
+                    icon: .none,
+                    title: "Nothing playing",
+                    body: "Open something from the library first."
+                ))
+            }
+            return .nowPlaying(.init(
+                title: playback.title,
+                subtitle: playback.subtitle,
+                elapsed: DialTimeFormat.clock(playback.position),
+                remaining: DialTimeFormat.remaining(playback.duration - playback.position),
+                progress: playback.progress,
+                isPlaying: playback.isPlaying
+            ))
+
+        case .recording:
+            guard let capture = content.capture else {
+                return .message(.init(
+                    icon: .recording,
+                    title: "Not recording",
+                    body: "Press the hub to start."
+                ))
+            }
+            return .recording(.init(
+                elapsed: DialTimeFormat.clock(capture.elapsed),
+                fraction: DialTimeFormat.tenths(capture.elapsed),
+                levels: capture.levels,
+                markers: capture.markers.map {
+                    .init(id: $0.id, label: $0.label, time: DialTimeFormat.clock($0.time))
+                }
+            ))
+
+        case .edit:
+            guard let editing = content.editing else {
+                return .message(.init(
+                    icon: .none,
+                    title: "Nothing to edit",
+                    body: "Open a recording first."
+                ))
+            }
+            let trim = trimRange(for: editing)
+            return .edit(.init(
+                title: editing.title,
+                keeping: DialTimeFormat.clock(trim.length),
+                waveform: editing.waveform,
+                inFraction: trim.inFraction,
+                outFraction: trim.outFraction,
+                playheadFraction: nil,
+                scale: [
+                    DialTimeFormat.clock(0),
+                    DialTimeFormat.clock(trim.start),
+                    DialTimeFormat.clock(trim.end),
+                    DialTimeFormat.clock(editing.duration)
+                ]
+            ))
+
+        case .actions:
+            return .list(list(rows: actionRows))
+        }
+    }
+
+    private func list(rows: [DialScreen.List.Row]) -> DialScreen.List {
+        DialScreen.List(
+            rows: rows,
+            highlighted: min(level.highlighted, max(0, rows.count - 1)),
+            position: route.countsRows && !rows.isEmpty
+                ? "\(min(level.highlighted, rows.count - 1) + 1) of \(rows.count)"
+                : nil
+        )
+    }
+
+    private var chooserRows: [DialScreen.List.Row] {
+        [
+            .init(id: "listen", icon: .playlist, title: "Listen", subtitle: "Play from your library"),
+            .init(id: "record", icon: .recording, title: "Record", subtitle: "Capture something new")
+        ]
+    }
+
+    /// `12 ▸` when there is somewhere to go, a bare `6` when there is only a count, nothing when
+    /// there is neither. The chevron is the affordance, so it is tied to the destination rather
+    /// than typed into the title.
+    private var libraryRows: [DialScreen.List.Row] {
+        content.sections.map { section in
+            let trailing = section.count.map { count in
+                section.destination == nil ? "\(count)" : "\(count) ▸"
+            }
+            return .init(id: section.id, icon: section.icon, title: section.title, trailing: trailing)
+        }
+    }
+
+    private var recordingRows: [DialScreen.List.Row] {
+        content.recordings.map {
+            .init(
+                id: $0.id,
+                icon: .recording,
+                title: $0.title,
+                trailing: DialTimeFormat.clock($0.duration),
+                subtitle: $0.subtitle
+            )
+        }
+    }
+
+    private var actionRows: [DialScreen.List.Row] {
+        DialItemAction.allCases.map {
+            .init(id: $0.rawValue, icon: $0.icon, title: $0.label)
+        }
+    }
+
+    // MARK: - Actions
+
+    private var actions: [DialScreen.Action] {
+        switch route {
+        case .chooseMode:
+            return []
+
+        case .library:
+            // The visible partner for `.hold`, which nothing on screen would otherwise announce.
+            return [.init(
+                id: "nowPlaying",
+                label: "Now playing",
+                emphasis: content.playback == nil ? .disabled : .plain
+            )]
+
+        case .recordings:
+            guard !content.recordings.isEmpty else {
+                return [back, .init(id: "record", label: "Record", emphasis: .primary)]
+            }
+            // `Edit` is the visible partner for `.doublePress`; the contract requires one.
+            return [back, .init(id: "edit", label: "Edit"), .init(id: "more", label: "•••")]
+
+        case .nowPlaying:
+            return modeChips
+
+        case .recording:
+            let paused = content.capture?.isPaused ?? false
+            return [
+                .init(id: "marker", label: "＋ Marker"),
+                .init(id: "pause", label: paused ? "Resume" : "Pause", emphasis: .primary)
+            ]
+
+        case .edit:
+            return modeChips + [.init(id: "preview", label: "Preview")]
+
+        case .actions:
+            return [back]
+        }
+    }
+
+    private var back: DialScreen.Action { .init(id: "back", label: "‹ Back") }
+
+    /// Exactly one `.selected`, always — the selected index is clamped into the mode list, so there
+    /// is no state in which a screen with modes shows none chosen.
+    private var modeChips: [DialScreen.Action] {
+        let modes = route.modes
+        guard !modes.isEmpty else { return [] }
+
+        let selected = min(level.mode, modes.count - 1)
+        return modes.enumerated().map { index, mode in
+            .init(id: mode.id, label: mode.label, emphasis: index == selected ? .selected : .plain)
+        }
+    }
+
+    // MARK: - Ring
+
+    private var ring: DialScreen.Ring {
+        DialScreen.Ring(ticks: ticks, hub: hub)
+    }
+
+    private var ticks: DialScreen.Ticks {
+        switch route {
+        case .nowPlaying:
+            guard let playback = content.playback else { return .browse(thumb: nil) }
+            switch axis {
+            case .volume: return .position(playback.volume)
+            case .queue: return .browse(thumb: fraction(playback.queueIndex, of: playback.queueCount))
+            default: return .position(playback.progress)
+            }
+
+        case .recording:
+            return .level(content.capture?.level ?? 0)
+
+        case .edit:
+            guard let editing = content.editing else { return .browse(thumb: nil) }
+            let trim = trimRange(for: editing)
+            return .position(axis == .trimEnd ? trim.outFraction : trim.inFraction)
+
+        default:
+            return .browse(thumb: fraction(level.highlighted, of: rowCount(route)))
+        }
+    }
+
+    private var hub: DialScreen.Hub {
+        switch route {
+        case .chooseMode: .label("CHOOSE")
+        case .library: .label("OPEN")
+        case .recordings: content.recordings.isEmpty ? .label("RECORD") : .label("OPEN")
+        case .nowPlaying: .glyph(content.playback?.isPlaying == false ? "play.fill" : "pause.fill")
+        case .recording: .recordDot
+        case .edit: .label("DONE")
+        case .actions: .label("SELECT")
+        }
+    }
+
+    // MARK: - Hint
+
+    /// The only thing teaching rotate/press/hold, so it follows the mode rather than describing the
+    /// screen in general — a caption that says "rotate to seek" while the wheel is set to Volume is
+    /// worse than none.
+    private var hint: String {
+        switch route {
+        case .chooseMode:
+            return "rotate to switch mode · press to choose"
+
+        case .library:
+            return "rotate to browse · press to open · hold for now playing"
+
+        case .recordings:
+            return content.recordings.isEmpty
+                ? "press to start recording · nothing to scroll yet"
+                : "rotate to scroll · press to open · double-press to edit"
+
+        case .nowPlaying:
+            let press = content.playback?.isPlaying == false ? "press to play" : "press to pause"
+            switch axis {
+            case .volume: return "rotate to set volume · \(press) · ticks show volume"
+            case .queue: return "rotate to change track · \(press)"
+            default: return "rotate to seek · \(press) · ticks show position"
+            }
+
+        case .recording:
+            return "ring shows input level · rotate to set gain · press to stop"
+
+        case .edit:
+            return "rotate to nudge the active handle · press when done"
+
+        case .actions:
+            return "rotate to highlight an action · press to confirm"
+        }
+    }
+
+    // MARK: - Helpers
+
+    /// The editor's selection, or the whole recording when the level has none — which happens only
+    /// if `content.editing` arrived after the screen was pushed.
+    private func trimRange(for editing: DialContent.Editable) -> DialTrimRange {
+        level.trim ?? DialTrimRange(start: 0, end: editing.duration, duration: editing.duration)
+    }
+
+    /// Where an index sits across a run of them, `0...1`. A run of one has no position to report —
+    /// lighting the first tick would claim the wheel is at the start of something it cannot leave.
+    private func fraction(_ index: Int, of count: Int) -> Double? {
+        guard count > 1 else { return nil }
+        return Double(min(max(0, index), count - 1)) / Double(count - 1)
+    }
+}
