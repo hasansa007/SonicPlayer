@@ -45,6 +45,9 @@ enum Radius {
     static let lg: CGFloat = 16
     /// 18 — a card sheet rising over the canvas. Larger than `lg` because the surface is larger.
     static let sheet: CGFloat = 18
+    /// 24 — the dial navigator's stage: the card holding a whole screen's content. Larger than
+    /// `sheet` for the reason `sheet` is larger than `lg` — the surface is larger again.
+    static let stage: CGFloat = 24
 }
 
 /// Control and artwork dimensions.
@@ -117,6 +120,37 @@ enum Sizing {
     /// 3 — the lit arc that tracks the thumb. Thicker than the ring it sits on, so it reads as a
     /// highlight rather than as a thicker section of the same line.
     static let wheelArcWidth: CGFloat = 3
+
+    // The dial navigator (#6). **Same rule as the wheel above — none of these scale with Dynamic
+    // Type.** They are larger than the wheel's because the dial is not a control on one screen: it
+    // is the navigation model, present on all eight, and the thumb rests on it for the whole
+    // session rather than reaching for it occasionally.
+
+    /// 236 — the dial's outer diameter. Around 60% of a compact screen's width, which is what puts
+    /// the whole ring inside a thumb's arc without the hand moving.
+    static let dialDiameter: CGFloat = 236
+    /// 92 — the hub, which is always the commit. Its radius comfortably clears
+    /// `RotaryTracker.deadZoneRadius`, so a press can never be read as the start of a turn.
+    static let dialHub: CGFloat = 92
+    /// 12 — one tick mark's length. Its width is `hairlineTrackHeight`, shared with the scrubber's.
+    static let dialTick: CGFloat = 12
+    /// 26 — the record dot at the hub's centre while capturing.
+    static let dialRecordDot: CGFloat = 26
+    /// 5 — the now-playing progress bar. Thinner than `trackHeight` because nothing drags it: the
+    /// ring is the seek control here and the bar is a readout.
+    static let dialTrack: CGFloat = 5
+    /// 4 — one bar of the live recording waveform.
+    static let dialWaveBar: CGFloat = 4
+    /// 70 — the live recording waveform's height.
+    static let dialWave: CGFloat = 70
+    /// 110 — the trim editor's waveform. Taller than the live one because handles have to be
+    /// grabbable inside it.
+    static let dialEditWave: CGFloat = 110
+    /// 20 — one trim handle's width.
+    static let dialTrimHandle: CGFloat = 20
+    /// 52 — the icon tile on a prominent choice row, where a screen offers two options rather than
+    /// a list of many.
+    static let dialChoiceTile: CGFloat = 52
 }
 
 /// A shadow, as one value rather than four loose arguments at the call site.
@@ -174,6 +208,10 @@ enum Motion {
     /// The transient value pill arriving and leaving.
     static let hudFade: Animation = .easeOut(duration: 0.25)
 
+    /// The capture indicator's breathing dot. 1.4s round trip — slow enough to read as breathing
+    /// rather than as an alarm, which matters because it is on screen for the whole recording.
+    static let recordPulse: Animation = .easeInOut(duration: 0.7).repeatForever(autoreverses: true)
+
     /// The playing-waveform bars. `index` staggers them so they do not pulse in unison.
     ///
     /// A fixed table rather than `Double.random(in: 0.3...0.6)`, which the old
@@ -185,4 +223,33 @@ enum Motion {
             .repeatForever(autoreverses: true)
             .delay(Double(index) * 0.1)
     }
+}
+
+/// Point sizes the dial navigator draws numerals at, plus the one tracking value its chrome needs.
+///
+/// These exist for the same reason `DisplayFont` does — **a `.system(size:)` is the same number of
+/// points at every accessibility setting** — and carry the same obligation: read each one through
+/// `@ScaledMetric`, never inline.
+///
+/// ```swift
+/// @ScaledMetric(relativeTo: .largeTitle) private var elapsed = DialFont.elapsed
+/// ```
+///
+/// They are here rather than beside `DisplayFont` in `Typography.swift` only because the dial's UI
+/// half was built on a branch that owns `Tokens.swift` and not that file. They are the same idea
+/// and should be folded in when the two land together.
+///
+/// No semantic style reaches these sizes: `.largeTitle` is 34pt and the running timer is half again
+/// that. That is the whole justification for a fixed size — a role a scale does not cover.
+enum DialFont {
+
+    /// 46 — now playing's elapsed time, the largest thing on that screen.
+    static let elapsed: CGFloat = 46
+    /// 54 — the recording timer. Larger than `elapsed` because on that screen it is the only
+    /// readout, and it is read from arm's length.
+    static let timer: CGFloat = 54
+    /// 26 — the tenths beside the timer, roughly half it, so the two read as one number.
+    static let fraction: CGFloat = 26
+    /// 1.5 — letter spacing on a breadcrumb. Set in caps at caption size, it needs the air.
+    static let breadcrumbTracking: CGFloat = 1.5
 }
