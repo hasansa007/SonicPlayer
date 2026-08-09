@@ -63,4 +63,26 @@ struct ScrubClampTests {
     @Test func test_backward_fromPastTheEnd_isNotBoundedByDuration() {
         #expect(ScrubClamp.backward(from: 120) == 105)
     }
+
+    // MARK: - Position (#6)
+    //
+    // The two above step by the fixed `interval`, so neither answered where an arbitrary seek
+    // lands. The wheel computes its own step — 0.1s per detent — and needs the bounds only.
+
+    @Test func test_position_insideTheTrack_isUnchanged() {
+        #expect(ScrubClamp.position(30, duration: 100) == 30)
+    }
+
+    @Test func test_position_pastTheEnd_clampsToTheEnd() {
+        #expect(ScrubClamp.position(140, duration: 100) == 100)
+    }
+
+    @Test func test_position_beforeTheStart_clampsToZero() {
+        #expect(ScrubClamp.position(-4, duration: 100) == 0)
+    }
+
+    /// An unloaded asset reports zero duration, and seeking to a negative time is unrecoverable.
+    @Test func test_position_withNoDurationYet_yieldsTheStart() {
+        #expect(ScrubClamp.position(30, duration: 0) == 0)
+    }
 }
