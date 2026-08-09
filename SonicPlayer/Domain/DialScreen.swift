@@ -63,12 +63,25 @@ struct DialScreen: Equatable {
             var subtitle: String?
         }
 
+        /// What the list is *about*, shown above the rows.
+        ///
+        /// The actions screen needs this — its rows act on one recording, and without naming that
+        /// recording the screen is five verbs with no object. A plain menu has no subject and
+        /// leaves this nil.
+        struct Subject: Equatable {
+            var icon: Icon
+            var title: String
+            /// A second line, e.g. `"12:07 · Today 14:02"`.
+            var detail: String?
+        }
+
         var rows: [Row]
         /// Index into `rows`. **Always valid when `rows` is non-empty** — the navigator clamps it,
         /// so the UI never has to decide what an out-of-range highlight looks like.
         var highlighted: Int
         /// `"1 of 12"`. Nil when the list is short enough that counting is noise.
         var position: String?
+        var subject: Subject?
     }
 
     struct NowPlaying: Equatable {
@@ -126,6 +139,10 @@ struct DialScreen: Equatable {
         case stats
         case marker
         case share
+        /// Writing a copy out of the app. Distinct from `share`, which hands the existing file to
+        /// another app — reusing `share` put the same glyph on two rows of one list, which reads
+        /// as a bug rather than as a pair.
+        case export
         case rename
         case delete
         case add
@@ -144,6 +161,11 @@ struct DialScreen: Equatable {
             /// Currently active, e.g. the chosen wheel mode on Now Playing, or which trim handle
             /// the wheel is nudging.
             case selected
+            /// Starts something, or destroys something, that the user cannot casually undo —
+            /// beginning a recording, deleting a file. Rendered in the warning colour rather than
+            /// the accent, so "the one thing this screen expects" and "the one thing you cannot
+            /// take back" never look alike.
+            case destructive
             /// Present but not available yet.
             case disabled
         }

@@ -121,18 +121,34 @@ extension DialNavigator {
                 ]
             ))
 
-        case .actions:
-            return .list(list(rows: actionRows))
+        case .actions(let itemID):
+            return .list(list(rows: actionRows, subject: subject(for: itemID)))
         }
     }
 
-    private func list(rows: [DialScreen.List.Row]) -> DialScreen.List {
+    private func list(
+        rows: [DialScreen.List.Row],
+        subject: DialScreen.List.Subject? = nil
+    ) -> DialScreen.List {
         DialScreen.List(
             rows: rows,
             highlighted: min(level.highlighted, max(0, rows.count - 1)),
             position: route.countsRows && !rows.isEmpty
                 ? "\(min(level.highlighted, rows.count - 1) + 1) of \(rows.count)"
-                : nil
+                : nil,
+            subject: subject
+        )
+    }
+
+    /// The recording the action rows act on. Without it the screen is five verbs and no object.
+    private func subject(for itemID: String) -> DialScreen.List.Subject? {
+        guard let item = content.item(itemID) else { return nil }
+        return DialScreen.List.Subject(
+            icon: .recording,
+            title: item.title,
+            detail: [DialTimeFormat.clock(item.duration), item.subtitle]
+                .compactMap { $0 }
+                .joined(separator: " · ")
         )
     }
 
@@ -190,7 +206,9 @@ extension DialNavigator {
 
         case .recordings:
             guard !content.recordings.isEmpty else {
-                return [back, .init(id: "record", label: "Record", emphasis: .primary)]
+                // Destructive rather than primary: starting a recording is the obvious action here
+                // and also the one you cannot casually undo, and those must not look alike.
+                return [back, .init(id: "record", label: "Record", emphasis: .destructive)]
             }
             // `Edit` is the visible partner for `.doublePress`; the contract requires one.
             return [back, .init(id: "edit", label: "Edit"), .init(id: "more", label: "•••")]

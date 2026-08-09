@@ -133,14 +133,14 @@ enum DialItemAction: String, Equatable, CaseIterable {
         }
     }
 
-    /// `DialScreen.Icon` has no export symbol and this file may not add one — the contract is
-    /// shared with the view half and frozen. `.none` is the honest answer rather than borrowing
-    /// `.share`, which would put the same glyph on two rows and read as a bug.
+    /// `.export` is its own role rather than a second use of `.share`, which would put one glyph on
+    /// two rows of a five-row list and read as a bug. Handing a file to another app and writing a
+    /// copy out are different promises.
     var icon: DialScreen.Icon {
         switch self {
         case .share: .share
         case .addToPlaylist: .playlist
-        case .export: .none
+        case .export: .export
         case .rename: .rename
         case .delete: .delete
         }

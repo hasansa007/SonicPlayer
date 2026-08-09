@@ -71,6 +71,9 @@ struct DialActionRow: View {
         // White rather than `sonicTextPrimary`: both of these sit on filled teal, which stays teal
         // in light mode, so the label has to stay light too.
         case .primary, .selected: .white
+        // Destructive keeps a light label for the same reason: it sits on a filled surface too,
+        // just an orange one.
+        case .destructive: .white
         case .plain: .sonicTextPrimary
         case .disabled: .sonicTextMuted
         }
@@ -81,6 +84,10 @@ struct DialActionRow: View {
     private func background(_ emphasis: DialScreen.Action.Emphasis) -> AnyShapeStyle {
         switch emphasis {
         case .primary, .selected: AnyShapeStyle(DialSurface.fill)
+        // Filled, like `.primary`, but never the accent. "The thing this screen expects" and "the
+        // thing you cannot take back" must not be the same colour — `Record` and `Delete` are both
+        // the obvious action on their screen, and only one is recoverable.
+        case .destructive: AnyShapeStyle(Color.sonicOrange)
         case .plain, .disabled: AnyShapeStyle(Color.sonicPrimary.opacity(ControlTint.on))
         }
     }

@@ -18,6 +18,7 @@ enum DialIcon {
         case .stats: "chart.bar.fill"
         case .marker: "bookmark.fill"
         case .share: "square.and.arrow.up"
+        case .export: "arrow.down.doc"
         case .rename: "pencil"
         case .delete: "trash"
         case .add: "plus"

@@ -33,8 +33,52 @@ struct DialListView: View {
         list.rows.contains { DialIcon.systemImage(for: $0.icon) != nil }
     }
 
+    /// What the rows below act on.
+    ///
+    /// Without it the actions screen is five verbs and no object — "Delete" with nothing saying
+    /// *what*. It is deliberately not a row: it cannot be highlighted and pressing the hub never
+    /// selects it, so it reads as a heading rather than as a sixth choice.
+    private func subjectHeader(_ subject: DialScreen.List.Subject) -> some View {
+        HStack(spacing: Spacing.md) {
+            if let symbol = DialIcon.systemImage(for: subject.icon) {
+                Image(systemName: symbol)
+                    .font(.subheadline)
+                    .foregroundColor(.sonicPrimary)
+                    .frame(width: Sizing.compactControl, height: Sizing.compactControl)
+                    .background(
+                        Color.sonicPrimary.opacity(ControlTint.on),
+                        in: RoundedRectangle(cornerRadius: Radius.sm)
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                Text(subject.title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.sonicTextPrimary)
+                    .lineLimit(1)
+
+                if let detail = subject.detail {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundColor(.sonicTextSecondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.bottom, Spacing.sm)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
     var body: some View {
         VStack(spacing: isProminent ? Spacing.md : Spacing.xxs) {
+            if let subject = list.subject {
+                subjectHeader(subject)
+            }
+
             if isProminent { Spacer(minLength: 0) }
 
             ForEach(Array(list.rows.enumerated()), id: \.element.id) { index, row in

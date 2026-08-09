@@ -148,6 +148,15 @@ struct DialScreenshotTests {
         #expect(screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS", "RECORDING 1"])
         #expect(screen.ring.hub == .label("SELECT"))
         #expect(screen.hint == "rotate to highlight an action · press to confirm")
+
+        // Without a subject this screen is five verbs and no object — "Delete" with nothing saying
+        // what. The breadcrumb names it in shouting caps; the header names it as the file is named.
+        #expect(rows(navigator)?.subject?.title == "Recording 1")
+        #expect(rows(navigator)?.subject?.icon == .recording)
+
+        // Export gets its own glyph. Reusing `.share` would put one symbol on two rows of the five
+        // above and read as a bug rather than as a pair.
+        #expect(rows(navigator)?.rows.map(\.icon) == [.share, .playlist, .export, .rename, .delete])
     }
 
     // MARK: - 1g Empty
@@ -167,7 +176,10 @@ struct DialScreenshotTests {
 
         #expect(screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS"])
         #expect(screen.actions.map(\.id) == ["back", "record"])
-        #expect(screen.actions.last?.emphasis == .primary)
+        // Destructive, not primary. It is the obvious action on this screen *and* the one you
+        // cannot casually undo, and the design draws it red for that reason — `.primary` renders
+        // in the accent, which would make starting a recording look like opening a playlist.
+        #expect(screen.actions.last?.emphasis == .destructive)
         #expect(screen.ring.hub == .label("RECORD"))
         #expect(screen.hint == "press to start recording · nothing to scroll yet")
     }
