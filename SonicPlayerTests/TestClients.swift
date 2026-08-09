@@ -104,3 +104,17 @@ extension FileManagerClient {
         documentsDirectory: { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
     )
 }
+
+extension HapticsClient {
+    /// `fire` reports, so a test that reaches the wheel's feedback path without meaning to says so.
+    /// `prepare` and `stop` are lifecycle no-ops that every path calls — reporting those would only
+    /// ever produce noise, which is the failure mode the comment at the top of this file describes
+    /// from the other direction.
+    static var test: Self {
+        Self(
+            prepare: {},
+            fire: { _ in Issue.record("HapticsClient.fire is unimplemented") },
+            stop: {}
+        )
+    }
+}
