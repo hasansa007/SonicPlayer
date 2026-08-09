@@ -22,6 +22,7 @@ final class DialViewModel {
     var onSeek: ((TimeInterval) -> Void)?
     var onSelectTrack: ((Int) -> Void)?
     var onStartRecording: (() -> Void)?
+    var onImportFiles: (() -> Void)?
     var onStopRecording: (() -> Void)?
     var onTogglePause: (() -> Void)?
     var onAddMarker: (() -> Void)?
@@ -72,28 +73,30 @@ final class DialViewModel {
         var content = DialContent()
 
         content.sections = [
+            // **Import is first**, because it is the only way audio the app did not record itself
+            // gets in — and with Home gone, nothing else asks for it.
+            DialContent.Section(
+                id: "import",
+                icon: .add,
+                title: String(localized: "Import"),
+                count: nil,
+                destination: nil,
+                effect: .importFiles
+            ),
             DialContent.Section(
                 id: "recordings",
                 icon: .recording,
-                title: String(localized: "Recordings"),
+                title: String(localized: "Library"),
                 count: recentFiles.count,
                 destination: .recordings
             ),
-            DialContent.Section(
-                id: "nowPlaying",
-                icon: .session,
-                title: String(localized: "Now Playing"),
-                count: nil,
-                destination: .nowPlaying
-            ),
-            // Without this the recording screen is unreachable. `startRecording()` pushes it, but
-            // nothing reached `startRecording()`: the Record chip only appears when the recordings
-            // list is *empty*, and the mode chooser is not the root. Opening the route directly
-            // lands on its "Not recording — press the hub to start" state, which is the honest
-            // resting state of that screen rather than a placeholder.
+            // **No "Now Playing" row.** It is not a place you go — it is where the app rests, and a
+            // list of places that includes the thing you are already doing is a category error. It
+            // is also useless exactly half the time, since there is nothing to go to when nothing
+            // plays. The chrome's status line is the way in, and `hold` still works from anywhere.
             DialContent.Section(
                 id: "record",
-                icon: .add,
+                icon: .marker,
                 title: String(localized: "Record"),
                 count: nil,
                 destination: .recording
@@ -227,6 +230,8 @@ final class DialViewModel {
             onSeek?(time)
         case .selectTrack(let index):
             onSelectTrack?(index)
+        case .importFiles:
+            onImportFiles?()
         case .startRecording:
             onStartRecording?()
         case .stopRecording:

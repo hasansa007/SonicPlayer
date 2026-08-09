@@ -48,4 +48,8 @@ enum DialEffect: Equatable {
     // MARK: - Items
 
     case item(DialItemAction, itemID: String)
+
+    /// Open the system file picker. The only way into the app for audio it did not record itself,
+    /// and with Home gone there was no longer anywhere else to ask for it.
+    case importFiles
 }

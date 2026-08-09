@@ -46,11 +46,20 @@ struct DialChrome: View {
             }
 
             if chrome.isRecording || chrome.status != nil {
-                status
+                // Tappable, and that is the point: `hold` jumps to Now Playing from anywhere and
+                // has no affordance at all. This line is already on screen saying something is
+                // playing, so making it the way in costs nothing and finally gives that gesture a
+                // visible partner.
+                Button { onCommand(.action("nowPlaying")) } label: { status }
+                    .accessibilityLabel(Text("Now playing"))
+                    .accessibilityHint(Text(chrome.status ?? ""))
             }
         }
         .frame(maxWidth: .infinity, alignment: hasBreadcrumb ? .leading : .center)
-        .accessibilityElement(children: .combine)
+        // `.contain`, not `.combine`. Combining flattens the children into one label — which was
+        // right when this row was three pieces of text, and silently swallows the Back chevron and
+        // the status button now that two of them are controls.
+        .accessibilityElement(children: .contain)
     }
 
     private var status: some View {

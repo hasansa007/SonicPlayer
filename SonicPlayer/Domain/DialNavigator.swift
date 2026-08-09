@@ -239,10 +239,14 @@ struct DialNavigator {
             return level.highlighted == 0 ? open(.library) : startRecording()
 
         case .library:
-            guard let destination = content.sections[safe: level.highlighted]?.destination else {
+            guard let section = content.sections[safe: level.highlighted] else {
                 return [.feedback(.limit)]
             }
-            return open(destination)
+            // A section either goes somewhere or does something. Import does something and stays
+            // put, which is why it cannot be modelled as a route.
+            if let destination = section.destination { return open(destination) }
+            if let effect = section.effect { return [effect, .feedback(.commit)] }
+            return [.feedback(.limit)]
 
         case .recordings:
             guard let item = content.recordings[safe: level.highlighted] else { return startRecording() }
@@ -330,6 +334,11 @@ struct DialNavigator {
         // The tri-state's two ends. Reusing `.action` rather than inventing commands: previous and
         // next were already sayable, and a spring-return switch is a new *affordance* for them, not
         // a new thing to say.
+        // The chrome's status is tappable, and this is what it sends. `hold` does the same thing
+        // from anywhere and is invisible; this is the affordance that says the destination exists.
+        case (_, "nowPlaying"):
+            return hold()
+
         case (.nowPlaying, "previous"):
             return stepQueue(by: -1)
         case (.nowPlaying, "next"):
