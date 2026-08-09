@@ -195,6 +195,17 @@ struct DialScreen: Equatable {
         /// Naming it makes the cost land where the feature is: exactly one screen waits, and every
         /// other press is instant.
         var defersPress: Bool = false
+
+        /// The current output level, `0...1`, when this screen offers a volume segment beside the
+        /// wheel. `nil` means no segment.
+        ///
+        /// It lives on `Ring` rather than in `Content` because it is part of the *control cluster* —
+        /// what you touch — and the content is what you read. The two segments and the wheel are one
+        /// thing on screen and should be one thing here.
+        var volume: Double?
+
+        /// Whether the track-stepping segment sits above the wheel.
+        var showsTrackStepper: Bool = false
     }
 
     /// What the ring's tick marks are showing. The design uses a different set per screen —

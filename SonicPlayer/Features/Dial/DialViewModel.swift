@@ -26,6 +26,11 @@ final class DialViewModel {
 
     private var navigator: DialNavigator
     private let haptics: HapticsClient
+    /// The live waveform's bar history. See `refresh`.
+    private var levels: [Double] = []
+    /// Input gain, `0...1`. Held here because nothing else in the app has a notion of it yet —
+    /// `setGain` is inert until the recorder gains one.
+    private var gain: Double = 0.7
 
     init(haptics: HapticsClient = .live) {
         self.navigator = DialNavigator()
@@ -45,7 +50,7 @@ final class DialViewModel {
     /// Called whenever the underlying data moves. The navigator re-clamps every level's highlight
     /// against the new content, so a list shrinking under a screen you are not looking at cannot
     /// leave a highlight pointing past the end.
-    func refresh(recentFiles: [AudioFile], player: PlayerViewModel) {
+    func refresh(recentFiles: [AudioFile], player: PlayerViewModel, recorder: RecordingViewModel) {
         var content = DialContent()
 
         content.sections = [
@@ -62,6 +67,18 @@ final class DialViewModel {
                 title: String(localized: "Now Playing"),
                 count: nil,
                 destination: .nowPlaying
+            ),
+            // Without this the recording screen is unreachable. `startRecording()` pushes it, but
+            // nothing reached `startRecording()`: the Record chip only appears when the recordings
+            // list is *empty*, and the mode chooser is not the root. Opening the route directly
+            // lands on its "Not recording — press the hub to start" state, which is the honest
+            // resting state of that screen rather than a placeholder.
+            DialContent.Section(
+                id: "record",
+                icon: .add,
+                title: String(localized: "Record"),
+                count: nil,
+                destination: .recording
             )
         ]
 
@@ -86,8 +103,29 @@ final class DialViewModel {
             )
         }
 
+        // The live capture, which is what turns the ring into a level meter. `peakLevel` is a
+        // single instantaneous value, so the bar history is kept here — the navigator holds a
+        // snapshot and has nowhere to accumulate one.
+        if recorder.isRecording {
+            levels.append(Double(max(0, min(1, recorder.peakLevel))))
+            if levels.count > Self.levelHistory { levels.removeFirst(levels.count - Self.levelHistory) }
+            content.capture = DialContent.Capture(
+                elapsed: recorder.recordingTime,
+                levels: levels,
+                gain: gain,
+                markers: [],
+                isPaused: false
+            )
+        } else {
+            levels.removeAll()
+        }
+
         navigator.update(content)
     }
+
+    /// How many bars the live waveform keeps. Enough to read as movement, few enough that each one
+    /// is still wide enough to see.
+    private static let levelHistory = 40
 
     private func apply(_ effect: DialEffect) {
         switch effect {
@@ -102,9 +140,14 @@ final class DialViewModel {
         case .selectTrack(let index):
             onSelectTrack?(index)
         case .startRecording:
+            levels.removeAll()
             onStartRecording?()
         case .stopRecording:
             onStopRecording?()
+        case .setGain(let value):
+            // Held locally: the recorder has no gain control yet, so this moves the meter's
+            // reference without pretending to change the hardware.
+            gain = min(max(0, value), 1)
 
         // Recording and trimming are slices of their own. Their effects are deliberately inert
         // rather than faked — a control that appears to work and does not is worse than one that

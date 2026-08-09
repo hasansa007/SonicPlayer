@@ -24,43 +24,57 @@ struct DialModeTests {
 
     // MARK: - The chips are the mode list
 
-    @Test func theChipsAreGeneratedFromTheModes() {
+    /// **Now Playing has no modes at all any more**, and that is the point of the redesign.
+    ///
+    /// Volume moved to a vertical spring-return segment and track-stepping to a horizontal one, so
+    /// the wheel does exactly one thing — seek. "What does the wheel do right now" stopped being a
+    /// question rather than becoming a faster one to answer.
+    @Test func nowPlayingHasNoModeChips() {
         let navigator = nowPlaying()
 
-        #expect(navigator.screen.actions.map(\.id) == navigator.route.modes.map(\.id))
-        #expect(navigator.screen.actions.map(\.label) == ["Seek", "Volume", "Browse"])
+        #expect(navigator.route.modes.isEmpty)
+        #expect(navigator.screen.actions.map(\.id) == ["back"])
+        #expect(navigator.axis == .seek)
+    }
+
+    /// Modes survive where a screen genuinely has two things one wheel must do. The trim editor is
+    /// the last of them: one wheel, two handles, and no room for a second control.
+    @Test func theChipsAreGeneratedFromTheModes() {
+        let navigator = DialSample.whileEditing()
+
+        #expect(navigator.screen.actions.map(\.id).prefix(2) == navigator.route.modes.map(\.id).prefix(2))
+        #expect(navigator.screen.actions.map(\.label).prefix(2) == ["Start handle", "End handle"])
     }
 
     @Test func exactlyOneChipIsSelected() {
-        var navigator = nowPlaying()
-        _ = navigator.receive(.action("volume"))
+        var navigator = DialSample.whileEditing()
+        _ = navigator.receive(.action("trimEnd"))
 
         let selected = navigator.screen.actions.filter { $0.emphasis == .selected }
 
         #expect(selected.count == 1)
-        #expect(selected.first?.id == "volume")
+        #expect(selected.first?.id == "trimEnd")
     }
 
     @Test func theSelectedModeDecidesWhatATickDoes() {
-        var navigator = nowPlaying()
-        #expect(navigator.axis == .seek)
+        var navigator = DialSample.whileEditing()
+        #expect(navigator.axis == .trimStart)
 
-        _ = navigator.receive(.action("volume"))
+        _ = navigator.receive(.action("trimEnd"))
 
-        #expect(navigator.axis == .volume)
+        #expect(navigator.axis == .trimEnd)
     }
 
     /// The mode belongs to the level, not to the navigator. Leaving Now Playing on `Browse` and
     /// coming back to a *new* Now Playing must not inherit it — a wheel that silently changes track
     /// because of a choice made two screens ago is the worst kind of surprise.
     @Test func aNewLevelStartsOnItsFirstMode() {
-        var navigator = nowPlaying()
-        _ = navigator.receive(.action("browse"))
+        var navigator = DialSample.whileEditing()
+        _ = navigator.receive(.action("trimEnd"))
 
         _ = navigator.receive(.action("back"))
-        _ = navigator.receive(.hold)
 
-        #expect(navigator.axis == .seek)
+        #expect(navigator.axis != .trimEnd)
     }
 
     // MARK: - Seek
@@ -107,24 +121,29 @@ struct DialModeTests {
 
     // MARK: - Volume
 
+    /// Volume arrives on its own command now, from its own control. The big wheel never touches it.
     @Test func volumeMovesByItsOwnStep() {
         var navigator = nowPlaying()
-        _ = navigator.receive(.action("volume"))
 
-        let effects = navigator.receive(.tick(2))
+        let effects = navigator.receive(.volumeTick(2))
 
         #expect(effects == [.setVolume(0.64), .feedback(.detent)])
-        #expect(navigator.screen.ring.ticks == .position(0.64))
+        // The ring keeps showing *position* — volume moved to its own segment, and the whole point
+        // is that turning the wheel no longer changes what the wheel means.
+        #expect(navigator.screen.ring.volume == 0.64)
+        guard case .position = navigator.screen.ring.ticks else {
+            Issue.record("the ring must still show position, got \(navigator.screen.ring.ticks)")
+            return
+        }
     }
 
     @Test func volumeStopsAtBothEnds() {
         var navigator = nowPlaying()
-        _ = navigator.receive(.action("volume"))
-        _ = navigator.receive(.tick(1000))
+        _ = navigator.receive(.volumeTick(1000))
 
-        let atTheTop = navigator.receive(.tick(1))
-        _ = navigator.receive(.tick(-1000))
-        let atTheBottom = navigator.receive(.tick(-1))
+        let atTheTop = navigator.receive(.volumeTick(1))
+        _ = navigator.receive(.volumeTick(-1000))
+        let atTheBottom = navigator.receive(.volumeTick(-1))
 
         #expect(atTheTop == [.feedback(.limit)])
         #expect(atTheBottom == [.feedback(.limit)])
@@ -132,44 +151,52 @@ struct DialModeTests {
 
     // MARK: - Browse
 
+    /// The track segment's two ends. It reuses `.action` because previous and next were already
+    /// sayable — a spring-return switch is a new affordance for them, not a new thing to say.
     @Test func browsingStepsTheQueue() {
         var navigator = nowPlaying()
-        _ = navigator.receive(.action("browse"))
 
-        let effects = navigator.receive(.tick(1))
+        let effects = navigator.receive(.action("next"))
 
         #expect(effects == [.selectTrack(index: 3), .feedback(.detent)])
     }
 
     @Test func browsingStopsAtTheEndsOfTheQueue() {
         var navigator = nowPlaying()
-        _ = navigator.receive(.action("browse"))
-        _ = navigator.receive(.tick(100))
+        for _ in 0..<100 { _ = navigator.receive(.action("next")) }
 
-        let effects = navigator.receive(.tick(1))
+        let effects = navigator.receive(.action("next"))
 
         #expect(effects == [.feedback(.limit)])
     }
 
-    /// Browse is the one mode whose ring is a browse ring rather than a filled position.
-    @Test func browsingShowsAThumbRatherThanAFill() {
+    /// The ring shows position and nothing else here, because seeking is all the wheel does.
+    @Test func theRingAlwaysShowsPositionOnNowPlaying() {
         var navigator = nowPlaying()
-        _ = navigator.receive(.action("browse"))
 
-        guard case .browse(let thumb) = navigator.screen.ring.ticks else {
-            Issue.record("expected browse ticks, got \(navigator.screen.ring.ticks)")
+        guard case .position = navigator.screen.ring.ticks else {
+            Issue.record("expected position ticks, got \(navigator.screen.ring.ticks)")
             return
         }
-        #expect(abs((thumb ?? .nan) - 0.25) < tolerance)
+
+        _ = navigator.receive(.volumeTick(2))
+        _ = navigator.receive(.action("next"))
+
+        guard case .position = navigator.screen.ring.ticks else {
+            Issue.record("the auxiliary controls must not change what the ring shows")
+            return
+        }
     }
 
-    @Test func theHintFollowsTheMode() {
+    /// One sentence, not one per mode — there is only one thing the wheel does.
+    @Test func theHintDoesNotChange() {
         var navigator = nowPlaying()
-        #expect(navigator.screen.hint == "rotate to seek · press to pause · ticks show position")
+        let before = navigator.screen.hint
 
-        _ = navigator.receive(.action("volume"))
+        _ = navigator.receive(.volumeTick(2))
 
-        #expect(navigator.screen.hint == "rotate to set volume · press to pause · ticks show volume")
+        #expect(navigator.screen.hint == before)
+        #expect(before == "rotate to seek · press to pause · slide to change track")
     }
 
     // MARK: - Gain, which is a mode-less axis

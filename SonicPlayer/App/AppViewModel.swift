@@ -251,13 +251,16 @@ final class AppViewModel {
         dial.onTogglePlayPause = { [player] in player.playPauseTapped() }
         dial.onSeek = { [player] time in player.seek(to: time) }
         dial.onSelectTrack = { [player] index in player.jumpToTrack(index) }
-        dial.onStartRecording = { [weak self] in self?.isRecordingSheetPresented = true }
-        dial.onStopRecording = { [weak self] in self?.dismissRecordingSheet() }
+        // **Drives the recorder directly rather than presenting the old sheet.** Raising
+        // `isRecordingSheetPresented` here put the legacy recording UI *over* the dial's own
+        // recording screen, so the level meter was unreachable even once the route was.
+        dial.onStartRecording = { [recording] in recording.startRecordingTapped() }
+        dial.onStopRecording = { [recording] in recording.stopRecordingTapped() }
     }
 
     /// Re-feeds the dial from the app's current state. Called wherever the data it renders moves,
     /// because the navigator holds a snapshot rather than reaching back into the view models.
     func refreshDial() {
-        dial.refresh(recentFiles: home.recentFiles, player: player)
+        dial.refresh(recentFiles: home.recentFiles, player: player, recorder: recording)
     }
 }

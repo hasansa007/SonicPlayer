@@ -136,6 +136,18 @@ enum Sizing {
     static let dialTick: CGFloat = 12
     /// 26 — the record dot at the hub's centre while capturing.
     static let dialRecordDot: CGFloat = 26
+    // Now Playing's two auxiliary controls (#6). They exist so the big wheel can stop having
+    // modes — volume and track-stepping each get their own surface instead of a third of a mode
+    // selector. Neither scales with Dynamic Type, for the same reason the dial does not.
+
+    /// 116 — a spring-return segment along its axis.
+    static let dialSegmentLength: CGFloat = 116
+    /// 40 — across its axis. Also the knob. At or above `tapTarget` on the short side, because each
+    /// end is a button as well as a drag target.
+    static let dialSegmentBreadth: CGFloat = 40
+    /// 24 — how far the knob travels before it hits the end of its track.
+    static let dialSegmentTravel: CGFloat = 24
+
     /// 5 — the now-playing progress bar. Thinner than `trackHeight` because nothing drags it: the
     /// ring is the seek control here and the bar is a readout.
     static let dialTrack: CGFloat = 5

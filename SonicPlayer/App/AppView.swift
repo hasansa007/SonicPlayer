@@ -19,9 +19,13 @@ struct AppView: View {
         return ZStack(alignment: .bottom) {
             // Main content
             NavigationStack(path: $app.path) {
-                homeRootContent
-                    .navigationTitle("Home")
-                    .navigationBarTitleDisplayMode(.large)
+                // **The dial is the app** (#6, #76). There is no Home screen and no tab bar: the
+                // player is the root, and everything else — recordings, now playing, recording —
+                // is a level of the dial's own stack rather than a separate destination.
+                //
+                // The `NavigationStack` stays only because Settings is still a push. When Settings
+                // becomes a dial route it goes too.
+                dialRoot
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button {
@@ -92,40 +96,13 @@ struct AppView: View {
             }
             .preferredColorScheme(app.settings.colorScheme.colorScheme)
 
-            // Mini Player (full-width bottom bar)
-            if player.shouldShowMiniPlayer {
-                VStack(spacing: 0) {
-                    Spacer()
-                    MiniPlayerView(player: player)
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .zIndex(1)
-            }
+            // The mini-player is gone with Home. It existed to get you *back* to the player from
+            // somewhere else, and there is no longer a somewhere else — the player is the root.
 
-            // Record FAB (home screen only, not on empty state)
-            if !app.isSettingsPresented && app.path.isEmpty && !(filesRoot.items.isEmpty && home.recentFiles.isEmpty) {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        recordFAB
-                    }
-                }
-                .padding(.trailing, 20)
-                .padding(.bottom, player.shouldShowMiniPlayer ? 72 : 20)
-                .zIndex(2)
-            }
+            // The record FAB is gone too. The dial carries Record as a section, and a floating
+            // button over it would be a second door to the same room.
         }
         // Global sheets
-        .sheet(isPresented: $player.isExpanded) {
-            DialScreenView(screen: app.dial.screen) { app.dial.receive($0) }
-                .onAppear { app.refreshDial() }
-                .onChange(of: player.currentTime) { _, _ in app.refreshDial() }
-                .onChange(of: player.isPlaying) { _, _ in app.refreshDial() }
-                .onChange(of: player.currentTrack) { _, _ in app.refreshDial() }
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        }
         .sheet(isPresented: isRecordingSheetPresented) {
             RecordingView(viewModel: app.recording)
                 .presentationDetents([.large])
@@ -222,6 +199,23 @@ private extension AppView {
     // MARK: - Home Root Content
 
     @ViewBuilder
+    /// The dial, fed from the app whenever anything it renders moves.
+    ///
+    /// The navigator holds a *snapshot* rather than reaching back into the view models, so every
+    /// source it draws from has to push. That is the cost of the contract being a plain value, and
+    /// it is the same cost that makes the whole navigator testable without a view.
+    var dialRoot: some View {
+        DialScreenView(screen: app.dial.screen) { app.dial.receive($0) }
+            .onAppear { app.refreshDial() }
+            .onChange(of: app.player.currentTime) { _, _ in app.refreshDial() }
+            .onChange(of: app.player.isPlaying) { _, _ in app.refreshDial() }
+            .onChange(of: app.player.currentTrack) { _, _ in app.refreshDial() }
+            .onChange(of: app.home.recentFiles) { _, _ in app.refreshDial() }
+            .onChange(of: app.recording.isRecording) { _, _ in app.refreshDial() }
+            .onChange(of: app.recording.peakLevel) { _, _ in app.refreshDial() }
+            .toolbar(.hidden, for: .navigationBar)
+    }
+
     var homeRootContent: some View {
         ZStack {
             Color.sonicBackground.ignoresSafeArea()

@@ -213,8 +213,10 @@ extension DialNavigator {
             // `Edit` is the visible partner for `.doublePress`; the contract requires one.
             return [back, .init(id: "edit", label: "Edit"), .init(id: "more", label: "•••")]
 
+        // No mode chips: the wheel only seeks here now. `back` alone, because a screen with no
+        // chips at all has no visible way out and the breadcrumb is not a button.
         case .nowPlaying:
-            return modeChips
+            return [back]
 
         case .recording:
             let paused = content.capture?.isPaused ?? false
@@ -248,7 +250,13 @@ extension DialNavigator {
     // MARK: - Ring
 
     private var ring: DialScreen.Ring {
-        DialScreen.Ring(ticks: ticks, hub: hub, defersPress: defersPress)
+        DialScreen.Ring(
+            ticks: ticks,
+            hub: hub,
+            defersPress: defersPress,
+            volume: route == .nowPlaying ? content.playback?.volume : nil,
+            showsTrackStepper: route == .nowPlaying && (content.playback?.queueCount ?? 0) > 1
+        )
     }
 
     /// True only where `doublePress()` has something to do — which today is a highlighted recording.
@@ -312,12 +320,10 @@ extension DialNavigator {
                 : "rotate to scroll · press to open · double-press to edit"
 
         case .nowPlaying:
+            // One sentence, because the wheel does one thing. The segments beside and above it
+            // are named in the third clause rather than getting a hint each.
             let press = content.playback?.isPlaying == false ? "press to play" : "press to pause"
-            switch axis {
-            case .volume: return "rotate to set volume · \(press) · ticks show volume"
-            case .queue: return "rotate to change track · \(press)"
-            default: return "rotate to seek · \(press) · ticks show position"
-            }
+            return "rotate to seek · \(press) · slide to change track"
 
         case .recording:
             return "ring shows input level · rotate to set gain · press to stop"

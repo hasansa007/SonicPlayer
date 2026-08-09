@@ -30,6 +30,13 @@ enum DialCommand: Equatable {
     /// Same rule as `doublePress`: it is a shortcut, never the only route.
     case hold
 
+    /// Signed detents from the *small* wheel, which only ever means volume.
+    ///
+    /// Separate from `.tick` rather than a mode of it: there are two wheels on Now Playing and they
+    /// are turned independently, so a single tick case would need a sender and that is a mode by
+    /// another name.
+    case volumeTick(Int)
+
     /// A chip in the action row was tapped. The `id` matches `DialScreen.Action.id`.
     ///
     /// Touch and wheel are equals here — the wheel highlights and presses, the finger taps

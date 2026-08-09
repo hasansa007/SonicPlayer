@@ -150,12 +150,13 @@ struct DialPressTests {
         #expect(navigator.axis == .trimStart)
     }
 
-    /// Now Playing's action row is three modes and no Back chip, so the command has to work anyway
-    /// or the screen is a trap.
+    /// Now Playing used to be three mode chips and no Back, which made the command load-bearing:
+    /// without it the screen was a trap. The modes are gone and Back is now the only chip — so this
+    /// pins the *reachability*, which is what mattered, rather than the absence that caused it.
     @Test func backWorksOnAScreenThatShowsNoBackChip() {
         var navigator = DialSample.navigator()
         _ = navigator.receive(.hold)
-        #expect(!navigator.screen.actions.contains { $0.id == "back" })
+        #expect(navigator.screen.actions.map(\.id) == ["back"])
 
         _ = navigator.receive(.action("back"))
 

@@ -71,6 +71,9 @@ struct DialNavigator {
     mutating func receive(_ command: DialCommand) -> [DialEffect] {
         switch command {
         case .tick(let detents): tick(detents)
+        case .volumeTick(let detents):
+            // The small wheel has one job, so it bypasses the axis entirely.
+            setVolume(by: Double(detents) * WheelRouter.volumePerDetent)
         case .press: press()
         case .doublePress: doublePress()
         case .hold: hold()
@@ -266,6 +269,14 @@ struct DialNavigator {
             return open(.actions(itemID: item.id))
         case (.recordings, "record"):
             return startRecording()
+
+        // The tri-state's two ends. Reusing `.action` rather than inventing commands: previous and
+        // next were already sayable, and a spring-return switch is a new *affordance* for them, not
+        // a new thing to say.
+        case (.nowPlaying, "previous"):
+            return stepQueue(by: -1)
+        case (.nowPlaying, "next"):
+            return stepQueue(by: 1)
 
         case (.recording, "marker"):
             return [.addMarker, .feedback(.commit)]

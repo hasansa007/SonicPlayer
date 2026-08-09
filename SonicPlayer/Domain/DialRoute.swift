@@ -50,12 +50,12 @@ enum DialRoute: Equatable {
     /// reason the selected mode is an index into data rather than a case in an enum of screens.
     var modes: [DialMode] {
         switch self {
+        // **Now Playing has no modes.** Volume moved to its own small wheel and Browse to a
+        // spring-return tri-state, which leaves the big wheel doing exactly one thing — seek. A
+        // one-entry mode row is noise, and "what does the wheel do right now" stops being a
+        // question the user has to hold.
         case .nowPlaying:
-            [
-                DialMode(id: "seek", label: "Seek", axis: .seek),
-                DialMode(id: "volume", label: "Volume", axis: .volume),
-                DialMode(id: "browse", label: "Browse", axis: .queue)
-            ]
+            []
         case .edit:
             [
                 DialMode(id: "trimStart", label: "Start handle", axis: .trimStart),
@@ -70,6 +70,7 @@ enum DialRoute: Equatable {
     var defaultAxis: DialAxis {
         switch self {
         case .recording: .gain
+        case .nowPlaying: .seek
         default: .highlight
         }
     }

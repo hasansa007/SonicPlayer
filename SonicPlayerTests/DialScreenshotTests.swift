@@ -82,10 +82,13 @@ struct DialScreenshotTests {
 
         // The screen owns the transport, so the chrome does not repeat it.
         #expect(screen.chrome.status == nil)
-        #expect(screen.actions.map(\.label) == ["Seek", "Volume", "Browse"])
-        #expect(screen.actions.filter { $0.emphasis == .selected }.map(\.id) == ["seek"])
+        // No mode row: volume and track-stepping have their own controls beside the wheel, so the
+        // only chip left is the way out.
+        #expect(screen.actions.map(\.id) == ["back"])
+        #expect(screen.ring.volume != nil, "the volume segment needs its level")
+        #expect(screen.ring.showsTrackStepper, "a queue of more than one gets the track segment")
         #expect(screen.ring.hub == .glyph("pause.fill"))
-        #expect(screen.hint == "rotate to seek · press to pause · ticks show position")
+        #expect(screen.hint == "rotate to seek · press to pause · slide to change track")
     }
 
     // MARK: - 1d Recording

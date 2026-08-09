@@ -136,14 +136,49 @@ struct DialScreenView: View {
         }
     }
 
+    /// The control cluster — **the only things on screen you touch to drive the app.**
+    ///
+    ///     ┌───────────────┐
+    ///     │  ◀   |   ▶    │   track, when the screen has a queue
+    ///     └───────────────┘
+    ///     ┌───┐  ╭─────────╮
+    ///     │ + │  │  seek   │   volume, when the screen has playback
+    ///     │ ─ │  ╰─────────╯
+    ///     └───┘
+    ///
+    /// The two segments are why the wheel has no modes. Each is present only where it means
+    /// something, so screens that are just a list still show one control and nothing else.
     private var dial: some View {
         VStack(spacing: Spacing.sm) {
-            DialRing(
-                ticks: screen.ring.ticks,
-                hub: screen.ring.hub,
-                defersPress: screen.ring.defersPress,
-                onCommand: onCommand
-            )
+            if screen.ring.showsTrackStepper {
+                DialTriState.track(
+                    onPrevious: { onCommand(.action("previous")) },
+                    onNext: { onCommand(.action("next")) }
+                )
+            }
+
+            HStack(alignment: .center, spacing: Spacing.md) {
+                if let volume = screen.ring.volume {
+                    DialTriState.volume(
+                        onDown: { onCommand(.volumeTick(-1)) },
+                        onUp: { onCommand(.volumeTick(1)) }
+                    )
+                    .accessibilityValue(Text("\(Int((volume * 100).rounded())) percent"))
+                } else {
+                    // Holds the wheel centred whether or not the segment is there, so it does not
+                    // slide sideways as you move between screens.
+                    Color.clear.frame(width: Sizing.dialSegmentBreadth, height: 1)
+                }
+
+                DialRing(
+                    ticks: screen.ring.ticks,
+                    hub: screen.ring.hub,
+                    defersPress: screen.ring.defersPress,
+                    onCommand: onCommand
+                )
+
+                Color.clear.frame(width: Sizing.dialSegmentBreadth, height: 1)
+            }
 
             Text(screen.hint)
                 .font(.caption2)
