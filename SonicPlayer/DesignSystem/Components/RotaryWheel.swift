@@ -39,6 +39,18 @@ struct RotaryWheel: View {
             hub
         }
         .frame(width: diameter, height: diameter)
+        // **The wheel does not scale with Dynamic Type, and this is what enforces it.**
+        //
+        // Pinning `Sizing.wheelDiameter` was not enough: the glyphs are drawn with
+        // `.sonicControlGlyph`, which *is* a Dynamic Type font, so at AX5 the transport arrows grew
+        // outside the ring and the hub's bars burst their circle. Capping the type size inside the
+        // wheel says the intended thing — this is a physical control, and a control that changes
+        // shape between accessibility settings is worse than one that stays put. Everything above
+        // the wheel scales normally.
+        //
+        // Accessibility is not lost by this: every target keeps its label, and the hub carries the
+        // adjustable action, so VoiceOver drives the whole wheel without needing it to be larger.
+        .dynamicTypeSize(...DynamicTypeSize.large)
         .environment(\.layoutDirection, .leftToRight)
         .gesture(turn)
     }
