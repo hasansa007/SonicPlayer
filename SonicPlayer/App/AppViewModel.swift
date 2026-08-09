@@ -155,6 +155,8 @@ final class AppViewModel {
             return
         }
         player.restoreSession()
+        // The restore is asynchronous, so the dial is fed and asked *after* it lands rather than
+        // here, where `player.currentTrack` is still nil.
     }
 
     /// A file handed over by another app. The player owns this rather than the coordinator,
@@ -190,6 +192,15 @@ final class AppViewModel {
     /// the user cannot see must not surface as an error they cannot act on.
     func scenePhaseChanged(_ phase: ScenePhase) {
         player.scenePhaseChanged(phase)
+
+        // Returning to the app with audio running: show what is playing. Guarded to the dial's root
+        // so a deliberate background from inside a list does not cost you your place — see
+        // `DialViewModel.showNowPlayingIfIdle`.
+        if phase == .active {
+            refreshDial()
+            dial.showNowPlayingIfIdle()
+        }
+
         guard phase == .background, !player.isImporting else { return }
         try? fileManager.drainStagingDirectory()
     }

@@ -209,7 +209,12 @@ private extension AppView {
             .onAppear { app.refreshDial() }
             .onChange(of: app.player.currentTime) { _, _ in app.refreshDial() }
             .onChange(of: app.player.isPlaying) { _, _ in app.refreshDial() }
-            .onChange(of: app.player.currentTrack) { _, _ in app.refreshDial() }
+            .onChange(of: app.player.currentTrack) { _, track in
+                app.refreshDial()
+                // Session restore is asynchronous, so a cold launch reaches the library first and
+                // the track lands a moment later. This is where that arrival is noticed.
+                if track != nil { app.dial.showNowPlayingIfIdle() }
+            }
             .onChange(of: app.home.recentFiles) { _, _ in app.refreshDial() }
             .onChange(of: app.recording.isRecording) { _, _ in app.refreshDial() }
             .onChange(of: app.recording.peakLevel) { _, _ in app.refreshDial() }
