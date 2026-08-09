@@ -143,8 +143,8 @@ wheel replaces.
 
 ### Tuning constants
 
-Settled against an interactive prototype (`.superpowers/brainstorm/…/trim-live.html`) and written
-into `RotaryTracker` as named constants:
+Settled against an interactive prototype — [`2026-08-09-rotary-trim-prototype.html`](./2026-08-09-rotary-trim-prototype.html),
+which runs this exact algorithm in a browser — and written into `RotaryTracker` as named constants:
 
 | Constant | Value | Note |
 |---|---|---|
