@@ -314,9 +314,17 @@ struct SettingsView: View {
 
     /// Read from the bundle rather than from stored state: what the app is actually speaking is
     /// what `Bundle.main` resolved at launch, which is the only thing that can be true here (#68).
+    ///
+    /// Named **in its own language** — "English", "العربية", "Русский" — because the receiver of
+    /// `localizedString(forLanguageCode:)` decides which language the name is rendered in, and the
+    /// row sits on a screen already drawn in `code`. Using `Locale.current` there was wrong (#70):
+    /// that is the *device's* locale, which differs from the app's whenever the device is set to
+    /// something outside the nine shipped — a German device falls back to English and the row read
+    /// "Englisch" on an otherwise English screen.
     private var currentLanguageName: String {
         let code = Bundle.main.preferredLocalizations.first ?? Locale.current.identifier
-        return Locale.current.localizedString(forLanguageCode: code)?.capitalized ?? code
+        let named = Locale(identifier: code)
+        return named.localizedString(forLanguageCode: code)?.capitalized ?? code
     }
 }
 

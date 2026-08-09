@@ -72,6 +72,7 @@
 		AC00000E000000000000001 /* CollectionPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC00001D000000000000001 /* CollectionPalette.swift */; };
 		AC00000F000000000000001 /* SonicRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC00001E000000000000001 /* SonicRow.swift */; };
 		AC000005000000000000001 /* ScrubGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000014000000000000001 /* ScrubGeometry.swift */; };
+		AC000042000000000000001 /* LegacyLanguageOverride.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000043000000000000001 /* LegacyLanguageOverride.swift */; };
 		AC000006000000000000001 /* Tokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000015000000000000001 /* Tokens.swift */; };
 		AC000007000000000000001 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000016000000000000001 /* Typography.swift */; };
 		AC000008000000000000001 /* IconControlButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000017000000000000001 /* IconControlButton.swift */; };
@@ -159,6 +160,7 @@
 		AC00001D000000000000001 /* CollectionPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionPalette.swift; sourceTree = "<group>"; };
 		AC00001E000000000000001 /* SonicRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonicRow.swift; sourceTree = "<group>"; };
 		AC000014000000000000001 /* ScrubGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrubGeometry.swift; sourceTree = "<group>"; };
+		AC000043000000000000001 /* LegacyLanguageOverride.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyLanguageOverride.swift; sourceTree = "<group>"; };
 		AC000015000000000000001 /* Tokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tokens.swift; sourceTree = "<group>"; };
 		AC000016000000000000001 /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
 		AC000017000000000000001 /* IconControlButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconControlButton.swift; sourceTree = "<group>"; };
@@ -383,6 +385,7 @@
 				A9000015000000000000001 /* SessionRestorePolicy.swift */,
 				AC000010000000000000001 /* SessionRestorePlan.swift */,
 				AC000014000000000000001 /* ScrubGeometry.swift */,
+				AC000043000000000000001 /* LegacyLanguageOverride.swift */,
 				AC00001C000000000000001 /* CollectionLabel.swift */,
 				AC00001D000000000000001 /* CollectionPalette.swift */,
 				A9000014000000000000001 /* SessionCodec.swift */,
@@ -573,6 +576,7 @@
 				AC00000E000000000000001 /* CollectionPalette.swift in Sources */,
 				AC00000F000000000000001 /* SonicRow.swift in Sources */,
 				AC000005000000000000001 /* ScrubGeometry.swift in Sources */,
+				AC000042000000000000001 /* LegacyLanguageOverride.swift in Sources */,
 				AC000006000000000000001 /* Tokens.swift in Sources */,
 				AC000007000000000000001 /* Typography.swift in Sources */,
 				AC000008000000000000001 /* IconControlButton.swift in Sources */,

@@ -1629,7 +1629,7 @@
         "hi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS सेटिंग्स में भाषा चुनें. इसे लागू करने के लिए ऐप पुनः आरंभ होगा."
+            "value" : "iOS सेटिंग्स में भाषा चुनें। इसे लागू करने के लिए ऐप पुनः आरंभ होगा।"
           }
         },
         "pt" : {
@@ -1647,7 +1647,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在 iOS 设置中选择语言。应用将重启以应用更改。"
+            "value" : "在 iOS 设置中选择语言。更改将在应用重启后生效。"
           }
         }
       }
@@ -3223,65 +3223,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重命名录音"
-          }
-        }
-      }
-    },
-    "Restart the app to apply language changes." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "أعد تشغيل التطبيق لتطبيق تغييرات اللغة."
-          }
-        },
-        "bn" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ভাষার পরিবর্তন প্রয়োগ করতে অ্যাপটি আবার চালু করুন।"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restart the app to apply language changes."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reinicia la app para aplicar los cambios de idioma."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Redémarrez l’app pour appliquer les changements de langue."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "भाषा परिवर्तन लागू करने के लिए ऐप फिर से खोलें।"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reinicie o app para aplicar as mudanças de idioma."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Перезапустите приложение, чтобы применить изменения языка."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重启应用以应用语言更改。"
           }
         }
       }
