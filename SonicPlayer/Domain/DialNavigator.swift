@@ -339,6 +339,14 @@ struct DialNavigator {
         case (_, "nowPlaying"):
             return hold()
 
+        // The stick's vertical axis. These had no handler at all — the nudge fired, the navigator
+        // shrugged, and nothing moved. A command with no case is silent, which is why the
+        // command/handler pair wants to be added in one breath.
+        case (.nowPlaying, "volumeUp"):
+            return setVolume(by: WheelRouter.volumePerDetent)
+        case (.nowPlaying, "volumeDown"):
+            return setVolume(by: -WheelRouter.volumePerDetent)
+
         case (.nowPlaying, "previous"):
             return stepQueue(by: -1)
         case (.nowPlaying, "next"):

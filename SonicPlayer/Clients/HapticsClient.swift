@@ -64,8 +64,20 @@ private final class HapticEngineBox: @unchecked Sendable {
 
     func fire(_ pulse: DetentFeedback.Pulse) {
         lock.lock()
-        let current = engine
+        var current = engine
         lock.unlock()
+
+        // **Start on demand, not only at init.** `stoppedHandler` nils the engine, and CoreHaptics
+        // stops for reasons that are entirely normal — the audio session going active for playback
+        // is one of them. Starting once at launch therefore meant the first track silenced every
+        // pulse for the rest of the session, and it failed the way this whole codebase keeps
+        // failing: silently, with no error anywhere.
+        if current == nil {
+            start()
+            lock.lock()
+            current = engine
+            lock.unlock()
+        }
         guard let current else { return }
 
         let event = CHHapticEvent(

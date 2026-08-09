@@ -48,9 +48,11 @@ struct DialRing: View {
     /// non-nil on a screen whose `defersPress` is true.
     @State private var pendingPress: Task<Void, Never>?
 
-    /// 36 ticks, one every 10°. A count, not a dimension — it never becomes a layout token because
-    /// nothing else in the app can share it.
-    private static let tickCount = 36
+    /// **One tick per detent**, taken from `RotaryTracker` rather than chosen here.
+    ///
+    /// They were 36 against 30 detents, which looked deliberate and meant every other click landed
+    /// between two marks — the ring was quietly disagreeing with the thing it was drawing.
+    private static var tickCount: Int { RotaryTracker.detentsPerRevolution }
 
     /// The level meter does not use the whole ring. It runs from 9 o'clock clockwise through the
     /// top, which puts the loud end where the thumb naturally rests and leaves the bottom of the

@@ -16,12 +16,17 @@ import Foundation
 /// Adding a flip would be the third instance of the bug #54 and #63 were both filed on.
 struct RotaryTracker {
 
-    /// 30 detents per revolution.
+    /// 18 detents per revolution.
     ///
     /// Tuned against the browser prototype committed beside the design spec, and **not yet
     /// re-tuned on a device** — a mouse is not a thumb, and there is no haptic in a browser, which
     /// is most of what a detent feels like.
-    static let detentDegrees: Double = 12
+    static let detentDegrees: Double = 20
+
+    /// How many detents a full turn holds. Derived rather than stated, because `DialRing` draws one
+    /// tick per detent and the two must not be able to disagree — 36 ticks over 30 detents looked
+    /// right and meant every other click landed between marks.
+    static var detentsPerRevolution: Int { Int(360 / detentDegrees) }
 
     /// Below this, `atan2` is numerically unstable: a one-point wobble near the centre is tens of
     /// degrees, and the wheel sprays detents while the thumb is effectively still.

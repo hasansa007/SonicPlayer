@@ -32,6 +32,9 @@ struct DialScreenView: View {
             // "rotate to browse ·…", which is the one line on the screen that teaches the wheel.
             VStack(spacing: Spacing.lg) {
                 stage
+                    .layoutPriority(0)
+
+                Spacer(minLength: 0)
 
                 DialActionRow(actions: screen.actions, onCommand: onCommand)
                     .layoutPriority(1)
@@ -95,7 +98,11 @@ struct DialScreenView: View {
             }
         }
         .padding(Spacing.lg)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // **Wide, but only as tall as it needs to be.** `maxHeight: .infinity` made the card fill
+        // whatever was left, so a three-row library was a third of a screen of nothing under three
+        // rows. The stack below still gives it every point the dial does not want, so a long list
+        // grows exactly as far as it can — it just no longer *claims* the space when empty.
+        .frame(maxWidth: .infinity)
         .background(Color.sonicSurface, in: RoundedRectangle(cornerRadius: Radius.stage))
         .overlay(
             RoundedRectangle(cornerRadius: Radius.stage).strokeBorder(Color.sonicBorder)
