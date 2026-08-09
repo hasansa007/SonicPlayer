@@ -52,6 +52,10 @@ final class AppViewModel {
     /// face on one playback engine, not a second engine (#6).
     let shell: ShellViewModel
 
+    /// The dial navigator (#6). Replaces `shell` as the presented player; `shell` stays only until
+    /// the landscape design lands, since it is still what compact height falls back to.
+    let dial: DialViewModel
+
     /// Non-`let` because completing onboarding discards it, which is what `store.onboarding != nil`
     /// expressed before #14.
     var onboarding: OnboardingViewModel?
@@ -99,6 +103,7 @@ final class AppViewModel {
         // Same reasoning as `home`: built from `player` rather than defaulted independently, so a
         // caller substituting the player gets a shell driving that substitute.
         self.shell = ShellViewModel(player: player, haptics: haptics)
+        self.dial = DialViewModel(haptics: haptics)
         wire()
     }
 
@@ -235,5 +240,24 @@ final class AppViewModel {
         // `onVolumeBy` is deliberately unwired. Volume belongs to `MPVolumeView`, which owns the
         // system slider and offers no setter worth having — an effect that silently does nothing
         // beats one that fights the hardware buttons.
+
+        // The dial's out-edges (#6). It navigates on its own; these are the moments it needs
+        // something that owns hardware.
+        dial.onPlay = { [player, home] itemID in
+            guard let file = home.recentFiles.first(where: { $0.url.absoluteString == itemID })
+            else { return }
+            player.loadTrack(file, queue: home.recentFiles, source: nil)
+        }
+        dial.onTogglePlayPause = { [player] in player.playPauseTapped() }
+        dial.onSeek = { [player] time in player.seek(to: time) }
+        dial.onSelectTrack = { [player] index in player.jumpToTrack(index) }
+        dial.onStartRecording = { [weak self] in self?.isRecordingSheetPresented = true }
+        dial.onStopRecording = { [weak self] in self?.dismissRecordingSheet() }
+    }
+
+    /// Re-feeds the dial from the app's current state. Called wherever the data it renders moves,
+    /// because the navigator holds a snapshot rather than reaching back into the view models.
+    func refreshDial() {
+        dial.refresh(recentFiles: home.recentFiles, player: player)
     }
 }

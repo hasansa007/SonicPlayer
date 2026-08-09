@@ -118,7 +118,11 @@ struct AppView: View {
         }
         // Global sheets
         .sheet(isPresented: $player.isExpanded) {
-            ShellView(shell: app.shell, player: player)
+            DialScreenView(screen: app.dial.screen) { app.dial.receive($0) }
+                .onAppear { app.refreshDial() }
+                .onChange(of: player.currentTime) { _, _ in app.refreshDial() }
+                .onChange(of: player.isPlaying) { _, _ in app.refreshDial() }
+                .onChange(of: player.currentTrack) { _, _ in app.refreshDial() }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
