@@ -156,7 +156,8 @@ struct DialPressTests {
     @Test func backWorksOnAScreenThatShowsNoBackChip() {
         var navigator = DialSample.navigator()
         _ = navigator.receive(.hold)
-        #expect(navigator.screen.actions.map(\.id) == ["back"])
+        #expect(navigator.screen.actions.isEmpty)
+        #expect(navigator.screen.chrome.canGoBack, "the way out is the top bar's chevron")
 
         _ = navigator.receive(.action("back"))
 

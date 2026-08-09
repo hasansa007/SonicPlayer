@@ -74,7 +74,7 @@ struct DialScreenView: View {
     private var stage: some View {
         VStack(spacing: Spacing.md) {
             if hasChrome {
-                DialChrome(chrome: screen.chrome)
+                DialChrome(chrome: screen.chrome, onCommand: onCommand)
                     .dynamicTypeSize(...Self.captionCeiling)
             }
 
@@ -106,7 +106,7 @@ struct DialScreenView: View {
     }
 
     private var hasChrome: Bool {
-        !screen.chrome.breadcrumb.isEmpty || screen.chrome.status != nil || screen.chrome.isRecording
+        !screen.chrome.breadcrumb.isEmpty || screen.chrome.status != nil || screen.chrome.isRecording || screen.chrome.canGoBack
     }
 
     @ViewBuilder

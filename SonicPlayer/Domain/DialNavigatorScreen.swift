@@ -26,7 +26,8 @@ extension DialNavigator {
         DialScreen.Chrome(
             breadcrumb: stack.compactMap { $0.route.crumb(in: content) },
             status: status,
-            isRecording: content.capture.map { !$0.isPaused } ?? false
+            isRecording: content.capture.map { !$0.isPaused } ?? false,
+            canGoBack: stack.count > 1
         )
     }
 
@@ -208,15 +209,15 @@ extension DialNavigator {
             guard !content.recordings.isEmpty else {
                 // Destructive rather than primary: starting a recording is the obvious action here
                 // and also the one you cannot casually undo, and those must not look alike.
-                return [back, .init(id: "record", label: "Record", emphasis: .destructive)]
+                return [.init(id: "record", label: "Record", emphasis: .destructive)]
             }
             // `Edit` is the visible partner for `.doublePress`; the contract requires one.
-            return [back, .init(id: "edit", label: "Edit"), .init(id: "more", label: "•••")]
+            return [.init(id: "edit", label: "Edit"), .init(id: "more", label: "•••")]
 
-        // No mode chips: the wheel only seeks here now. `back` alone, because a screen with no
-        // chips at all has no visible way out and the breadcrumb is not a button.
+        // Nothing at all: the wheel seeks, the segments do volume and track, and Back is in the
+        // top bar. A screen can legitimately have no chips.
         case .nowPlaying:
-            return [back]
+            return []
 
         case .recording:
             let paused = content.capture?.isPaused ?? false
@@ -229,11 +230,12 @@ extension DialNavigator {
             return modeChips + [.init(id: "preview", label: "Preview")]
 
         case .actions:
-            return [back]
+            return []
         }
     }
 
-    private var back: DialScreen.Action { .init(id: "back", label: "‹ Back") }
+    /// `back` is no longer a chip — it is the top bar's chevron — but the *command* is unchanged
+    /// and still accepted on every screen, so nothing that used to send it has broken.
 
     /// Exactly one `.selected`, always — the selected index is clamped into the mode list, so there
     /// is no state in which a screen with modes shows none chosen.

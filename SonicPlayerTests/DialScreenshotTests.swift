@@ -49,7 +49,9 @@ struct DialScreenshotTests {
         #expect(rows(navigator)?.rows.first?.trailing == "01:00")
         #expect(rows(navigator)?.rows.first?.subtitle == "Today 14:02 · 2 markers")
         #expect(rows(navigator)?.rows.dropFirst().first?.subtitle == nil)
-        #expect(screen.actions.map(\.id) == ["back", "edit", "more"])
+        // Back moved to the top bar — it is navigation, not one of the things this screen does.
+        #expect(screen.actions.map(\.id) == ["edit", "more"])
+        #expect(screen.chrome.canGoBack)
         #expect(screen.ring.hub == .label("OPEN"))
         #expect(screen.hint == "rotate to scroll · press to open · double-press to edit")
     }
@@ -84,7 +86,8 @@ struct DialScreenshotTests {
         #expect(screen.chrome.status == nil)
         // No mode row: volume and track-stepping have their own controls beside the wheel, so the
         // only chip left is the way out.
-        #expect(screen.actions.map(\.id) == ["back"])
+        #expect(screen.actions.isEmpty, "the wheel seeks, the segments do the rest, Back is chrome")
+        #expect(screen.chrome.canGoBack)
         #expect(screen.ring.volume != nil, "the volume segment needs its level")
         #expect(screen.ring.showsTrackStepper, "a queue of more than one gets the track segment")
         #expect(screen.ring.hub == .glyph("pause.fill"))
@@ -178,7 +181,8 @@ struct DialScreenshotTests {
         #expect(message.title == "No recordings yet")
 
         #expect(screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS"])
-        #expect(screen.actions.map(\.id) == ["back", "record"])
+        #expect(screen.actions.map(\.id) == ["record"])
+        #expect(screen.chrome.canGoBack)
         // Destructive, not primary. It is the obvious action on this screen *and* the one you
         // cannot casually undo, and the design draws it red for that reason — `.primary` renders
         // in the accent, which would make starting a recording look like opening a playlist.

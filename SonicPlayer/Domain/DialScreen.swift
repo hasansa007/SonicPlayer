@@ -37,6 +37,13 @@ struct DialScreen: Equatable {
         var status: String?
         /// Drives the pulsing dot. Separate from `status` because it animates.
         var isRecording: Bool = false
+
+        /// Whether there is a level to pop to.
+        ///
+        /// Back lives in the top bar rather than the action row because it is *navigation*, not one
+        /// of the things this screen does. Mixing "go up a level" in with "delete this file" made
+        /// them look like peers, and it cost the action row a slot on every screen below the root.
+        var canGoBack: Bool = false
     }
 
     // MARK: - Content

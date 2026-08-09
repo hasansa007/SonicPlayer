@@ -33,7 +33,10 @@ struct DialModeTests {
         let navigator = nowPlaying()
 
         #expect(navigator.route.modes.isEmpty)
-        #expect(navigator.screen.actions.map(\.id) == ["back"])
+        // No chips at all: the wheel seeks, the two segments carry volume and track, and Back is
+        // the top bar's chevron. A screen is allowed to have an empty action row.
+        #expect(navigator.screen.actions.isEmpty)
+        #expect(navigator.screen.chrome.canGoBack)
         #expect(navigator.axis == .seek)
     }
 

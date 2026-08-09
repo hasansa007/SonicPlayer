@@ -123,13 +123,13 @@ private final class AudioPlayerManager: NSObject, ObservableObject {
 
     @MainActor
     func prepare(url: URL) async throws {
-        // Setup audio session
-        let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.playback, mode: .spokenAudio)
-        // Activate off the main thread: setActive(_:) is a synchronous call
-        // that AVAudioSession warns can block the main thread.
+        // Configure and activate off the main thread: setCategory(_:mode:) and
+        // setActive(_:) are synchronous calls that AVAudioSession warns can block
+        // the main thread while the session is active.
         try await Task.detached {
-            try AVAudioSession.sharedInstance().setActive(true)
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setCategory(.playback, mode: .spokenAudio)
+            try audioSession.setActive(true)
         }.value
 
         // Create player

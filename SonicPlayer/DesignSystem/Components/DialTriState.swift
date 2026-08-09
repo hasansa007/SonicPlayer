@@ -106,6 +106,7 @@ struct DialTriState: View {
     private func end(_ systemImage: String, _ label: Text, _ action: @escaping () -> Void) -> some View {
         Button {
             guard isEnabled else { return }
+            throwKnob(toward: systemImage == increaseImage ? 1 : -1)
             action()
         } label: {
             Image(systemName: systemImage)
@@ -139,6 +140,26 @@ struct DialTriState: View {
         let increasing = isHorizontal ? settled > 0 : settled < 0
         increasing ? onIncrease() : onDecrease()
     }
+
+    /// Sends the knob to one end and lets it spring back, so a **tap** looks like the drag it
+    /// stands in for.
+    ///
+    /// Without this the two ways of using the control looked like two different controls: a drag
+    /// moved the knob and a tap fired silently, which reads as a dead button next to a live one.
+    /// The gesture is the explanation here — the knob travelling *is* what tells you what happened.
+    private func throwKnob(toward direction: Int) {
+        // `direction` is in value terms; the vertical axis draws increase upward, which is negative.
+        let sign: CGFloat = isHorizontal ? CGFloat(direction) : CGFloat(-direction)
+        withAnimation(Motion.press) { offset = sign * Sizing.dialSegmentTravel }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(Self.throwHold))
+            withAnimation(Motion.settle) { offset = 0 }
+        }
+    }
+
+    /// How long the knob sits at the end before springing back. Long enough to be seen as travel
+    /// rather than a flicker, short enough that repeated taps still feel immediate.
+    private static let throwHold: TimeInterval = 0.12
 }
 
 extension DialTriState {

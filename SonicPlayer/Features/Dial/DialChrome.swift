@@ -8,6 +8,8 @@ import SwiftUI
 struct DialChrome: View {
 
     let chrome: DialScreen.Chrome
+    /// Back is navigation, so it lives up here with the breadcrumb it pops.
+    var onCommand: (DialCommand) -> Void = { _ in }
 
     @State private var isPulsing = false
 
@@ -15,6 +17,22 @@ struct DialChrome: View {
 
     var body: some View {
         HStack(spacing: Spacing.sm) {
+            if chrome.canGoBack {
+                Button {
+                    onCommand(.action("back"))
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.sonicPrimary)
+                        // A hit area the size of a real target, drawn as a small chevron. The glyph
+                        // is chrome; the thing you press is not allowed to be chrome-sized.
+                        .frame(width: Sizing.tapTarget, height: Sizing.compactControl, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel(Text("Back"))
+            }
+
             if hasBreadcrumb {
                 Text(chrome.breadcrumb.joined(separator: " ▸ "))
                     .font(.caption2)
