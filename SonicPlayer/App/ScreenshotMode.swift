@@ -30,6 +30,13 @@ enum ScreenshotMode {
         case recording
         case editRecording = "editRecording"
         case homeWithMiniPlayer = "homeWithMiniPlayer"
+
+        // The player's three non-happy states (#6). They exist here because epic #6 requires every
+        // screen to have designed empty, loading and error states — and a state nobody can put on
+        // screen is a state nobody checks. These are the only way to see them without editing code.
+        case playerEmpty = "playerEmpty"
+        case playerLoading = "playerLoading"
+        case playerError = "playerError"
     }
 }
 
@@ -231,6 +238,25 @@ extension ScreenshotDemoData {
             player.currentTime = 1234
             player.queue = Array(recentFiles.prefix(5))
             player.currentIndex = 0
+
+        // The three states, each pinned to the exact condition the view branches on.
+
+        case .playerEmpty:
+            player.isExpanded = true
+
+        case .playerLoading:
+            // "Loading" is not "no track": `loadTrack` sets both in the same breath, and the view
+            // gates on a zero duration so the state stays off screen during a track *switch*.
+            player.currentTrack = recentFiles[0]
+            player.isExpanded = true
+            player.isLoadingTrack = true
+            player.duration = 0
+
+        case .playerError:
+            player.isExpanded = true
+            player.openError = String(
+                localized: "The file could not be read. It may have been moved or deleted."
+            )
 
         case .home, .collections, .recording, .editRecording:
             break
