@@ -28,6 +28,10 @@ struct RotaryWheel: View {
 
     private var diameter: CGFloat { Sizing.wheelDiameter }
 
+    /// How much of the ring the lit arc covers, as a fraction of the whole circle. Read twice — the
+    /// trim itself, and the rotation that centres it under the thumb — so it is named once.
+    private static let arcFraction: CGFloat = 0.08
+
     var body: some View {
         ZStack {
             ring
@@ -43,17 +47,23 @@ struct RotaryWheel: View {
 
     private var ring: some View {
         ZStack {
+            // 0.35, not the 0.2 the dark mockups used. `sonicBackground` is near-white in light
+            // mode, where a fifth-opacity teal hairline is effectively invisible — the ring read
+            // as absent on the first device build.
             Circle()
-                .strokeBorder(Color.sonicPrimary.opacity(0.2), lineWidth: Sizing.hairlineTrackHeight)
+                .strokeBorder(Color.sonicPrimary.opacity(0.35), lineWidth: Sizing.hairlineTrackHeight)
 
             if let thumbAngle {
                 Circle()
-                    .trim(from: 0, to: 0.08)
-                    .stroke(Color.sonicPrimary, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .trim(from: 0, to: Self.arcFraction)
+                    .stroke(
+                        Color.sonicPrimary,
+                        style: StrokeStyle(lineWidth: Sizing.wheelArcWidth, lineCap: .round)
+                    )
                     // `trim` starts at 12 o'clock and `atan2` reports 0° at 3 o'clock, so the arc
-                    // is rotated back a quarter turn, then back again by half its own length so it
-                    // sits centred under the thumb rather than trailing it.
-                    .rotationEffect(.degrees(thumbAngle - 90 - 0.08 * 180))
+                    // is rotated back a quarter turn — then back again by half its own length, so
+                    // it sits centred under the thumb rather than trailing it.
+                    .rotationEffect(.degrees(thumbAngle - 90 - Self.arcFraction * 180))
                     .animation(Motion.detent, value: thumbAngle)
             }
         }

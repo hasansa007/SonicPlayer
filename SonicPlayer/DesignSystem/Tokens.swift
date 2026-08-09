@@ -114,6 +114,9 @@ enum Sizing {
     /// 200 — the band at the bottom of the canvas the wheel owns. Nothing is drawn over it, except
     /// while capturing audio, which is the one stated exception in the design.
     static let wheelZone: CGFloat = 200
+    /// 3 — the lit arc that tracks the thumb. Thicker than the ring it sits on, so it reads as a
+    /// highlight rather than as a thicker section of the same line.
+    static let wheelArcWidth: CGFloat = 3
 }
 
 /// A shadow, as one value rather than four loose arguments at the call site.

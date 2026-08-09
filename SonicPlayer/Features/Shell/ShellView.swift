@@ -45,7 +45,12 @@ struct ShellView: View {
             )
             .ignoresSafeArea()
 
+            // Centred in the space above the wheel, not pinned to the top. Top-aligning left a
+            // hand's width of dead air between the time labels and the ring on a real device —
+            // the mockups this was drawn from were 474pt tall and the phone is 874pt, so the gap
+            // only existed at full size. Found by looking at it, which is what Task 12 is for.
             VStack(spacing: 0) {
+                Spacer(minLength: 0)
                 stage
                 Spacer(minLength: 0)
             }

@@ -6,9 +6,6 @@
 	objectVersion = 70;
 	objects = {
 
-/* Begin PBXBuildFile section */
-/* End PBXBuildFile section */
-
 /* Begin PBXContainerItemProxy section */
 		9FD073A530248C9F0007DEBD /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -25,11 +22,10 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		AC000202000000000000001 /* Exceptions for "SonicPlayer" folder in "SonicPlayer" target */ = {
+		AC000202000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				SonicPlayer.entitlements,
 			);
 			target = A1000052000000000000001 /* SonicPlayer */;
 		};
@@ -37,7 +33,7 @@
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		9FD073A230248C9F0007DEBD /* SonicPlayerTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = SonicPlayerTests; sourceTree = "<group>"; };
-		AC000200000000000000001 /* SonicPlayer */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AC000202000000000000001 /* Exceptions for "SonicPlayer" folder in "SonicPlayer" target */, ); explicitFileTypes = {}; explicitFolders = (); path = SonicPlayer; sourceTree = "<group>"; };
+		AC000200000000000000001 /* SonicPlayer */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AC000202000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = SonicPlayer; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
