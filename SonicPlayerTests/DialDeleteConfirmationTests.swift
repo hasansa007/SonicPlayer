@@ -59,7 +59,8 @@ struct DialDeleteConfirmationTests {
 
         // Home is Library then Record, and the highlight opens on row 0 — so Library is already
         // under it and a tick here would land on Record instead.
-        app.dial.receive(.press)            // into the recordings list
+        app.dial.receive(.press)            // into the library, highlight on Import
+        app.dial.receive(.tick(1))          // onto the file
         app.dial.receive(.action("more"))   // the actions menu
         app.dial.receive(.tick(4))          // Rename, Edit, Share, Add to playlist, Delete
         app.dial.receive(.press)

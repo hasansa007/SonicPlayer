@@ -18,9 +18,9 @@ struct DialPausesPlaybackTests {
     @Test func startingARecordingPausesPlayback() {
         var navigator = DialSample.navigator(recordingCount: 0)
         _ = navigator.receive(.tick(1))
-        _ = navigator.receive(.press)           // the empty list
+        _ = navigator.receive(.press)           // the empty library
 
-        let effects = navigator.receive(.press) // whose hub records
+        let effects = navigator.receive(.action("record"))
 
         #expect(effects.contains(.pausePlayback))
         #expect(
@@ -66,7 +66,7 @@ struct DialPausesPlaybackTests {
         _ = navigator.receive(.tick(1))
         _ = navigator.receive(.press)
 
-        let effects = navigator.receive(.press)
+        let effects = navigator.receive(.action("record"))
 
         #expect(!effects.contains(.pausePlayback))
         #expect(effects == [.startRecording, .feedback(.commit)])

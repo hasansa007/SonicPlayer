@@ -84,11 +84,17 @@ enum DialSample {
         )
     }
 
-    /// Drills library → recordings, which is the starting point of most of the deeper tests.
+    /// Drills home → library, **landing on the first file rather than on Import.**
+    ///
+    /// Import is row 0 of that list, so the highlight arrives on it. Almost every test built on this
+    /// helper means "I am on a file" — `press` plays, `doublePress` edits, the stick offers its menu
+    /// — so the tick belongs here rather than being repeated, and forgotten, in twenty places.
+    /// `DialImportRowTests` is where the Import row itself is exercised.
     static func inRecordings(recordingCount: Int = 12) -> DialNavigator {
         var navigator = navigator(recordingCount: recordingCount)
         _ = navigator.receive(.tick(1))     // Playlists → Recordings
         _ = navigator.receive(.press)
+        _ = navigator.receive(.tick(1))     // Import → the first file
         return navigator
     }
 
@@ -96,8 +102,10 @@ enum DialSample {
     static func whileRecording() -> DialNavigator {
         var navigator = navigator(recordingCount: 0, capture: capture)
         _ = navigator.receive(.tick(1))
-        _ = navigator.receive(.press)       // opens the empty list
-        _ = navigator.receive(.press)       // which starts a recording
+        _ = navigator.receive(.press)             // opens the list, highlight on Import
+        // **The chip, not a second press.** An empty library is the Import row alone, so its hub
+        // imports. `Record` is on screen for exactly this reason.
+        _ = navigator.receive(.action("record"))
         return navigator
     }
 
@@ -119,13 +127,13 @@ struct DialNavigationTests {
     @Test func theRootIsTheLibrary() {
         let navigator = DialSample.navigator()
 
-        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY"])
+        #expect(navigator.screen.chrome.breadcrumb == ["HOME"])
     }
 
     @Test func drillingInPushesACrumb() {
         let navigator = DialSample.inRecordings()
 
-        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS"])
+        #expect(navigator.screen.chrome.breadcrumb == ["HOME", "LIBRARY"])
     }
 
     /// The point of deriving it: three levels deep, nothing had to store its own header.
@@ -134,7 +142,7 @@ struct DialNavigationTests {
 
         _ = navigator.receive(.action("more"))
 
-        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS", "RECORDING 1"])
+        #expect(navigator.screen.chrome.breadcrumb == ["HOME", "LIBRARY", "RECORDING 1"])
     }
 
     @Test func backPopsALevel() {
@@ -142,7 +150,7 @@ struct DialNavigationTests {
 
         let effects = navigator.receive(.action("back"))
 
-        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY"])
+        #expect(navigator.screen.chrome.breadcrumb == ["HOME"])
         #expect(effects.contains(.feedback(.commit)))
     }
 
@@ -152,7 +160,7 @@ struct DialNavigationTests {
 
         let effects = navigator.receive(.action("back"))
 
-        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY"])
+        #expect(navigator.screen.chrome.breadcrumb == ["HOME"])
         #expect(effects == [.feedback(.limit)])
     }
 
@@ -160,7 +168,7 @@ struct DialNavigationTests {
     @Test func poppingRestoresTheHighlightYouLeft() {
         var navigator = DialSample.inRecordings()
         _ = navigator.receive(.tick(4))
-        _ = navigator.receive(.press)          // opens row 4 → now playing
+        _ = navigator.receive(.press)          // opens row 5 → now playing
 
         _ = navigator.receive(.action("back"))
 
@@ -168,7 +176,7 @@ struct DialNavigationTests {
             Issue.record("expected the recordings list back")
             return
         }
-        #expect(list.highlighted == 4)
+        #expect(list.highlighted == 5, "opened from row 5 — the helper starts on 1, past Import")
     }
 
     @Test func aSectionWithNowhereToGoIsALimit() {
@@ -178,7 +186,7 @@ struct DialNavigationTests {
         let effects = navigator.receive(.press)
 
         #expect(effects == [.feedback(.limit)])
-        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY"])
+        #expect(navigator.screen.chrome.breadcrumb == ["HOME"])
     }
 
     // MARK: - Hold
@@ -188,7 +196,7 @@ struct DialNavigationTests {
 
         _ = navigator.receive(.hold)
 
-        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS", "NOW PLAYING"])
+        #expect(navigator.screen.chrome.breadcrumb == ["HOME", "LIBRARY", "NOW PLAYING"])
     }
 
     @Test func holdingWithNothingPlayingIsALimit() {
@@ -206,7 +214,7 @@ struct DialNavigationTests {
 
         _ = navigator.receive(.hold)
 
-        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY", "NOW PLAYING"])
+        #expect(navigator.screen.chrome.breadcrumb == ["HOME", "NOW PLAYING"])
     }
 
     // MARK: - Touch and wheel are equals
@@ -222,7 +230,7 @@ struct DialNavigationTests {
 
         #expect(chipEffects == wheelEffects)
         #expect(byChip.screen == byWheel.screen)
-        #expect(byChip.screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS", "EDIT"])
+        #expect(byChip.screen.chrome.breadcrumb == ["HOME", "LIBRARY", "EDIT"])
     }
 
     /// **The invariant that keeps `.doublePress` reachable at all.**

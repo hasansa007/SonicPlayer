@@ -26,7 +26,7 @@ struct DialScreenshotTests {
         let navigator = DialSample.navigator()
         let screen = navigator.screen
 
-        #expect(screen.chrome.breadcrumb == ["LIBRARY"])
+        #expect(screen.chrome.breadcrumb == ["HOME"])
         // The gear and the label share the corner. The label was briefly a row here instead, which
         // could name the track — and could not follow you down into the library, which is the job.
         #expect(screen.chrome.status == "20:34 ▸ playing")
@@ -48,13 +48,14 @@ struct DialScreenshotTests {
         let navigator = DialSample.inRecordings()
         let screen = navigator.screen
 
-        #expect(screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS"])
+        #expect(screen.chrome.breadcrumb == ["HOME", "LIBRARY"])
         // No counter here any more — the ring's lit tick already says where you are, and the line
         // cost a row's height at the bottom of the card to repeat it.
         #expect(rows(navigator)?.position == nil)
-        #expect(rows(navigator)?.rows.first?.trailing == "01:00")
-        #expect(rows(navigator)?.rows.first?.subtitle == "Today 14:02 · 2 markers")
-        #expect(rows(navigator)?.rows.dropFirst().first?.subtitle == nil)
+        #expect(rows(navigator)?.rows.first?.id == "import")
+        #expect(rows(navigator)?.rows.dropFirst().first?.trailing == "01:00")
+        #expect(rows(navigator)?.rows.dropFirst().first?.subtitle == "Today 14:02 · 2 markers")
+        #expect(rows(navigator)?.rows.dropFirst(2).first?.subtitle == nil)
         // Back moved to the top bar. Edit came off the stick's right nudge and into the actions
         // menu as its top row, leaving one nudge — upward, because a lone sideways one on a
         // four-way stick reads as though the others are broken.
@@ -158,7 +159,7 @@ struct DialScreenshotTests {
         #expect(edit.outFraction == 1)
         #expect(edit.scale == ["00:00", "00:00", "10:00", "10:00"])
 
-        #expect(screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS", "EDIT"])
+        #expect(screen.chrome.breadcrumb == ["HOME", "LIBRARY", "EDIT"])
         #expect(screen.actions.map(\.label) == ["Start handle", "End handle", "Preview"])
         #expect(screen.ring.hub == .label("DONE"))
         #expect(screen.hint == "rotate to nudge the active handle · press when done")
@@ -177,7 +178,7 @@ struct DialScreenshotTests {
             "Rename", "Edit", "Share file…", "Add to playlist", "Delete"
         ])
         #expect(rows(navigator)?.position == "1 of 5")
-        #expect(screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS", "RECORDING 1"])
+        #expect(screen.chrome.breadcrumb == ["HOME", "LIBRARY", "RECORDING 1"])
         #expect(screen.ring.hub == .label("SELECT"))
         #expect(screen.hint == "rotate to highlight an action · press to confirm")
 
@@ -199,22 +200,26 @@ struct DialScreenshotTests {
         _ = navigator.receive(.press)
         let screen = navigator.screen
 
-        guard case .message(let message) = screen.content else {
-            Issue.record("expected the empty state, got \(screen.content)")
+        // **An empty library is the Import row alone, not a message.** A row cannot live inside a
+        // message screen, and Import has to be reachable when there is nothing else — which is the
+        // state it matters most in.
+        guard case .list(let list) = screen.content else {
+            Issue.record("expected the one-row list, got \(screen.content)")
             return
         }
-        #expect(message.icon == .recording)
-        #expect(message.title == "No recordings yet")
+        #expect(list.rows.map(\.id) == ["import"])
+        #expect(list.rows.first?.subtitle == "Nothing here yet · bring audio in")
 
-        #expect(screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS"])
+        #expect(screen.chrome.breadcrumb == ["HOME", "LIBRARY"])
+        // `Record` stays, and is the only way to start one from here — the hub belongs to Import.
         #expect(screen.actions.map(\.id) == ["record"])
         #expect(screen.chrome.canGoBack)
         // Destructive, not primary. It is the obvious action on this screen *and* the one you
         // cannot casually undo, and the design draws it red for that reason — `.primary` renders
         // in the accent, which would make starting a recording look like opening a playlist.
         #expect(screen.actions.last?.emphasis == .destructive)
-        #expect(screen.ring.hub == .label("RECORD"))
-        #expect(screen.hint == "press to start recording · nothing to scroll yet")
+        #expect(screen.ring.hub == .label("IMPORT"))
+        #expect(screen.hint == "press to import · nothing else here yet")
     }
 
     // MARK: - 1h Listen vs record
@@ -238,7 +243,7 @@ struct DialScreenshotTests {
 
         _ = navigator.receive(.press)
 
-        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY"])
+        #expect(navigator.screen.chrome.breadcrumb == ["HOME"])
     }
 
     // MARK: - Data that changes under a screen
@@ -251,20 +256,23 @@ struct DialScreenshotTests {
 
         navigator.update(DialSample.content(recordingCount: 3))
 
-        #expect(rows(navigator)?.highlighted == 2)
+        #expect(rows(navigator)?.highlighted == 3, "Import plus three files is four rows")
         #expect(rows(navigator)?.position == nil)
     }
 
-    @Test func aListThatEmptiesFallsBackToTheEmptyState() {
+    /// A library that empties is a one-row list, and the clamp must pull the highlight onto it.
+    @Test func aListThatEmptiesLeavesOnlyTheImportRow() {
         var navigator = DialSample.inRecordings()
         _ = navigator.receive(.tick(5))
 
         navigator.update(DialSample.content(recordingCount: 0))
 
-        guard case .message = navigator.screen.content else {
-            Issue.record("expected the empty state, got \(navigator.screen.content)")
+        guard case .list(let list) = navigator.screen.content else {
+            Issue.record("expected the one-row list, got \(navigator.screen.content)")
             return
         }
-        #expect(navigator.screen.ring.hub == .label("RECORD"))
+        #expect(list.rows.map(\.id) == ["import"])
+        #expect(list.highlighted == 0)
+        #expect(navigator.screen.ring.hub == .label("IMPORT"))
     }
 }

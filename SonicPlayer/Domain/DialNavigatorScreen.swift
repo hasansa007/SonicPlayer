@@ -64,14 +64,10 @@ extension DialNavigator {
         case .library:
             return .list(list(rows: libraryRows))
 
+        // **Always a list.** Import is row 0 and is always there, so there is never nothing to draw
+        // — and the empty-state message could not have held a row anyway. What the message said
+        // lives on that row's second line when the library is bare.
         case .recordings:
-            guard !content.recordings.isEmpty else {
-                return .message(.init(
-                    icon: .recording,
-                    title: "No recordings yet",
-                    body: "Press the hub to record the first one."
-                ))
-            }
             return .list(list(rows: recordingRows))
 
         case .nowPlaying:
@@ -189,15 +185,29 @@ extension DialNavigator {
         }
     }
 
-    /// The recordings, and nothing else.
+    /// Import, then every audio file the app can see.
     ///
-    /// **Import was briefly row 0 here and is gone from the dial entirely.** It is a file operation,
-    /// not a place, and iOS already offers two ways in that need no screen of ours — the Files share
-    /// sheet and the Open-in handler. Putting it in the list cost an index offset on every read of
-    /// the highlight; putting it in the chip row made a menu of one. Neither was worth a command the
-    /// system already provides.
+    /// **Import belongs to a library, which is what this screen turned out to be.** It was tried as
+    /// a card on home, a chip here, a row here, and then removed altogether — the removal on the
+    /// reasoning that iOS already provides the share sheet and Open-in. What that missed is that a
+    /// library is the place you *add to*: reaching it from a card marked `Library` and finding no
+    /// way to put anything in is the gap that sent it back.
+    ///
+    /// `RecordingsRow` owns the offset this creates, and everything that reads the highlight goes
+    /// through it. This is only the drawing half of the same fact.
     private var recordingRows: [DialScreen.List.Row] {
-        content.recordings.map {
+        let importRow = DialScreen.List.Row(
+            id: "import",
+            icon: .importFile,
+            title: "Import",
+            // The empty state's sentence, folded into the row that answers it — with nothing else
+            // in the library this is the only row, so it has to say why the screen is bare.
+            subtitle: content.recordings.isEmpty
+                ? "Nothing here yet · bring audio in"
+                : "Bring audio in from Files"
+        )
+
+        return [importRow] + content.recordings.map {
             .init(
                 id: $0.id,
                 icon: .recording,
@@ -229,8 +239,9 @@ extension DialNavigator {
 
         case .recordings:
             guard !content.recordings.isEmpty else {
-                // Destructive rather than primary: starting a recording is the obvious action here
-                // and also the one you cannot casually undo, and those must not look alike.
+                // Destructive rather than primary: starting a recording is the obvious action on an
+                // empty library and also the one you cannot casually undo, and those must not look
+                // alike. It is a chip because the hub belongs to the Import row.
                 return [.init(id: "record", label: "Record", emphasis: .destructive)]
             }
             // `Edit` is the visible partner for `.doublePress`; the contract requires one.
@@ -287,7 +298,16 @@ extension DialNavigator {
     /// Everywhere else a press is instant, because there is no second meaning to wait for.
     private var defersPress: Bool {
         guard case .recordings = route else { return false }
-        return content.recordings.indices.contains(level.highlighted)
+        // Not on Import: there is no second meaning there, so waiting to find out whether a second
+        // press is coming would delay the one press that has nothing to wait for.
+        guard case .recording(let index)? = highlightedLibraryRow else { return false }
+        return content.recordings.indices.contains(index)
+    }
+
+    /// What the highlight is pointing at on the library list, or `nil` anywhere else.
+    private var highlightedLibraryRow: RecordingsRow? {
+        guard case .recordings = route else { return nil }
+        return RecordingsRow.at(level.highlighted, recordings: content.recordings.count)
     }
 
     /// What the gear stick does here.
@@ -320,8 +340,10 @@ extension DialNavigator {
         // **One nudge, upward.** Edit had the right nudge and now lives inside this menu as its top
         // row, which leaves a single direction — and a lone sideways nudge on a stick that can go
         // four ways reads as though the other three are broken. Up is where a menu comes from.
+        // Absent on Import: the menu acts on *the highlighted recording*, and offering `Delete`
+        // while the highlight is on Import is offering to delete nothing.
         case .recordings:
-            guard !content.recordings.isEmpty else { return nil }
+            guard case .recording? = highlightedLibraryRow else { return nil }
             return DialScreen.Directions(
                 up: .init(id: "more", icon: .more, label: "More actions")
             )
@@ -364,7 +386,9 @@ extension DialNavigator {
         switch route {
         case .chooseMode: .label("CHOOSE")
         case .library: .label("OPEN")
-        case .recordings: content.recordings.isEmpty ? .label("RECORD") : .label("OPEN")
+        // The hub says what *this row* does, which is the whole point of one button meaning
+        // something different everywhere. On Import it cannot say OPEN.
+        case .recordings: highlightedLibraryRow == .importFiles ? .label("IMPORT") : .label("OPEN")
         case .nowPlaying: .glyph(content.playback?.isPlaying == false ? "play.fill" : "pause.fill")
         case .recording: .recordDot
         case .edit: .label("DONE")
@@ -386,9 +410,12 @@ extension DialNavigator {
             return "rotate to browse · press to open · hold for now playing"
 
         case .recordings:
-            return content.recordings.isEmpty
-                ? "press to start recording · nothing to scroll yet"
-                : "rotate to scroll · press to open · double-press to edit"
+            if highlightedLibraryRow == .importFiles {
+                return content.recordings.isEmpty
+                    ? "press to import · nothing else here yet"
+                    : "press to import · rotate for your files"
+            }
+            return "rotate to scroll · press to open · double-press to edit"
 
         case .nowPlaying:
             // One sentence, because the wheel does one thing. The segments beside and above it

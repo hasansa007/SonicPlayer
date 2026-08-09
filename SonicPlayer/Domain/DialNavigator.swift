@@ -9,10 +9,11 @@ import Foundation
 ///
 /// **Three rules run through all of it.**
 ///
-/// 1. **Clamp, never wrap.** The ring is continuous and the list is not. Wrapping would mean a
-///    thumb that overshoots the top of the actions list lands on `Delete`, and a fast spin — five,
-///    fifteen or forty rows after `RotaryTracker`'s acceleration — would wrap several times with no
-///    way to tell. Clamping also gives the ends something to *be*, which is rule 2.
+/// 1. **Wrap, because the ring is continuous and pretending otherwise cost more than it saved.**
+///    This read "clamp, never wrap" until `Delete` got a confirmation dialog — the whole argument
+///    for a wall was that a thumb overshooting the top of the actions list would land on the
+///    destructive row. Guarded, that objection goes. A fast spin still cannot wrap several times
+///    unnoticed: `detents` is reduced modulo the row count before it is applied.
 /// 2. **A tick that changes nothing is a `.limit`; a tick that changes anything is a `.detent`.**
 ///    One law, applied to the highlight, the seek position, the volume, the gain and both trim
 ///    handles. Travel that is merely truncated by a bound still moved, so it still clicks; only the
@@ -268,8 +269,17 @@ struct DialNavigator {
             return open(destination)
 
         case .recordings:
-            guard let item = content.recordings[safe: level.highlighted] else { return startRecording() }
-            return playItem(item, at: level.highlighted)
+            switch RecordingsRow.at(level.highlighted, recordings: content.recordings.count) {
+            case .importFiles:
+                // Stays put. The picker belongs to the host and the files land in this very list,
+                // so navigating away would be a round trip back to where you already are.
+                return [.importFiles, .feedback(.commit)]
+            case .recording(let index):
+                guard let item = content.recordings[safe: index] else { return [.feedback(.limit)] }
+                return playItem(item, at: index)
+            case nil:
+                return [.feedback(.limit)]
+            }
 
         case .nowPlaying:
             content.playback?.isPlaying.toggle()
@@ -306,7 +316,9 @@ struct DialNavigator {
     /// exists and would not move, and a double-press on the library is not pushing against
     /// anything at all. Buzzing there would teach the gesture is available everywhere.
     private mutating func doublePress() -> [DialEffect] {
-        guard case .recordings = route, content.recordings[safe: level.highlighted] != nil else {
+        guard case .recordings = route,
+              case .recording(let index)? = RecordingsRow.at(level.highlighted, recordings: content.recordings.count),
+              content.recordings.indices.contains(index) else {
             return []
         }
         return openEditor()
@@ -349,7 +361,8 @@ struct DialNavigator {
         case (.recordings, "edit"):
             return doublePress()
         case (.recordings, "more"):
-            guard let item = content.recordings[safe: level.highlighted] else { return [.feedback(.limit)] }
+            guard case .recording(let index)? = RecordingsRow.at(level.highlighted, recordings: content.recordings.count),
+                  let item = content.recordings[safe: index] else { return [.feedback(.limit)] }
             return open(.actions(itemID: item.id))
         case (.recordings, "record"):
             return startRecording()
@@ -404,7 +417,8 @@ struct DialNavigator {
     }
 
     private mutating func openEditor() -> [DialEffect] {
-        guard let item = content.recordings[safe: level.highlighted] else { return [.feedback(.limit)] }
+        guard case .recording(let index)? = RecordingsRow.at(level.highlighted, recordings: content.recordings.count),
+              let item = content.recordings[safe: index] else { return [.feedback(.limit)] }
         return openEditor(itemID: item.id)
     }
 
@@ -467,7 +481,7 @@ struct DialNavigator {
         switch route {
         case .chooseMode: 2
         case .library: content.sections.count
-        case .recordings: content.recordings.count
+        case .recordings: RecordingsRow.rowCount(recordings: content.recordings.count)
         case .actions: DialItemAction.allCases.count
         case .nowPlaying, .recording, .edit: 0
         }

@@ -23,6 +23,7 @@ final class DialViewModel {
     var onPausePlayback: (() -> Void)?
     /// `0...1`, already clamped by the navigator.
     var onSetVolume: ((Double) -> Void)?
+    var onImportFiles: (() -> Void)?
     /// Raised only after the user has confirmed. The composition root does the deleting, because a
     /// file leaving disk concerns the player, the markers and the waveform cache as well.
     var onDeleteItem: ((String) -> Void)?
@@ -120,13 +121,11 @@ final class DialViewModel {
     ) {
         var content = DialContent()
 
-        // **Home is two cards, and Import is not one of them — nor is it anywhere else in the dial.**
+        // **Home is two cards, and Import is not one of them — it lives in the library it adds to.**
         //
-        // It was a card here, then a chip on the library, then a row in it. Each move cost
-        // something: as a card it outranked the two things this screen exists to offer, as a chip it
-        // made a menu of one, and as a row it put an index offset on every read of the highlight.
-        // iOS already provides two ways in that need no screen of ours — the Files share sheet and
-        // the Open-in handler — so the dial stopped competing with them.
+        // It was a card here first, where it outranked the two things this screen exists to offer.
+        // The library is where it belongs: that screen is the place you *add to*, and arriving there
+        // from a card marked `Library` with no way to put anything in is the gap that settled it.
         content.sections = [
             DialContent.Section(
                 id: "recordings",
@@ -292,6 +291,8 @@ final class DialViewModel {
             onSeek?(time)
         case .selectTrack(let index):
             onSelectTrack?(index)
+        case .importFiles:
+            onImportFiles?()
         case .openSettings:
             onOpenSettings?()
         case .startRecording:

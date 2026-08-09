@@ -293,6 +293,7 @@ final class AppViewModel {
         // come back to.
         dial.onPausePlayback = { [player] in player.pauseIfPlaying() }
         dial.onSetVolume = { [player] value in player.setVolume(value) }
+        dial.onImportFiles = { [weak self] in self?.isImportSheetPresented = true }
 
         // **Deleting from the dial goes through the browser's own edge, not around it.**
         //

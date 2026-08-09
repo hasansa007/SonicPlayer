@@ -60,6 +60,10 @@ enum DialEffect: Equatable {
 
     case item(DialItemAction, itemID: String)
 
+    /// Open the system file picker. A library is the place you add to, and reaching one from a card
+    /// marked `Library` with no way to put anything in is the gap this fills.
+    case importFiles
+
     /// Open Settings. Still a push rather than a dial route — when it becomes one, this goes.
     case openSettings
 }

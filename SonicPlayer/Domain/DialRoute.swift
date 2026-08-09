@@ -34,8 +34,15 @@ enum DialRoute: Equatable {
     func crumb(in content: DialContent) -> String? {
         switch self {
         case .chooseMode: nil
-        case .library: "LIBRARY"
-        case .recordings: "RECORDINGS"
+        // **`HOME` and `LIBRARY`, not `LIBRARY` and `RECORDINGS`.** The card that opens the second
+        // screen has always been labelled *Library*, while the screen itself said *Recordings* and
+        // listed every audio file the app can see — podcasts and imports included. Two names for
+        // one place, and the one on the header was the wrong one.
+        //
+        // Renaming only the second would have read `LIBRARY ▸ LIBRARY`, so the root took the name
+        // it actually has: it is a menu you start from, not a library.
+        case .library: "HOME"
+        case .recordings: "LIBRARY"
         case .nowPlaying: "NOW PLAYING"
         case .recording: "RECORDING"
         case .edit: "EDIT"

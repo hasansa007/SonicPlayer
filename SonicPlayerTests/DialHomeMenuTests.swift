@@ -50,7 +50,7 @@ struct DialHomeMenuTests {
     @Test func aShortRecordingsListIsNotCards() {
         let navigator = DialSample.inRecordings(recordingCount: 2)
 
-        #expect(list(navigator)?.rows.count == 2)
+        #expect(list(navigator)?.rows.count == 3, "two files and the Import row")
         #expect(list(navigator)?.isProminent == false, "two recordings are a list, not a menu")
     }
 
@@ -61,18 +61,16 @@ struct DialHomeMenuTests {
         #expect(list(navigator)?.isProminent == false)
     }
 
-    // MARK: - Import left the dial
+    // MARK: - Import belongs to the library, not to home
 
-    /// It was a card, then a chip, then a row, and is now none of them. iOS already offers two ways
-    /// in that need no screen of ours — the Files share sheet and the Open-in handler.
-    @Test func importIsNowhereInTheDial() {
+    /// A library is the place you add to. Home is a menu of destinations, and Import is not one.
+    @Test func importIsARowOnTheLibrary_notOnHome() {
         let home = DialSample.navigator()
-        #expect(!home.screen.actions.contains { $0.id == "import" })
         #expect(list(home)?.rows.contains { $0.id == "import" } == false)
+        #expect(!home.screen.actions.contains { $0.id == "import" })
 
         let library = DialSample.inRecordings()
-        #expect(!library.screen.actions.contains { $0.id == "import" })
-        #expect(list(library)?.rows.contains { $0.id == "import" } == false)
+        #expect(list(library)?.rows.first?.id == "import")
     }
 
     /// **The corner label follows you down, which is why it outlived the row that replaced it.**
