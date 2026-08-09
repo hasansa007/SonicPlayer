@@ -197,9 +197,15 @@ struct DialRing: View {
         .accessibilityHidden(true)
     }
 
-    private static let directions: [(glyph: String, x: CGFloat, y: CGFloat)] = [
-        ("chevron.up", 0, -1),
-        ("chevron.down", 0, 1),
+    /// Volume marks rather than chevrons.
+    ///
+    /// A chevron says "there is a direction here" and nothing about what it does, which left the
+    /// vertical axis unlabelled in practice — the horizontal marks named their action and the
+    /// vertical ones did not. `speaker.plus` / `speaker.minus` say it outright, and stay legible at
+    /// this size where a wave count would not.
+    static let directions: [(glyph: String, x: CGFloat, y: CGFloat)] = [
+        ("speaker.plus.fill", 0, -1),
+        ("speaker.minus.fill", 0, 1),
         ("backward.end.fill", -1, 0),
         ("forward.end.fill", 1, 0)
     ]

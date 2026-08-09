@@ -126,9 +126,13 @@ enum Sizing {
     // is the navigation model, present on all eight, and the thumb rests on it for the whole
     // session rather than reaching for it occasionally.
 
-    /// 236 — the dial's outer diameter. Around 60% of a compact screen's width, which is what puts
-    /// the whole ring inside a thumb's arc without the hand moving.
-    static let dialDiameter: CGFloat = 236
+    /// 262 — the dial's outer diameter. About two thirds of a compact screen's width: still inside
+    /// a thumb's arc without the hand moving, and now the largest thing on the screen, which is
+    /// what it should be in an app whose whole interface is one control.
+    ///
+    /// It clears the horizontal insets with room to spare — 393pt of screen less two `Spacing.xxl`
+    /// margins leaves 345.
+    static let dialDiameter: CGFloat = 262
     /// 92 — the hub, which is always the commit. Its radius comfortably clears
     /// `RotaryTracker.deadZoneRadius`, so a press can never be read as the start of a turn.
     static let dialHub: CGFloat = 92
