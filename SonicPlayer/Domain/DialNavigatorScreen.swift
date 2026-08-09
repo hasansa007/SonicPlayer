@@ -256,8 +256,7 @@ extension DialNavigator {
             ticks: ticks,
             hub: hub,
             defersPress: defersPress,
-            volume: route == .nowPlaying ? content.playback?.volume : nil,
-            showsTrackStepper: route == .nowPlaying && (content.playback?.queueCount ?? 0) > 1
+            volume: route == .nowPlaying ? content.playback?.volume : nil
         )
     }
 
@@ -325,7 +324,7 @@ extension DialNavigator {
             // One sentence, because the wheel does one thing. The segments beside and above it
             // are named in the third clause rather than getting a hint each.
             let press = content.playback?.isPlaying == false ? "press to play" : "press to pause"
-            return "rotate to seek · \(press) · slide to change track"
+            return "rotate to seek · \(press) · nudge for track and volume"
 
         case .recording:
             return "ring shows input level · rotate to set gain · press to stop"

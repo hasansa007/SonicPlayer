@@ -136,60 +136,29 @@ struct DialScreenView: View {
         }
     }
 
-    /// The control cluster — **the only things on screen you touch to drive the app.**
+    /// The dial, and nothing else.
     ///
-    ///     ┌───────────────┐
-    ///     │  ◀   |   ▶    │   track, when the screen has a queue
-    ///     └───────────────┘
-    ///     ┌───┐  ╭─────────╮
-    ///     │ + │  │  seek   │   volume, when the screen has playback
-    ///     │ ─ │  ╰─────────╯
-    ///     └───┘
+    /// **One component.** It briefly grew two spring-return segments beside it for volume and
+    /// track; they worked and they were busy — three controls to drive one player is two too many,
+    /// and the whole idea of the dial is that there is only ever one thing to touch. Those
+    /// directions folded into the hub, which is now a gear stick.
     ///
-    /// The two segments are why the wheel has no modes. Each is present only where it means
-    /// something, so screens that are just a list still show one control and nothing else.
+    /// The caption under it is gone too. It was the only thing teaching the gestures, so its
+    /// replacement is the four direction marks around the hub — smaller than a control and
+    /// permanent, rather than a sentence that had to change per mode.
     private var dial: some View {
-        VStack(spacing: Spacing.sm) {
-            if screen.ring.showsTrackStepper {
-                DialTriState.track(
-                    onPrevious: { onCommand(.action("previous")) },
-                    onNext: { onCommand(.action("next")) }
-                )
-            }
-
-            HStack(alignment: .center, spacing: Spacing.md) {
-                if let volume = screen.ring.volume {
-                    DialTriState.volume(
-                        onDown: { onCommand(.volumeTick(-1)) },
-                        onUp: { onCommand(.volumeTick(1)) }
-                    )
-                    .accessibilityValue(Text("\(Int((volume * 100).rounded())) percent"))
-                } else {
-                    // Holds the wheel centred whether or not the segment is there, so it does not
-                    // slide sideways as you move between screens.
-                    Color.clear.frame(width: Sizing.dialSegmentBreadth, height: 1)
-                }
-
-                DialRing(
-                    ticks: screen.ring.ticks,
-                    hub: screen.ring.hub,
-                    defersPress: screen.ring.defersPress,
-                    onCommand: onCommand
-                )
-
-                Color.clear.frame(width: Sizing.dialSegmentBreadth, height: 1)
-            }
-
-            Text(screen.hint)
-                .font(.caption2)
-                .foregroundColor(.sonicTextMuted)
-                .multilineTextAlignment(.center)
-                .dynamicTypeSize(...Self.captionCeiling)
-                // The hint is the only thing teaching rotate/press/hold, so it is read out rather
-                // than hidden as decoration — and it is the sentence that tells a VoiceOver user
-                // the hub is adjustable. It is read in full whatever the ceiling below does.
-                .accessibilityLabel(Text(screen.hint))
-        }
+        DialRing(
+            ticks: screen.ring.ticks,
+            hub: screen.ring.hub,
+            defersPress: screen.ring.defersPress,
+            volume: screen.ring.volume,
+            onCommand: onCommand
+        )
+        // The hint is no longer drawn, but it is still the sentence that explains the gestures —
+        // and a VoiceOver user cannot see the direction marks that replaced it. So it stops being
+        // a caption and becomes the dial's spoken description, which is where it was always most
+        // useful.
+        .accessibilityHint(Text(screen.hint))
     }
 
     private static let washTint: Double = 0.15

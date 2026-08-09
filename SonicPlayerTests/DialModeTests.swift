@@ -199,7 +199,7 @@ struct DialModeTests {
         _ = navigator.receive(.volumeTick(2))
 
         #expect(navigator.screen.hint == before)
-        #expect(before == "rotate to seek · press to pause · slide to change track")
+        #expect(before == "rotate to seek · press to pause · nudge for track and volume")
     }
 
     // MARK: - Gain, which is a mode-less axis

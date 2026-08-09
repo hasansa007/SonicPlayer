@@ -30,7 +30,6 @@ MIGRATED=(
   "SonicPlayer/DesignSystem/Components/RotaryWheel.swift"
   "SonicPlayer/DesignSystem/Components/WheelHUD.swift"
   "SonicPlayer/DesignSystem/Components/DialRing.swift"
-  "SonicPlayer/DesignSystem/Components/DialTriState.swift"
   "SonicPlayer/Features/Dial/DialScreenView.swift"
   "SonicPlayer/Features/Dial/DialChrome.swift"
   "SonicPlayer/Features/Dial/DialActionRow.swift"

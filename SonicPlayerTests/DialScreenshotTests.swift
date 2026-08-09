@@ -88,10 +88,11 @@ struct DialScreenshotTests {
         // only chip left is the way out.
         #expect(screen.actions.isEmpty, "the wheel seeks, the segments do the rest, Back is chrome")
         #expect(screen.chrome.canGoBack)
-        #expect(screen.ring.volume != nil, "the volume segment needs its level")
-        #expect(screen.ring.showsTrackStepper, "a queue of more than one gets the track segment")
+        #expect(screen.ring.volume != nil, "a hub with directions needs its volume")
         #expect(screen.ring.hub == .glyph("pause.fill"))
-        #expect(screen.hint == "rotate to seek · press to pause · slide to change track")
+        // The hint is no longer drawn — it is the dial's accessibility hint now — but it is still
+        // produced, and it is still what a VoiceOver user is told.
+        #expect(screen.hint == "rotate to seek · press to pause · nudge for track and volume")
     }
 
     // MARK: - 1d Recording

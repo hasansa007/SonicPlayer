@@ -21,6 +21,9 @@ struct DialRing: View {
     let hub: DialScreen.Hub
     /// See `registerPress`. True only where a double-press means something.
     var defersPress: Bool = false
+    /// Present when the hub is a gear stick — nudge left/right for track, up/down for volume.
+    /// `nil` leaves it a plain press.
+    var volume: Double?
     let onCommand: (DialCommand) -> Void
 
     /// A reference box rather than `@State var tracker = RotaryTracker()`. The tracker is a gesture
@@ -34,6 +37,9 @@ struct DialRing: View {
     @State private var isHubPressed = false
     @State private var didHold = false
     @State private var holdTask: Task<Void, Never>?
+    /// How far the gear stick has been pushed, and in which direction.
+    @State private var nudge: CGSize = .zero
+    @State private var didNudge = false
     /// A single press held back while we find out whether a second one is coming. Only ever
     /// non-nil on a screen whose `defersPress` is true.
     @State private var pendingPress: Task<Void, Never>?
@@ -61,11 +67,14 @@ struct DialRing: View {
     private static let neighbourTick: Double = 0.4
     private static let plateTint: Double = 0.12
 
+    private var hasDirections: Bool { volume != nil }
+
     var body: some View {
         ZStack {
             plate
             tickMarks
             thumbGlow
+            if hasDirections { directionMarks }
             hubView
         }
         .frame(width: Sizing.dialDiameter, height: Sizing.dialDiameter)
@@ -173,6 +182,31 @@ struct DialRing: View {
         return min(raw, count - raw)
     }
 
+    /// The gear stick's four ways out, drawn just outside the hub.
+    ///
+    /// They are the only thing announcing that the hub moves at all, which matters more now that
+    /// the caption under the dial is gone. Small and dim on purpose: they are a legend, not four
+    /// more buttons — the thing you touch is the hub.
+    private var directionMarks: some View {
+        ForEach(Self.directions, id: \.glyph) { mark in
+            Image(systemName: mark.glyph)
+                .font(.system(size: DialFont.directionMark, weight: .semibold))
+                .foregroundColor(.sonicTextMuted)
+                .offset(x: mark.x * Self.markRadius, y: mark.y * Self.markRadius)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private static let directions: [(glyph: String, x: CGFloat, y: CGFloat)] = [
+        ("chevron.up", 0, -1),
+        ("chevron.down", 0, 1),
+        ("backward.end.fill", -1, 0),
+        ("forward.end.fill", 1, 0)
+    ]
+
+    /// Just outside the hub, just inside the ticks.
+    private static var markRadius: CGFloat { Sizing.dialHub / 2 + Spacing.lg }
+
     // MARK: - Hub
 
     private var hubView: some View {
@@ -197,7 +231,9 @@ struct DialRing: View {
             hubContent
         }
         .scaleEffect(isHubPressed ? Self.pressedScale : 1)
+        .offset(x: nudge.width, y: nudge.height)
         .animation(Motion.press, value: isHubPressed)
+        .animation(Motion.settle, value: nudge)
         .contentShape(Circle())
         .gesture(hubPress)
         .accessibilityElement(children: .ignore)
@@ -297,31 +333,78 @@ struct DialRing: View {
         atan2(Double(point.y - centre.y), Double(point.x - centre.x)) * 180 / .pi
     }
 
-    // MARK: - The press
+    // MARK: - The press, and the four nudges
 
-    /// A raw drag rather than a `Button`, because the hub has to tell three gestures apart and a
-    /// `Button` fires its action on release even after a long press.
+    /// **The hub is a gear stick.** Tap it to play or pause; push it left or right for track,
+    /// up or down for volume.
+    ///
+    /// This replaced two spring-return segments beside the wheel. They worked, and three separate
+    /// controls to drive one player was two too many — the whole idea of the dial is that there is
+    /// only ever one thing to touch. Folding the directions into the hub keeps that promise and
+    /// costs nothing, because a hub that only ever did one thing was under-used.
+    ///
+    /// A raw drag rather than a `Button`: the hub has to tell tap, hold and four directions apart,
+    /// and a `Button` fires on release even after a long press.
     private var hubPress: some Gesture {
         DragGesture(minimumDistance: 0)
-            .onChanged { _ in
-                guard !isHubPressed else { return }
-                isHubPressed = true
-                didHold = false
-                holdTask = Task {
-                    try? await Task.sleep(for: .seconds(DialCommand.holdDuration))
-                    guard !Task.isCancelled else { return }
-                    didHold = true
-                    onCommand(.hold)
+            .onChanged { value in
+                if !isHubPressed {
+                    isHubPressed = true
+                    didHold = false
+                    didNudge = false
+                    holdTask = Task {
+                        try? await Task.sleep(for: .seconds(DialCommand.holdDuration))
+                        guard !Task.isCancelled else { return }
+                        didHold = true
+                        onCommand(.hold)
+                    }
                 }
+                guard hasDirections else { return }
+                // Follow the thumb, bounded, so the stick reads as a stick rather than as a button
+                // that happens to react.
+                nudge = CGSize(
+                    width: Self.bounded(value.translation.width),
+                    height: Self.bounded(value.translation.height)
+                )
             }
-            .onEnded { _ in
+            .onEnded { value in
                 holdTask?.cancel()
                 holdTask = nil
                 isHubPressed = false
+                nudge = .zero
+
                 guard !didHold else { return }
+                if hasDirections, let command = Self.direction(of: value.translation) {
+                    onCommand(command)
+                    return
+                }
                 registerPress()
             }
     }
+
+    /// Which way the stick went, or `nil` for a tap.
+    ///
+    /// **The dominant axis wins**, so a diagonal is read as whichever it is mostly — a stick that
+    /// demanded a pure axis would feel broken far more often than it would feel precise.
+    private static func direction(of translation: CGSize) -> DialCommand? {
+        let dx = translation.width, dy = translation.height
+        guard max(abs(dx), abs(dy)) >= nudgeThreshold else { return nil }
+        if abs(dx) >= abs(dy) {
+            return .action(dx > 0 ? "next" : "previous")
+        }
+        // Screen y grows downward, so up — the negative direction — is volume *up*.
+        return .volumeTick(dy < 0 ? 1 : -1)
+    }
+
+    private static func bounded(_ value: CGFloat) -> CGFloat {
+        min(max(-nudgeTravel, value), nudgeTravel)
+    }
+
+    /// How far the stick has to move before it counts. Above a thumb's resting wobble, below the
+    /// distance that would feel like a drag.
+    private static let nudgeThreshold: CGFloat = 16
+    /// How far it is allowed to travel while you hold it.
+    private static let nudgeTravel: CGFloat = 22
 
     /// **A press waits only on the screens that have a second meaning for it.**
     ///

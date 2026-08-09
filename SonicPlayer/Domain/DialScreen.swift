@@ -203,16 +203,13 @@ struct DialScreen: Equatable {
         /// other press is instant.
         var defersPress: Bool = false
 
-        /// The current output level, `0...1`, when this screen offers a volume segment beside the
-        /// wheel. `nil` means no segment.
+        /// The current output level, `0...1`, when this screen's hub can set volume. `nil` means
+        /// the hub is press-only and has no directions.
         ///
-        /// It lives on `Ring` rather than in `Content` because it is part of the *control cluster* —
-        /// what you touch — and the content is what you read. The two segments and the wheel are one
-        /// thing on screen and should be one thing here.
+        /// Its presence is what turns the hub into a gear stick: nudge it up or down for volume,
+        /// left or right for track. One control does all of it, which is why the segments beside
+        /// the wheel are gone — three controls to drive one player was two too many.
         var volume: Double?
-
-        /// Whether the track-stepping segment sits above the wheel.
-        var showsTrackStepper: Bool = false
     }
 
     /// What the ring's tick marks are showing. The design uses a different set per screen —

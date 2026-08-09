@@ -254,6 +254,10 @@ enum Motion {
 /// No semantic style reaches these sizes: `.largeTitle` is 34pt and the running timer is half again
 /// that. That is the whole justification for a fixed size — a role a scale does not cover.
 enum DialFont {
+    /// 10 — the gear stick's four direction marks. A legend around the hub, deliberately smaller
+    /// than anything you are meant to press.
+    static let directionMark: CGFloat = 10
+
 
     /// 46 — now playing's elapsed time, the largest thing on that screen.
     static let elapsed: CGFloat = 46
