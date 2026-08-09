@@ -28,6 +28,17 @@ enum DialSample {
         .init(id: "stats", icon: .stats, title: "Stats")
     ]
 
+    /// **Not in `sections`**, which is the design's own five. `DialViewModel` inserts this one at
+    /// runtime and only while a track is loaded, so a fixture that always carried it would test a
+    /// library that cannot exist half the time.
+    static let nowPlayingSection = DialContent.Section(
+        id: "nowPlaying",
+        icon: .session,
+        title: "Now Playing",
+        destination: .nowPlaying,
+        subtitle: "Deep Work, Chapter 4"
+    )
+
     static let playback = DialContent.Playback(
         title: "Deep Work, Chapter 4",
         subtitle: "Cal Newport",

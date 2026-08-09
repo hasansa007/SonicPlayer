@@ -37,7 +37,8 @@ struct DialContent: Equatable {
         var subtitle: String?
     }
 
-    /// What the transport is doing (1c), and what the status line on every other screen reports.
+    /// What the transport is doing (1c), and what the Now Playing row's trailing value reports on
+    /// the library home.
     struct Playback: Equatable {
         var title: String
         var subtitle: String?

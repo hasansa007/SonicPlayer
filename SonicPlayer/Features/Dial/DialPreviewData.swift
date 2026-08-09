@@ -16,11 +16,20 @@ enum DialPreviewData {
     // MARK: - 1a · Library home
 
     static let libraryHome = DialScreen(
-        chrome: .init(breadcrumb: ["LIBRARY"], status: "20:34 ▸ playing"),
+        chrome: .init(breadcrumb: ["LIBRARY"], showsSettings: true),
         content: .list(.init(
             rows: [
                 .init(id: "playlists", icon: .playlist, title: "Playlists", trailing: "6"),
                 .init(id: "recordings", icon: .recording, title: "Recordings", trailing: "12 ▸"),
+                // Where the corner label went: the clock at the trailing edge, the track named on
+                // the second line — the two things it could not do at once up there.
+                .init(
+                    id: "nowPlaying",
+                    icon: .session,
+                    title: "Now Playing",
+                    trailing: "20:34 · playing",
+                    subtitle: "Deep Work, Chapter 4"
+                ),
                 .init(id: "sessions", icon: .session, title: "Focus Sessions", trailing: "24"),
                 .init(id: "podcasts", icon: .podcast, title: "Podcasts", trailing: "9"),
                 .init(id: "stats", icon: .stats, title: "Stats", trailing: "▸")
@@ -39,7 +48,7 @@ enum DialPreviewData {
     // MARK: - 1b · Recordings drill-in
 
     static let recordings = DialScreen(
-        chrome: .init(breadcrumb: ["LIBRARY", "RECORDINGS"], status: "12"),
+        chrome: .init(breadcrumb: ["LIBRARY", "RECORDINGS"], canGoBack: true),
         content: .list(.init(
             rows: [
                 .init(
@@ -68,10 +77,10 @@ enum DialPreviewData {
 
     // MARK: - 1c · Now playing
 
-    /// No chrome at all: this screen owns the transport, so the status the others carry would be
-    /// repeating the two time labels below the bar.
+    /// Nothing up top but the way back: this screen owns the transport, and the two time labels
+    /// under the bar already say everything a status line could.
     static let nowPlaying = DialScreen(
-        chrome: .init(breadcrumb: [], status: nil),
+        chrome: .init(breadcrumb: [], canGoBack: true),
         content: .nowPlaying(.init(
             title: "Deep Focus Session",
             subtitle: "Rainfall mix · Focus",
@@ -92,7 +101,7 @@ enum DialPreviewData {
     // MARK: - 1d · Recording
 
     static let recording = DialScreen(
-        chrome: .init(breadcrumb: [], status: "RECORDING", isRecording: true),
+        chrome: .init(breadcrumb: [], isRecording: true, canGoBack: true),
         content: .recording(.init(
             elapsed: "12:07",
             fraction: "4",
@@ -117,7 +126,7 @@ enum DialPreviewData {
     /// no field for them and the contract says a screen may carry five actions with real words.
     /// So they are actions. The row centres when it fits and scrolls when it does not.
     static let edit = DialScreen(
-        chrome: .init(breadcrumb: [], status: nil),
+        chrome: .init(breadcrumb: [], canGoBack: true),
         content: .edit(.init(
             title: "New Recording 4",
             keeping: "08:12",
@@ -141,7 +150,7 @@ enum DialPreviewData {
     // MARK: - 1f · Item actions
 
     static let itemActions = DialScreen(
-        chrome: .init(breadcrumb: ["RECORDINGS", "ACTIONS"], status: nil),
+        chrome: .init(breadcrumb: ["RECORDINGS", "ACTIONS"], canGoBack: true),
         content: .list(.init(
             rows: [
                 .init(id: "share", icon: .share, title: "Share file…", trailing: "▸"),
@@ -169,7 +178,7 @@ enum DialPreviewData {
     /// `browse(thumb: nil)` is what "nothing to scroll yet" looks like on the ring: every tick dim,
     /// so the dial says the same thing the hint does.
     static let empty = DialScreen(
-        chrome: .init(breadcrumb: ["LIBRARY", "RECORDINGS"], status: "0"),
+        chrome: .init(breadcrumb: ["LIBRARY", "RECORDINGS"], canGoBack: true),
         content: .message(.init(
             icon: .recording,
             title: "No recordings yet",
@@ -189,7 +198,7 @@ enum DialPreviewData {
     /// `List` with the other three, and the row count is the honest signal for "a choice between
     /// two things" rather than "a list to scroll".
     static let chooser = DialScreen(
-        chrome: .init(breadcrumb: ["START"], status: nil),
+        chrome: .init(breadcrumb: ["START"], showsSettings: true),
         content: .list(.init(
             rows: [
                 .init(

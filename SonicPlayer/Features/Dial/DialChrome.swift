@@ -1,10 +1,14 @@
 import SwiftUI
 
-/// A screen's top line: where you are on the left, what is happening on the right (#6).
+/// A screen's top line: where you are on the left, Settings in the corner (#6).
 ///
-/// **With no breadcrumb the status centres**, which is not a special case so much as the same rule
-/// read honestly — the status is the only thing there, so it belongs in the middle. That is what
-/// gives the recording screen its centred `● RECORDING` without the contract needing a field for it.
+/// **It says nothing about playback any more.** The `20:34 ▸ playing` label that used to sit at the
+/// trailing edge is on the Now Playing row now — a row has the width to name the track *and* carry
+/// the clock, which is the whole reason the label lost that argument. What is left up here is
+/// navigation plus the recording dot, and the dot stays because a live take has no row of its own.
+///
+/// With no breadcrumb the row centres, which is the same rule read honestly rather than a special
+/// case — whatever is up there is the only thing up there, so it belongs in the middle.
 struct DialChrome: View {
 
     let chrome: DialScreen.Chrome
@@ -45,6 +49,11 @@ struct DialChrome: View {
                 Spacer(minLength: Spacing.sm)
             }
 
+            // Before Settings, so the gear keeps the corner it was given.
+            if chrome.isRecording {
+                recordingDot
+            }
+
             if chrome.showsSettings {
                 Button {
                     onCommand(.action("settings"))
@@ -57,49 +66,27 @@ struct DialChrome: View {
                 }
                 .accessibilityLabel(Text("Settings"))
             }
-
-            if chrome.isRecording || chrome.status != nil {
-                // Tappable, and that is the point: `hold` jumps to Now Playing from anywhere and
-                // has no affordance at all. This line is already on screen saying something is
-                // playing, so making it the way in costs nothing and finally gives that gesture a
-                // visible partner.
-                Button { onCommand(.action("nowPlaying")) } label: { status }
-                    .accessibilityLabel(Text("Now playing"))
-                    .accessibilityHint(Text(chrome.status ?? ""))
-            }
         }
         .frame(maxWidth: .infinity, alignment: hasBreadcrumb ? .leading : .center)
-        // `.contain`, not `.combine`. Combining flattens the children into one label — which was
-        // right when this row was three pieces of text, and silently swallows the Back chevron and
-        // the status button now that two of them are controls.
+        // `.contain`, not `.combine`. Combining flattens the children into one label, which would
+        // swallow the Back chevron and the gear now that both of them are controls.
         .accessibilityElement(children: .contain)
     }
 
-    private var status: some View {
-        HStack(spacing: Spacing.sm) {
-            if chrome.isRecording {
-                Circle()
-                    .fill(Color.red)
-                    .frame(width: Spacing.sm, height: Spacing.sm)
-                    // Opacity *and* scale, because a dot that only dims reads as a rendering
-                    // artefact at this size while one that also breathes reads as alive.
-                    .opacity(isPulsing ? Self.pulseFloor : 1)
-                    .scaleEffect(isPulsing ? Self.pulseFloor : 1)
-                    .animation(Motion.recordPulse, value: isPulsing)
-                    .onAppear { isPulsing = true }
-                    .accessibilityHidden(true)
-            }
-
-            if let status = chrome.status {
-                Text(status)
-                    .font(.caption2)
-                    .fontWeight(chrome.isRecording ? .semibold : .medium)
-                    .tracking(chrome.isRecording ? DialFont.breadcrumbTracking : 0)
-                    .monospacedDigit()
-                    .foregroundColor(chrome.isRecording ? .red : .sonicPrimary)
-                    .lineLimit(1)
-            }
-        }
+    /// The only thing up here that is neither navigation nor a label: something is being captured
+    /// right now, on a screen that may be nowhere near the recorder.
+    private var recordingDot: some View {
+        Circle()
+            .fill(Color.red)
+            .frame(width: Spacing.sm, height: Spacing.sm)
+            // Opacity *and* scale, because a dot that only dims reads as a rendering artefact at
+            // this size while one that also breathes reads as alive.
+            .opacity(isPulsing ? Self.pulseFloor : 1)
+            .scaleEffect(isPulsing ? Self.pulseFloor : 1)
+            .animation(Motion.recordPulse, value: isPulsing)
+            .onAppear { isPulsing = true }
+            .accessibilityElement()
+            .accessibilityLabel(Text("Recording"))
     }
 
     private static let pulseFloor: Double = 0.45

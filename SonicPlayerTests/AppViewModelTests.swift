@@ -54,6 +54,35 @@ struct AppViewModelTests {
         #expect(app.player.currentTrack == nil)
     }
 
+    /// Recording claims the shared `AVAudioSession`, so the take cannot start over live playback —
+    /// the system would interrupt it and leave the player insisting it was still playing.
+    ///
+    /// **Paused, not cleared.** The track stays loaded, which is what keeps the Now Playing row on
+    /// the library when the take ends.
+    @MainActor
+    @Test func test_startingARecording_pausesPlayback() {
+        let app = makeApp()
+        app.player.currentTrack = audioFile(at: URL(fileURLWithPath: "/Docs/Podcasts/Ep1.mp3"))
+        app.player.isPlaying = true
+
+        app.dial.onStartRecording?()
+
+        #expect(!app.player.isPlaying)
+        #expect(app.player.currentTrack != nil, "the row it feeds must survive the take")
+    }
+
+    /// The guard inside `pauseIfPlaying`: a paused track must not be toggled *into* playing by the
+    /// thing that exists to stop it.
+    @MainActor
+    @Test func test_startingARecordingWhilePaused_doesNotStartPlayback() {
+        let app = makeApp()
+        app.player.currentTrack = audioFile(at: URL(fileURLWithPath: "/Docs/Podcasts/Ep1.mp3"))
+
+        app.dial.onStartRecording?()
+
+        #expect(!app.player.isPlaying)
+    }
+
     @MainActor
     @Test func test_removingAnUnrelatedFile_leavesPlaybackAlone() {
         let app = makeApp()
@@ -145,6 +174,8 @@ struct AppViewModelTests {
         // forget the track.
         audioPlayer.stop = {}
         audioPlayer.setRate = { _ in }
+        // Reached by `pauseIfPlaying` — starting a recording stops whatever is playing first.
+        audioPlayer.pause = {}
 
         return AppViewModel(
             player: PlayerViewModel(

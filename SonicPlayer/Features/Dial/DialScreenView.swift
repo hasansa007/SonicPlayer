@@ -113,7 +113,10 @@ struct DialScreenView: View {
     }
 
     private var hasChrome: Bool {
-        !screen.chrome.breadcrumb.isEmpty || screen.chrome.status != nil || screen.chrome.isRecording || screen.chrome.canGoBack
+        !screen.chrome.breadcrumb.isEmpty
+            || screen.chrome.showsSettings
+            || screen.chrome.isRecording
+            || screen.chrome.canGoBack
     }
 
     @ViewBuilder

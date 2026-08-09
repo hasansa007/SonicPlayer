@@ -33,17 +33,15 @@ struct DialScreen: Equatable {
     struct Chrome: Equatable {
         /// `["LIBRARY", "RECORDINGS"]` renders as `LIBRARY ▸ RECORDINGS`. Empty is a valid header.
         var breadcrumb: [String]
-        /// The right-hand status, e.g. `"20:34 ▸ playing"`. Absent on screens that own the transport.
-        var status: String?
-        /// Drives the pulsing dot. Separate from `status` because it animates.
+        /// Drives the pulsing dot — the one thing up here that is not navigation.
+        ///
+        /// **There is no `status` beside it any more.** The `20:34 ▸ playing` label it used to
+        /// animate next to has moved onto the Now Playing row, where it sits at the trailing edge
+        /// and updates with the clock. The corner is Settings and nothing else; a status field with
+        /// no producer left is a contract that lies about what a screen can show.
         var isRecording: Bool = false
 
         /// Whether the top-right corner offers Settings.
-        ///
-        /// It replaced the `20:34 ▸ playing` label that used to sit there. That label was doing two
-        /// jobs badly: saying what was playing, in a space too small to name it, and being the only
-        /// way to reach Now Playing. Both moved to a row in the library, which has room for a title
-        /// — and the corner went to the one thing that had nowhere to live at all.
         var showsSettings: Bool = false
 
         /// Whether there is a level to pop to.

@@ -214,7 +214,6 @@ final class AppViewModel {
     /// root would never notice, a test that builds one would leak it.
     private func wire() {
         settings.onDefaultPlaybackSpeedChanged = { [player] speed in player.setPlaybackSpeed(speed) }
-        settings.onDefaultSkipDurationChanged = { [player] duration in player.setSkipDuration(duration) }
 
         onboarding?.onGetStarted = { [weak self] in
             OnboardingViewModel.markSeen()
@@ -293,7 +292,17 @@ final class AppViewModel {
         // recording screen, so the level meter was unreachable even once the route was.
         dial.onImportFiles = { [weak self] in self?.isImportSheetPresented = true }
         dial.onOpenSettings = { [weak self] in self?.isSettingsPresented = true }
-        dial.onStartRecording = { [recording] in recording.startRecordingTapped() }
+        // **Playback stops before the take starts.** Recording claims the shared `AVAudioSession`,
+        // so anything still running is about to be interrupted by the system — and the player would
+        // go on claiming it was playing something now silent. `pauseIfPlaying` has said so in its
+        // own doc comment since #15 and had no caller; this is it.
+        //
+        // Pause rather than clear: the track stays loaded, so the Now Playing row is still there
+        // when the take ends, at the second you left it.
+        dial.onStartRecording = { [player, recording] in
+            player.pauseIfPlaying()
+            recording.startRecordingTapped()
+        }
         dial.onStopRecording = { [recording] in recording.stopRecordingTapped() }
 
         // Capture (#75). The recorder owns the hardware and the take; the dial owns where you are.

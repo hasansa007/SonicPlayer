@@ -17,19 +17,20 @@ import UIKit
 final class SettingsViewModel {
 
     var defaultPlaybackSpeed: PlaybackSpeed
-    var defaultSkipDuration: SkipDuration
     var colorScheme: AppColorScheme
     var showAbout = false
     var showHelp = false
 
     /// Replaces `AppFeature`'s `.settings(.setDefaultPlaybackSpeed)` → `.player(...)` tap.
+    ///
+    /// **The only preference that still travels this way.** Skip duration used to have a twin here;
+    /// the dial has no skip control — its horizontal nudges step *tracks* — so the setting was
+    /// choosing the size of a button nothing presses. `PlayerViewModel` keeps its `skipDuration`
+    /// at the stored default for the remote-command centre, which does still offer ±15s.
     var onDefaultPlaybackSpeedChanged: (PlaybackSpeed) -> Void = { _ in }
-    /// Replaces `AppFeature`'s `.settings(.setDefaultSkipDuration)` → `.player(...)` tap.
-    var onDefaultSkipDurationChanged: (SkipDuration) -> Void = { _ in }
 
     init() {
         defaultPlaybackSpeed = UserDefaults.standard.savedPlaybackSpeed
-        defaultSkipDuration = UserDefaults.standard.savedSkipDuration
         colorScheme = UserDefaults.standard.savedColorScheme
     }
 
@@ -37,12 +38,6 @@ final class SettingsViewModel {
         defaultPlaybackSpeed = speed
         UserDefaults.standard.savedPlaybackSpeed = speed
         onDefaultPlaybackSpeedChanged(speed)
-    }
-
-    func setDefaultSkipDuration(_ duration: SkipDuration) {
-        defaultSkipDuration = duration
-        UserDefaults.standard.savedSkipDuration = duration
-        onDefaultSkipDurationChanged(duration)
     }
 
     func setColorScheme(_ scheme: AppColorScheme) {

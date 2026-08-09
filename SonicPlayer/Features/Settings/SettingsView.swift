@@ -5,7 +5,7 @@ struct SettingsView: View {
     @State private var expandedSection: ExpandableSection?
 
     private enum ExpandableSection {
-        case speed, skipDuration, theme
+        case speed, theme
     }
 
     var body: some View {
@@ -115,63 +115,6 @@ struct SettingsView: View {
                                         .foregroundColor(.sonicTextPrimary)
                                     Spacer()
                                     if speed == viewModel.defaultPlaybackSpeed {
-                                        Image(systemName: "checkmark")
-                                            .font(.caption)
-                                            .foregroundColor(.sonicPrimary)
-                                    }
-                                }
-                                .padding(.vertical, 8)
-                                .padding(.horizontal, 12)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.leading, 36)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-
-                Divider()
-
-                Button {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        expandedSection = expandedSection == .skipDuration ? nil : .skipDuration
-                    }
-                } label: {
-                    SettingsRow(
-                        icon: "arrow.left.arrow.right",
-                        title: "Skip Duration",
-                        iconColor: .sonicPrimary
-                    ) {
-                        HStack(spacing: 4) {
-                            Text(viewModel.defaultSkipDuration.displayText)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(.sonicPrimary)
-                                .monospacedDigit()
-                            Image(systemName: expandedSection == .skipDuration ? "chevron.up" : "chevron.down")
-                                .font(.caption2)
-                                .foregroundColor(.sonicTextMuted)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-
-                if expandedSection == .skipDuration {
-                    VStack(spacing: 0) {
-                        ForEach(SkipDuration.allCases) { duration in
-                            Button {
-                                viewModel.setDefaultSkipDuration(duration)
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    expandedSection = nil
-                                }
-                            } label: {
-                                HStack {
-                                    Text(duration.displayText)
-                                        .font(.subheadline)
-                                        .foregroundColor(.sonicTextPrimary)
-                                    Spacer()
-                                    if duration == viewModel.defaultSkipDuration {
                                         Image(systemName: "checkmark")
                                             .font(.caption)
                                             .foregroundColor(.sonicPrimary)

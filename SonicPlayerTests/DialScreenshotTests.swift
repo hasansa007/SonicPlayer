@@ -27,7 +27,9 @@ struct DialScreenshotTests {
         let screen = navigator.screen
 
         #expect(screen.chrome.breadcrumb == ["LIBRARY"])
-        #expect(screen.chrome.status == "20:34 ▸ playing")
+        // The corner is Settings and nothing else. What used to sit beside it — `20:34 ▸ playing` —
+        // is a row's trailing value now; see `theNowPlayingRowCarriesTheClock`.
+        #expect(screen.chrome.showsSettings)
         #expect(rows(navigator)?.rows.map(\.title) == [
             "Playlists", "Recordings", "Focus Sessions", "Podcasts", "Stats"
         ])
@@ -36,6 +38,49 @@ struct DialScreenshotTests {
         #expect(rows(navigator)?.position == nil)
         #expect(screen.ring.hub == .label("OPEN"))
         #expect(screen.hint == "rotate to browse · press to open · hold for now playing")
+    }
+
+    /// **The corner label, moved onto a row.**
+    ///
+    /// It said `20:34 ▸ playing` in a space with no room to name the track, and it was the only way
+    /// to reach Now Playing. The row does both: the title and the track on the left, the clock at
+    /// the trailing edge, ticking with playback. `·` rather than `▸`, because in this list `▸` means
+    /// *goes somewhere* and a trailing value is a value.
+    @Test func theNowPlayingRowCarriesTheClock() {
+        let navigator = DialNavigator(
+            content: DialContent(
+                sections: DialSample.sections + [DialSample.nowPlayingSection],
+                playback: DialSample.playback
+            ),
+            root: .library
+        )
+
+        #expect(rows(navigator)?.rows.last?.trailing == "20:34 · playing")
+        #expect(rows(navigator)?.rows.last?.subtitle == "Deep Work, Chapter 4")
+    }
+
+    /// Paused is the state worth reading at a glance, and the row is the only thing that says it —
+    /// the ring's motion stops, but a still ring and a ring with nothing loaded look alike.
+    @Test func theNowPlayingRowSaysPaused() {
+        var paused = DialSample.playback
+        paused.isPlaying = false
+        let navigator = DialNavigator(
+            content: DialContent(
+                sections: DialSample.sections + [DialSample.nowPlayingSection],
+                playback: paused
+            ),
+            root: .library
+        )
+
+        #expect(rows(navigator)?.rows.last?.trailing == "20:34 · paused")
+    }
+
+    /// The row is inserted by the host only when a track is loaded, so a library without one is the
+    /// ordinary case rather than an empty state — and nothing on it claims a clock.
+    @Test func aLibraryWithNothingPlayingHasNoClockAnywhere() {
+        let navigator = DialSample.navigator(playback: nil)
+
+        #expect(rows(navigator)?.rows.map(\.trailing) == ["6", "12 ▸", "24", "9", nil])
     }
 
     // MARK: - 1b Recordings
@@ -84,8 +129,6 @@ struct DialScreenshotTests {
         #expect(abs(playing.progress - 1234.0 / 2745.0) < 1e-9)
         #expect(playing.isPlaying)
 
-        // The screen owns the transport, so the chrome does not repeat it.
-        #expect(screen.chrome.status == nil)
         // No mode row: volume and track-stepping have their own controls beside the wheel, so the
         // only chip left is the way out.
         #expect(screen.actions.isEmpty, "the wheel seeks, the segments do the rest, Back is chrome")
@@ -117,8 +160,8 @@ struct DialScreenshotTests {
         #expect(capture.levels == [0.2, 0.5, 0.8, 0.42])
         #expect(capture.markers.map(\.time) == ["01:02"])
 
+        // The dot, and no word beside it — the chrome has no status line to carry one.
         #expect(screen.chrome.isRecording)
-        #expect(screen.chrome.status == nil)
         // The chip row is gone: both actions moved onto the stick, up and left.
         #expect(screen.actions.isEmpty)
         #expect(screen.ring.directions?.up?.id == "marker")

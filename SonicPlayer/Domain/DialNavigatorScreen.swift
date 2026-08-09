@@ -25,26 +25,10 @@ extension DialNavigator {
     private var chrome: DialScreen.Chrome {
         DialScreen.Chrome(
             breadcrumb: stack.compactMap { $0.route.crumb(in: content) },
-            status: status,
             isRecording: content.capture.map { !$0.isPaused } ?? false,
             showsSettings: stack.count == 1,
             canGoBack: stack.count > 1
         )
-    }
-
-    /// **Nothing, now that the corner is Settings.**
-    ///
-    /// Kept as a field rather than deleted because the recorder may yet want a word up there, and
-    /// because removing it from the contract would touch every screenshot test to prove a negative.
-    private var status: String? {
-        switch route {
-        case .nowPlaying, .recording:
-            return nil
-        default:
-            guard let playback = content.playback else { return nil }
-            let state = playback.isPlaying ? "playing" : "paused"
-            return "\(DialTimeFormat.clock(playback.position)) ▸ \(state)"
-        }
     }
 
     // MARK: - Content
@@ -166,11 +150,15 @@ extension DialNavigator {
     /// `12 ▸` when there is somewhere to go, a bare `6` when there is only a count, nothing when
     /// there is neither. The chevron is the affordance, so it is tied to the destination rather
     /// than typed into the title.
+    ///
+    /// **Now Playing is the exception, and carries the clock instead** — see `playbackStatus`.
     private var libraryRows: [DialScreen.List.Row] {
         content.sections.map { section in
-            let trailing = section.count.map { count in
-                section.destination == nil ? "\(count)" : "\(count) ▸"
-            }
+            let trailing = section.destination == .nowPlaying
+                ? playbackStatus
+                : section.count.map { count in
+                    section.destination == nil ? "\(count)" : "\(count) ▸"
+                }
             return .init(
                 id: section.id,
                 icon: section.icon,
@@ -179,6 +167,24 @@ extension DialNavigator {
                 subtitle: section.subtitle
             )
         }
+    }
+
+    /// `20:34 · playing` at the trailing edge of the Now Playing row, ticking with the clock.
+    ///
+    /// **This is where the corner label went.** It was the same string in the chrome, where it had
+    /// no room to say *what* was playing and had to be tapped to find out. On the row it is beside
+    /// the track's own name, which is the arrangement the label could never have.
+    ///
+    /// `·` rather than the `▸` it used to carry: in this list `▸` means *goes somewhere*, and the
+    /// Now Playing row already has a subtitle doing that job. A recording row's bare `12:07` is the
+    /// precedent — a trailing value here is a value, not an affordance.
+    ///
+    /// `nil` when nothing is loaded, which never shows: `DialViewModel` only adds the row when
+    /// there is a track, so the two cannot disagree.
+    private var playbackStatus: String? {
+        guard let playback = content.playback else { return nil }
+        let state = playback.isPlaying ? "playing" : "paused"
+        return "\(DialTimeFormat.clock(playback.position)) · \(state)"
     }
 
     private var recordingRows: [DialScreen.List.Row] {

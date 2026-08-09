@@ -27,7 +27,10 @@ final class PlayerViewModel {
     // MARK: - Preferences
 
     var playbackSpeed: PlaybackSpeed
-    var skipDuration: SkipDuration
+    /// Read once from `UserDefaults` and never written: Settings stopped offering the choice, since
+    /// the dial has no skip control to size — its horizontal nudges step tracks. The stored value
+    /// (30s by default) still sizes the legacy player's ±buttons and is what `skipForward` uses.
+    let skipDuration: SkipDuration
     var repeatMode: RepeatMode
     var isShuffleEnabled: Bool
 
@@ -266,11 +269,6 @@ final class PlayerViewModel {
         UserDefaults.standard.savedPlaybackSpeed = speed
         let rate = speed.rawValue
         Task { [audioPlayer] in await audioPlayer.setRate(rate) }
-    }
-
-    func setSkipDuration(_ duration: SkipDuration) {
-        skipDuration = duration
-        UserDefaults.standard.savedSkipDuration = duration
     }
 
     func toggleRepeatMode() {
