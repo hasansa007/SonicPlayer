@@ -131,13 +131,16 @@ struct DialPressTests {
         #expect(effects == [.addMarker, .feedback(.commit)])
     }
 
-    @Test func thePauseChipTogglesAndRelabelsItself() {
+    /// Pause is a **left nudge** now rather than a chip, and it still has to say which way it will
+    /// go — a control that toggles without relabelling leaves you guessing what a press will do.
+    @Test func thePauseNudgeTogglesAndRelabelsItself() {
         var navigator = DialSample.whileRecording()
 
         let effects = navigator.receive(.action("pause"))
 
         #expect(effects == [.toggleRecordingPause, .feedback(.commit)])
-        #expect(navigator.screen.actions.last?.label == "Resume")
+        #expect(navigator.screen.ring.directions?.left?.label == "Resume")
+        #expect(navigator.screen.ring.directions?.left?.icon == .play)
     }
 
     @Test func thePreviewChipIsAnActionRatherThanAMode() {

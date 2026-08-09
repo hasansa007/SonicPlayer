@@ -49,8 +49,10 @@ struct DialScreenshotTests {
         #expect(rows(navigator)?.rows.first?.trailing == "01:00")
         #expect(rows(navigator)?.rows.first?.subtitle == "Today 14:02 · 2 markers")
         #expect(rows(navigator)?.rows.dropFirst().first?.subtitle == nil)
-        // Back moved to the top bar — it is navigation, not one of the things this screen does.
-        #expect(screen.actions.map(\.id) == ["edit", "more"])
+        // Back moved to the top bar; Edit and the actions menu moved onto the stick.
+        #expect(screen.actions.isEmpty)
+        #expect(screen.ring.directions?.right?.id == "edit")
+        #expect(screen.ring.directions?.left?.id == "more")
         #expect(screen.chrome.canGoBack)
         #expect(screen.ring.hub == .label("OPEN"))
         #expect(screen.hint == "rotate to scroll · press to open · double-press to edit")
@@ -117,7 +119,11 @@ struct DialScreenshotTests {
 
         #expect(screen.chrome.isRecording)
         #expect(screen.chrome.status == nil)
-        #expect(screen.actions.map(\.label) == ["＋ Marker", "Pause"])
+        // The chip row is gone: both actions moved onto the stick, up and left.
+        #expect(screen.actions.isEmpty)
+        #expect(screen.ring.directions?.up?.id == "marker")
+        #expect(screen.ring.directions?.left?.id == "pause")
+        #expect(screen.ring.isLive, "the border moves while a take is running")
         #expect(screen.ring.ticks == .level(0.42))
         #expect(screen.ring.hub == .recordDot)
         #expect(screen.hint == "ring shows input level · rotate to set gain · press to stop")
