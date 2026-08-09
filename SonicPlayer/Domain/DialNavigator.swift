@@ -330,6 +330,11 @@ struct DialNavigator {
             return open(.actions(itemID: item.id))
         case (.recordings, "record"):
             return startRecording()
+        // Import moved off the home menu and onto this screen. It stays put rather than opening a
+        // route, exactly as it did on the library — the picker is the host's, and the screen you
+        // come back to is the one the files land in.
+        case (.recordings, "import"):
+            return [.importFiles, .feedback(.commit)]
 
         // The tri-state's two ends. Reusing `.action` rather than inventing commands: previous and
         // next were already sayable, and a spring-return switch is a new *affordance* for them, not

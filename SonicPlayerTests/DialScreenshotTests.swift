@@ -31,8 +31,10 @@ struct DialScreenshotTests {
         #expect(rows(navigator)?.rows.map(\.title) == [
             "Playlists", "Recordings", "Focus Sessions", "Podcasts", "Stats"
         ])
-        // The chevron is the affordance, and only Recordings has somewhere to go.
-        #expect(rows(navigator)?.rows.map(\.trailing) == ["6", "12 ▸", "24", "9", nil])
+        // The count and the affordance are separate fields now. They were one string — `"12 ▸"` —
+        // until the card style drew a real chevron beside it and the row read `12 ▸ ›`.
+        #expect(rows(navigator)?.rows.map(\.trailing) == ["6", "12", "24", "9", nil])
+        #expect(rows(navigator)?.rows.map(\.opensSomewhere) == [false, true, false, false, false])
         #expect(rows(navigator)?.position == nil)
         #expect(screen.ring.hub == .label("OPEN"))
         #expect(screen.hint == "rotate to browse · press to open · hold for now playing")
@@ -49,8 +51,9 @@ struct DialScreenshotTests {
         #expect(rows(navigator)?.rows.first?.trailing == "01:00")
         #expect(rows(navigator)?.rows.first?.subtitle == "Today 14:02 · 2 markers")
         #expect(rows(navigator)?.rows.dropFirst().first?.subtitle == nil)
-        // Back moved to the top bar; Edit and the actions menu moved onto the stick.
-        #expect(screen.actions.isEmpty)
+        // Back moved to the top bar; Edit and the actions menu moved onto the stick. Import is the
+        // one chip left, having moved off the home menu onto the library it operates on.
+        #expect(screen.actions.map(\.id) == ["import"])
         #expect(screen.ring.directions?.right?.id == "edit")
         #expect(screen.ring.directions?.left?.id == "more")
         #expect(screen.chrome.canGoBack)
@@ -193,7 +196,9 @@ struct DialScreenshotTests {
         #expect(message.title == "No recordings yet")
 
         #expect(screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS"])
-        #expect(screen.actions.map(\.id) == ["record"])
+        // Import is here too, and the empty state is exactly why it is a chip rather than a row —
+        // there is no list to be a row in, and this is the state where importing matters most.
+        #expect(screen.actions.map(\.id) == ["import", "record"])
         #expect(screen.chrome.canGoBack)
         // Destructive, not primary. It is the obvious action on this screen *and* the one you
         // cannot casually undo, and the design draws it red for that reason — `.primary` renders

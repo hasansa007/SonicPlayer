@@ -84,6 +84,23 @@ enum DialRoute: Equatable {
         default: false
         }
     }
+
+    /// Whether the rows are large cards rather than compact list rows.
+    ///
+    /// **The top two menus, and nothing else.** These are the screens you *choose from* — two or
+    /// three destinations, each worth a title, a second line and a real icon. Everything below is a
+    /// list you *scan*, where the same treatment would fit four recordings on a screen that holds
+    /// twelve.
+    ///
+    /// It reads off the route for the same reason `countsRows` does: the alternative is inferring
+    /// it from the row count in the view, and the library home legitimately has two rows or three
+    /// depending on whether anything is loaded (`DialScreen.List.isProminent` has the full story).
+    var showsProminentRows: Bool {
+        switch self {
+        case .chooseMode, .library: true
+        default: false
+        }
+    }
 }
 
 /// What a tick of the wheel changes.

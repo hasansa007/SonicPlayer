@@ -87,50 +87,56 @@ final class DialViewModel {
     ) {
         var content = DialContent()
 
+        // **Home is a menu of two or three cards, and Import is not one of them.**
+        //
+        // It was first here on the argument that it is the only way audio the app did not record
+        // itself gets in. True, and still not a reason for it to outrank the two things this screen
+        // exists to offer — it is a *file operation on the library*, so it moved to the library,
+        // where `DialNavigatorScreen` makes it a chip on both the full and the empty state.
         content.sections = [
-            // **Import is first**, because it is the only way audio the app did not record itself
-            // gets in — and with Home gone, nothing else asks for it.
-            DialContent.Section(
-                id: "import",
-                icon: .importFile,
-                title: String(localized: "Import"),
-                count: nil,
-                destination: nil,
-                effect: .importFiles
-            ),
             DialContent.Section(
                 id: "recordings",
                 icon: .library,
                 title: String(localized: "Library"),
                 count: recentFiles.count,
-                destination: .recordings
+                destination: .recordings,
+                // What is inside, not how much — the count is already the row's trailing value, and
+                // a card that says `12` and "12 recordings" is one fact wearing two hats. Short
+                // because the card also carries a count and a chevron: "Recordings · Imported
+                // files" truncated to "Recordings · Import…" at the default text size.
+                subtitle: String(localized: "Recordings · Imports")
             ),
             DialContent.Section(
                 id: "record",
                 icon: .recording,
                 title: String(localized: "Record"),
                 count: nil,
-                destination: .recording
+                destination: .recording,
+                subtitle: String(localized: "Capture something new")
             )
         ]
 
-        // **Now Playing is a row again, but only when there is something to go to.**
+        // **Now Playing is the fast way back, so it goes first.**
         //
-        // It was removed for being a place that is not a place, and that argument was right about
-        // the *list* and wrong about the need — the corner label replacing it could say `20:34 ▸
-        // playing` and never *what*. A row can name the track, and it disappears when nothing is
-        // loaded, so it is never the dead entry that made it wrong the first time.
+        // It appears only when something is loaded, which is what stops it being the dead entry it
+        // was the first time. First rather than in the middle because that is what makes it fast:
+        // the highlight rests on row 0, so returning to what is playing is one press from the menu
+        // and needs no turn at all. `hold` still reaches it from anywhere; this is the visible
+        // partner for that gesture, in the same card style as its neighbours.
         if let track = player.currentTrack {
             content.sections.insert(
                 DialContent.Section(
                     id: "nowPlaying",
                     icon: .session,
-                    title: String(localized: "Now Playing"),
+                    // The existing key, not a title-cased twin of it. `DialChrome` already localises
+                    // "Now playing" into all nine languages, and two keys differing by one capital
+                    // is two things for a translator to keep in sync and one of them to miss.
+                    title: String(localized: "Now playing"),
                     count: nil,
                     destination: .nowPlaying,
                     subtitle: track.title
                 ),
-                at: 2
+                at: 0
             )
         }
 

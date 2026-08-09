@@ -8,10 +8,11 @@ import SwiftUI
 /// would also give the finger a second way to move the highlight, which is the thing this
 /// navigation model is trying not to have.
 ///
-/// **Two rows or fewer render prominently.** The listen/record chooser and a twelve-item recording
-/// list are the same `DialScreen.List` in the contract, so the count is the only signal available
-/// for "this is a choice between two things" versus "this is a list to scroll" — and it is the
-/// right signal, because that *is* the difference.
+/// **The navigator says whether the rows are cards.** This used to be `rows.count <= 2`, decided
+/// here, on the reasoning that the count is the only available signal for "a choice between two
+/// things" versus "a list to scroll". It was the wrong signal: the library home is two rows when
+/// nothing is loaded and three when something is, so the entire screen changed shape the moment
+/// playback started — see `DialScreen.List.isProminent`.
 struct DialListView: View {
 
     let list: DialScreen.List
@@ -19,9 +20,7 @@ struct DialListView: View {
     /// equal of pressing the hub on that row, which is what keeps the two input surfaces peers.
     let onSelect: (Int) -> Void
 
-    private static let prominentRowLimit = 2
-
-    private var isProminent: Bool { list.rows.count <= Self.prominentRowLimit }
+    private var isProminent: Bool { list.isProminent }
 
     /// Whether rows without an icon still hold the leading column open.
     ///
@@ -79,8 +78,6 @@ struct DialListView: View {
                 subjectHeader(subject)
             }
 
-            if isProminent { Spacer(minLength: 0) }
-
             ForEach(Array(list.rows.enumerated()), id: \.element.id) { index, row in
                 Button {
                     onSelect(index)
@@ -95,7 +92,11 @@ struct DialListView: View {
                 .buttonStyle(.plain)
             }
 
-            Spacer(minLength: 0)
+            // The cards sat between two of these and were therefore *centred* in whatever height
+            // the card gave them — which is where the empty band above and below them came from.
+            // A menu of two or three things should hug; only a list needs a floor to push `1 of 12`
+            // down to.
+            if !isProminent { Spacer(minLength: 0) }
 
             if let position = list.position {
                 Text(position)
@@ -130,13 +131,13 @@ private struct DialRowView: View {
                 // ordinary sizes, where these titles are one line anyway.
                 Text(row.title)
                     .font(titleFont)
-                    .fontWeight(isHighlighted || isProminent ? .semibold : .regular)
+                    .fontWeight(isProminent ? .bold : (isHighlighted ? .semibold : .regular))
                     .foregroundColor(titleColor)
                     .lineLimit(2)
 
                 if let subtitle = row.subtitle {
                     Text(subtitle)
-                        .font(.caption)
+                        .font(isProminent ? .subheadline : .caption)
                         .foregroundColor(secondaryColor)
                         .lineLimit(1)
                 }
@@ -146,13 +147,24 @@ private struct DialRowView: View {
 
             if let trailing = row.trailing {
                 Text(trailing)
-                    .font(.caption)
+                    .font(isProminent ? .subheadline : .caption)
                     .monospacedDigit()
                     .foregroundColor(secondaryColor)
             }
+
+            // Drawn for every card that goes somewhere, not just the highlighted one — it is a
+            // property of the destination, and a chevron that appears as the highlight arrives
+            // would read as part of the selection rather than as what the row is.
+            if isProminent && row.opensSomewhere {
+                Image(systemName: "chevron.right")
+                    .font(.footnote)
+                    .fontWeight(.semibold)
+                    .foregroundColor(isHighlighted ? secondaryColor : .sonicTextMuted)
+                    .accessibilityHidden(true)
+            }
         }
-        .padding(.horizontal, Spacing.md)
-        .padding(.vertical, isProminent ? Spacing.xl : Spacing.md)
+        .padding(.horizontal, isProminent ? Spacing.lg : Spacing.md)
+        .padding(.vertical, isProminent ? Spacing.lg : Spacing.md)
         .background(background)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)

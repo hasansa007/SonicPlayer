@@ -140,7 +140,8 @@ extension DialNavigator {
             position: route.countsRows && !rows.isEmpty
                 ? "\(min(level.highlighted, rows.count - 1) + 1) of \(rows.count)"
                 : nil,
-            subject: subject
+            subject: subject,
+            isProminent: route.showsProminentRows
         )
     }
 
@@ -163,20 +164,20 @@ extension DialNavigator {
         ]
     }
 
-    /// `12 ▸` when there is somewhere to go, a bare `6` when there is only a count, nothing when
-    /// there is neither. The chevron is the affordance, so it is tied to the destination rather
-    /// than typed into the title.
+    /// The count when there is one, and separately whether the row goes anywhere.
+    ///
+    /// The chevron used to be `▸` appended to the count string. It is a flag now, for the reason
+    /// `DialScreen.List.Row.opensSomewhere` gives — one field cannot be both a number and an
+    /// affordance without the view being unable to draw either properly.
     private var libraryRows: [DialScreen.List.Row] {
         content.sections.map { section in
-            let trailing = section.count.map { count in
-                section.destination == nil ? "\(count)" : "\(count) ▸"
-            }
-            return .init(
+            .init(
                 id: section.id,
                 icon: section.icon,
                 title: section.title,
-                trailing: trailing,
-                subtitle: section.subtitle
+                trailing: section.count.map { "\($0)" },
+                subtitle: section.subtitle,
+                opensSomewhere: section.destination != nil
             )
         }
     }
@@ -213,14 +214,28 @@ extension DialNavigator {
             return []
 
         case .recordings:
+            // **Import lives here now, not on the home menu.**
+            //
+            // It is a chip rather than a row on purpose. As a row it would have to sit at index 0
+            // of a list whose every other index means "the recording at that position" — and
+            // `press`, `doublePress`, `defersPress` and the stick's directions all read
+            // `content.recordings[safe: level.highlighted]` directly. One inserted row shifts the
+            // meaning of that subscript in five places at once, and the failure is silent: the
+            // wheel lands on a recording and the hub opens the one before it.
+            //
+            // A chip also survives the empty state, where there is no list to be a row in — and
+            // that is the state where importing matters most.
             guard !content.recordings.isEmpty else {
                 // Destructive rather than primary: starting a recording is the obvious action here
                 // and also the one you cannot casually undo, and those must not look alike.
-                return [.init(id: "record", label: "Record", emphasis: .destructive)]
+                return [
+                    .init(id: "import", label: "Import"),
+                    .init(id: "record", label: "Record", emphasis: .destructive)
+                ]
             }
             // `Edit` is the visible partner for `.doublePress`; the contract requires one.
             // Both moved onto the stick — right nudges to Edit, left to the actions menu.
-            return []
+            return [.init(id: "import", label: "Import")]
 
         // Nothing at all: the wheel seeks, the segments do volume and track, and Back is in the
         // top bar. A screen can legitimately have no chips.

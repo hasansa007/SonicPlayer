@@ -72,10 +72,18 @@ struct DialScreen: Equatable {
             var id: String
             var icon: Icon
             var title: String
-            /// The right-hand value — a duration (`"12:07"`), a count (`"12 ▸"`), or nothing.
+            /// The right-hand value — a duration (`"12:07"`), a count (`"12"`), or nothing.
             var trailing: String?
             /// The second line, e.g. `"Today 14:02 · 2 markers"`. Only some rows have one.
             var subtitle: String?
+            /// Whether pressing this row goes somewhere, as opposed to doing something in place.
+            ///
+            /// **This used to be a `▸` glued onto the end of `trailing`**, which made the count and
+            /// the affordance one string: a row could not have a count without also claiming to
+            /// navigate, and the view could not draw a real chevron without printing two. Once the
+            /// card style drew an actual glyph they appeared together — `3 ▸ ›` — which is the
+            /// stringly-typed version showing through.
+            var opensSomewhere: Bool = false
         }
 
         /// What the list is *about*, shown above the rows.
@@ -97,6 +105,16 @@ struct DialScreen: Equatable {
         /// `"1 of 12"`. Nil when the list is short enough that counting is noise.
         var position: String?
         var subject: Subject?
+        /// Whether the rows are the large cards of a top-level menu rather than the compact rows of
+        /// a list you scan.
+        ///
+        /// **This used to be `rows.count <= 2`, inferred in the view, and that was a latent style
+        /// flip.** The library home has two rows when nothing is loaded and three the moment
+        /// something is, so a count-derived rule made the whole screen change shape as playback
+        /// started — the cards it was designed as, collapsing into a plain list because a fourth
+        /// thing had happened elsewhere. It is a property of *which screen this is*, so the
+        /// navigator states it and the view obeys.
+        var isProminent: Bool = false
     }
 
     struct NowPlaying: Equatable {
