@@ -48,6 +48,10 @@ final class AppViewModel {
     let settings: SettingsViewModel
     let filesRoot: CollectionsViewModel
 
+    /// Holds the *same* player instance, for the same reason `home` does: the shell is a second
+    /// face on one playback engine, not a second engine (#6).
+    let shell: ShellViewModel
+
     /// Non-`let` because completing onboarding discards it, which is what `store.onboarding != nil`
     /// expressed before #14.
     var onboarding: OnboardingViewModel?
@@ -79,7 +83,8 @@ final class AppViewModel {
         settings: SettingsViewModel,
         filesRoot: CollectionsViewModel,
         onboarding: OnboardingViewModel?,
-        fileManager: FileManagerClient = .live
+        fileManager: FileManagerClient = .live,
+        haptics: HapticsClient = .live
     ) {
         self.player = player
         self.recording = recording
@@ -91,6 +96,9 @@ final class AppViewModel {
         // playback properties be deleted rather than ported (#16), so it cannot be defaulted
         // independently of `player`.
         self.home = HomeViewModel(player: player)
+        // Same reasoning as `home`: built from `player` rather than defaulted independently, so a
+        // caller substituting the player gets a shell driving that substitute.
+        self.shell = ShellViewModel(player: player, haptics: haptics)
         wire()
     }
 
@@ -212,5 +220,20 @@ final class AppViewModel {
         }
         // Any reload of the root browser refreshes Home's recents, which are drawn from it.
         filesRoot.onItemsLoaded = { [home] in home.loadRecentFiles() }
+
+        // The shell's out-edges (#6). Closures rather than direct calls for the reason every other
+        // edge here is one: it makes the edge reachable from a test without rendering a view.
+        shell.onSeek = { [player] time in player.seek(to: time) }
+        shell.onPlayPause = { [player] in player.playPauseTapped() }
+        shell.onNextTrack = { [player] in player.nextTrack() }
+        shell.onPreviousTrack = { [player] in player.previousTrack() }
+        shell.onSpeedBy = { [player] steps in
+            let all = PlaybackSpeed.allCases
+            guard let index = all.firstIndex(of: player.playbackSpeed) else { return }
+            player.setPlaybackSpeed(all[min(max(0, index + steps), all.count - 1)])
+        }
+        // `onVolumeBy` is deliberately unwired. Volume belongs to `MPVolumeView`, which owns the
+        // system slider and offers no setter worth having — an effect that silently does nothing
+        // beats one that fights the hardware buttons.
     }
 }

@@ -118,7 +118,7 @@ struct AppView: View {
         }
         // Global sheets
         .sheet(isPresented: $player.isExpanded) {
-            PlayerView(player: player)
+            ShellView(shell: app.shell, player: player)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
