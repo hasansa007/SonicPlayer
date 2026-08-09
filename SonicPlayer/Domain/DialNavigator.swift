@@ -341,9 +341,12 @@ struct DialNavigator {
     }
 }
 
-extension Array {
-    /// Bounds-checked subscript. The navigator clamps every index it owns, but the data behind one
-    /// can be replaced by `update(_:)` between a turn and a press.
+/// Bounds-checked subscript. The navigator clamps every index it owns, but the data behind one can
+/// be replaced by `update(_:)` between a turn and a press.
+///
+/// Deliberately file-private rather than a module-wide convenience: `subscript(safe:)` is a name
+/// several files could plausibly want, and two of them declaring it is a build failure for both.
+private extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil
     }
