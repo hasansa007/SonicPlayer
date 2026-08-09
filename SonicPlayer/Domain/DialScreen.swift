@@ -145,6 +145,12 @@ struct DialScreen: Equatable {
         case podcast
         case stats
         case marker
+        /// Bringing a file in from outside the app. The mirror of `export`, and not `add` — `add`
+        /// is a bare plus, which says "one more of these" rather than "from somewhere else".
+        case importFile
+        /// A collection of recordings, as a place rather than as the act of recording. Distinct
+        /// from `recording`, which is the microphone.
+        case library
         // Roles the gear stick's directions need. Named for what they do, not for the symbol, so
         // the view still owns every glyph choice.
         case volumeUp

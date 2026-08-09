@@ -77,7 +77,7 @@ final class DialViewModel {
             // gets in — and with Home gone, nothing else asks for it.
             DialContent.Section(
                 id: "import",
-                icon: .add,
+                icon: .importFile,
                 title: String(localized: "Import"),
                 count: nil,
                 destination: nil,
@@ -85,7 +85,7 @@ final class DialViewModel {
             ),
             DialContent.Section(
                 id: "recordings",
-                icon: .recording,
+                icon: .library,
                 title: String(localized: "Library"),
                 count: recentFiles.count,
                 destination: .recordings
@@ -96,7 +96,7 @@ final class DialViewModel {
             // plays. The chrome's status line is the way in, and `hold` still works from anywhere.
             DialContent.Section(
                 id: "record",
-                icon: .marker,
+                icon: .recording,
                 title: String(localized: "Record"),
                 count: nil,
                 destination: .recording

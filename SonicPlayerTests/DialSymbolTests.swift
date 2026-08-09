@@ -45,7 +45,7 @@ private extension DialScreen.Icon {
     /// adding the conformance to the shared file to serve one test would be the test leaking into
     /// the design. Listed here instead, where forgetting to add a case costs only this test.
     static let allDialCases: [DialScreen.Icon] = [
-        .playlist, .recording, .session, .podcast, .stats, .marker,
+        .playlist, .recording, .session, .podcast, .stats, .marker, .importFile, .library,
         .volumeUp, .volumeDown, .previous, .next, .pause, .play, .edit, .more,
         .share, .export, .rename, .delete, .add, .none
     ]

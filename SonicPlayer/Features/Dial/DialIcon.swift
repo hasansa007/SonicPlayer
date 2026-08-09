@@ -17,6 +17,8 @@ enum DialIcon {
         case .podcast: "dot.radiowaves.left.and.right"
         case .stats: "chart.bar.fill"
         case .marker: "bookmark.fill"
+        case .importFile: "square.and.arrow.down"
+        case .library: "square.stack.fill"
         case .volumeUp: "speaker.plus.fill"
         case .volumeDown: "speaker.minus.fill"
         case .previous: "backward.end.fill"
