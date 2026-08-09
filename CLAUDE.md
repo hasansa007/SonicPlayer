@@ -255,6 +255,27 @@ Three differences from XCTest that bite when writing new tests:
 - **`#expect`'s message is `Comment?`, not `String`.** A literal or `"\(interpolation)"` works; a
   bare `String` variable does not.
 
+## App Store compliance — binding on the UI and on every word that ships
+
+The dial is a rotary control, and rotary controls on a music player invite one comparison in
+particular. App Store Review Guideline 5.2.5 prohibits an app that "appears confusingly similar to
+an existing Apple product, interface…", and *Rewound* was removed in 2020 for exactly that. Two
+standing rules follow, and **`docs/superpowers/specs/2026-08-09-rotary-shell-design.md` §3 is the
+authority** — it holds the full table of what is kept and what is deliberately changed.
+
+- **No skeuomorphic mimicry of Apple hardware.** Flat and matte, the app's dark palette and its
+  gradients. Never a white or grey plastic wheel, a chrome bevel, brushed metal or gloss.
+- **Five words never appear** in the UI, store copy, `RELEASE_NOTES.md`, App Store keyword metadata,
+  screenshots, type names or commit messages: *iPod*, *Click Wheel*, *Classic Player*, *Retro*,
+  *Nostalgia*. The first two are Apple trademarks; the other three are refused because they are the
+  words that argue an app is trading on a resemblance, which is evidence for the reading 5.2.5
+  turns on.
+- **Positioning is affirmative:** *precision dial navigation* and *gesture-based scrubbing*, for
+  modern use. A claim about what the control does, not about what it recalls.
+
+`RELEASE_NOTES.md` is the surface most likely to slip, because a version's What's New is written in
+a hurry and ships straight to testers.
+
 ## Release
 
 Summarised here for context; **`docs/deploy-and-staging.md` is authoritative** and wins if these

@@ -19,12 +19,14 @@ struct DialHighlightTests {
     // `#expect` captures its expression in a closure, so a `mutating` call written inside one fails
     // to compile against an immutable copy. Every result below is bound to a local first.
 
+    // `inRecordings` lands on the first *recording*, which is row 1 — Import is row 0.
+
     @Test func oneTickMovesOneRow() {
         var navigator = DialSample.inRecordings()
 
         let effects = navigator.receive(.tick(1))
 
-        #expect(highlight(navigator) == 1)
+        #expect(highlight(navigator) == 2)
         #expect(effects == [.feedback(.detent)])
     }
 
@@ -34,7 +36,7 @@ struct DialHighlightTests {
 
         _ = navigator.receive(.tick(5))
 
-        #expect(highlight(navigator) == 5)
+        #expect(highlight(navigator) == 6)
     }
 
     @Test func turningBackwardsMovesBackwards() {
@@ -43,7 +45,7 @@ struct DialHighlightTests {
 
         _ = navigator.receive(.tick(-2))
 
-        #expect(highlight(navigator) == 3)
+        #expect(highlight(navigator) == 4)
     }
 
     @Test func aZeroTickDoesNothingAtAll() {
@@ -54,55 +56,59 @@ struct DialHighlightTests {
         #expect(effects.isEmpty)
     }
 
-    // MARK: - The ends
+    // MARK: - The ends, which are no longer ends
 
-    /// **Clamping, not wrapping** — and the wall has to be felt or it is not a wall.
-    @Test func theTopOfTheListIsAWall() {
-        var navigator = DialSample.inRecordings()
+    /// **The list wraps in both directions.** It clamped until `Delete` got a confirmation dialog —
+    /// the whole argument for a wall was that overshooting the top of the actions menu would land a
+    /// thumb on the destructive row. Guarded, that objection goes, and a wheel with no ends stops
+    /// having to explain which end you are against through a pulse that means four other things.
+    @Test func turningBackPastTheFirstRowLandsOnTheLast() {
+        var navigator = DialSample.inRecordings(recordingCount: 3)
+        _ = navigator.receive(.tick(-1))            // onto Import, row 0
 
         let effects = navigator.receive(.tick(-1))
 
-        #expect(highlight(navigator) == 0)
-        #expect(effects == [.feedback(.limit)])
+        #expect(highlight(navigator) == 3, "Import plus three recordings — round to the last")
+        #expect(effects == [.feedback(.detent)], "a move is a detent, not a wall")
     }
 
-    @Test func theBottomOfTheListIsAWall() {
+    @Test func turningPastTheLastRowLandsOnTheFirst() {
         var navigator = DialSample.inRecordings(recordingCount: 3)
-        _ = navigator.receive(.tick(2))
+        _ = navigator.receive(.tick(2))             // the last recording, row 3
 
         let effects = navigator.receive(.tick(1))
 
+        #expect(highlight(navigator) == 0)
+        #expect(effects == [.feedback(.detent)])
+    }
+
+    /// A flick far larger than the list still lands somewhere sensible rather than running out of
+    /// bounds — `detents` is reduced modulo the row count before it is applied.
+    @Test func aFlickLongerThanTheListStillLands() {
+        var navigator = DialSample.inRecordings(recordingCount: 3)   // 4 rows, highlight on 1
+
+        let effects = navigator.receive(.tick(41))                   // 41 % 4 == 1
+
         #expect(highlight(navigator) == 2)
+        #expect(effects == [.feedback(.detent)])
+    }
+
+    /// **The one honest limit left.** A spin of exactly a whole number of revolutions ends where it
+    /// started, and a tick that changes nothing reports `.limit` — the law this suite opens with,
+    /// which wrapping does not repeal.
+    @Test func awholeNumberOfRevolutionsChangesNothing() {
+        var navigator = DialSample.inRecordings(recordingCount: 3)   // 4 rows
+
+        let effects = navigator.receive(.tick(40))                   // 40 % 4 == 0
+
+        #expect(highlight(navigator) == 1)
         #expect(effects == [.feedback(.limit)])
-    }
-
-    /// A spin that overshoots still lands, and landing is a detent. Only the *next* tick, which
-    /// moves nothing, is the limit — which is exactly how a real detented wheel behaves.
-    @Test func overshootingLandsOnTheEndAndStillClicks() {
-        var navigator = DialSample.inRecordings(recordingCount: 3)
-
-        let landing = navigator.receive(.tick(40))
-        let afterwards = navigator.receive(.tick(40))
-
-        #expect(highlight(navigator) == 2)
-        #expect(landing == [.feedback(.detent)])
-        #expect(afterwards == [.feedback(.limit)])
-    }
-
-    /// Wrapping would put the last row — `Delete`, on the actions screen — under a thumb that
-    /// overshot the top. Clamping is the choice, and this is the case that decides it.
-    @Test func theListDoesNotWrapAround() {
-        var navigator = DialSample.inRecordings(recordingCount: 3)
-        _ = navigator.receive(.tick(2))
-
-        _ = navigator.receive(.tick(1))
-
-        #expect(highlight(navigator) == 2)
     }
 
     // MARK: - Nothing to scroll
 
-    @Test func anEmptyListHasNothingToMoveAndSaysSo() {
+    /// One row cannot wrap onto itself. An empty library is exactly that — the Import row alone.
+    @Test func aSingleRowListHasNothingToMoveAndSaysSo() {
         var navigator = DialSample.navigator(recordingCount: 0)
         _ = navigator.receive(.tick(1))
         _ = navigator.receive(.press)
@@ -116,6 +122,8 @@ struct DialHighlightTests {
 
     /// `Ticks.browse(thumb:)` exists to light the tick you are on, so it has to track the row.
     @Test func theRingsThumbFollowsTheHighlight() {
+        // Five recordings and the Import row is six, so the midpoint is row 3 — the highlight opens
+        // on row 1 and two ticks reach it.
         var navigator = DialSample.inRecordings(recordingCount: 5)
 
         _ = navigator.receive(.tick(2))
@@ -124,13 +132,15 @@ struct DialHighlightTests {
             Issue.record("expected browse ticks, got \(navigator.screen.ring.ticks)")
             return
         }
-        #expect(abs((thumb ?? .nan) - 0.5) < 1e-9)
+        #expect(abs((thumb ?? .nan) - 0.6) < 1e-9)
     }
 
+    /// A one-row list has no span to place a thumb along. Only the empty library is one row now —
+    /// a single recording is two, because Import is always above it.
     @Test func aSingleRowHasNoThumbToPlace() {
-        var navigator = DialSample.inRecordings(recordingCount: 1)
-
+        var navigator = DialSample.navigator(recordingCount: 0)
         _ = navigator.receive(.tick(1))
+        _ = navigator.receive(.press)
 
         #expect(navigator.screen.ring.ticks == .browse(thumb: nil))
     }

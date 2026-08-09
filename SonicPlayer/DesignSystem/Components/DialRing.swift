@@ -253,7 +253,13 @@ struct DialRing: View {
         if let direction, let glyph = DialIcon.systemImage(for: direction.icon) {
             Image(systemName: glyph)
                 .font(.system(size: DialFont.directionMark, weight: .semibold))
-                .foregroundColor(.sonicTextMuted)
+                // **`sonicTextMuted` was too quiet to survive daylight.** It is the right token for
+                // text that is genuinely secondary, and these are not: they are the only thing
+                // naming what the stick's four nudges do, so a glyph nobody can find is a control
+                // nobody knows exists. The accent gives them the app's own colour and enough
+                // contrast to read outdoors, without turning them into buttons — they are a legend,
+                // and the thing you touch is still the hub.
+                .foregroundColor(.sonicPrimary)
                 .offset(x: x * Self.markRadius, y: y * Self.markRadius)
         }
     }

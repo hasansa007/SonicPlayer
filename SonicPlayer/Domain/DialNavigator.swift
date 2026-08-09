@@ -106,11 +106,29 @@ struct DialNavigator {
         }
     }
 
+    /// **The list wraps.** Past the last row is the first, and backwards past the first is the last.
+    ///
+    /// This was a wall in both directions, and the recorded reason was the actions menu: wrapping
+    /// puts `Delete` — its last row — one detent from the top, so overshooting upward lands the
+    /// thumb on the destructive one. That objection stands only while `Delete` is unguarded, and it
+    /// is not: the confirmation dialog and this change belong to the same slice and must not be
+    /// separated.
+    ///
+    /// A wheel with no ends also removes the thing a wheel is worst at — telling you *which* end
+    /// you are against, when the only signal is a pulse that means several other things too.
+    ///
+    /// One row still cannot move: `(0 + n) % 1` is 0, so a single-row list would report a detent
+    /// for a turn that changed nothing. That is the one honest limit left.
     private mutating func moveHighlight(by detents: Int) -> [DialEffect] {
         let rows = rowCount(route)
-        guard rows > 0 else { return [.feedback(.limit)] }
+        guard rows > 1 else { return [.feedback(.limit)] }
 
-        let target = min(max(0, level.highlighted + detents), rows - 1)
+        // `%` keeps the sign of its left operand in Swift, so a backward turn off row 0 lands
+        // negative. Adding `rows` before the second modulo is what brings it round to the end
+        // rather than out of bounds — and `detents` itself can exceed `rows` on a fast flick, which
+        // is why it is reduced first.
+        let offset = ((detents % rows) + rows) % rows
+        let target = (level.highlighted + offset) % rows
         guard target != level.highlighted else { return [.feedback(.limit)] }
 
         stack[stack.count - 1].highlighted = target
@@ -249,8 +267,17 @@ struct DialNavigator {
             return [.feedback(.limit)]
 
         case .recordings:
-            guard let item = content.recordings[safe: level.highlighted] else { return startRecording() }
-            return playItem(item, at: level.highlighted)
+            switch RecordingsRow.at(level.highlighted, recordings: content.recordings.count) {
+            case .importFiles:
+                // Stays put. The picker belongs to the host and the files land in this very list,
+                // so navigating away would be a round trip back to where you already are.
+                return [.importFiles, .feedback(.commit)]
+            case .recording(let index):
+                guard let item = content.recordings[safe: index] else { return [.feedback(.limit)] }
+                return playItem(item, at: index)
+            case nil:
+                return [.feedback(.limit)]
+            }
 
         case .nowPlaying:
             content.playback?.isPlaying.toggle()
@@ -273,6 +300,10 @@ struct DialNavigator {
         case .actions(let itemID):
             let action = DialItemAction.allCases[min(level.highlighted, DialItemAction.allCases.count - 1)]
             pop()
+            // **Edit is a place, not a thing done to a file.** Emitting `.item(.edit, …)` like the
+            // others would hand it to `onItemAction`, which is deliberately unwired — the row would
+            // have looked identical and done nothing at all.
+            guard action != .edit else { return openEditor(itemID: itemID) }
             return [.item(action, itemID: itemID), .feedback(.commit)]
         }
     }
@@ -283,7 +314,9 @@ struct DialNavigator {
     /// exists and would not move, and a double-press on the library is not pushing against
     /// anything at all. Buzzing there would teach the gesture is available everywhere.
     private mutating func doublePress() -> [DialEffect] {
-        guard case .recordings = route, content.recordings[safe: level.highlighted] != nil else {
+        guard case .recordings = route,
+              case .recording(let index)? = RecordingsRow.at(level.highlighted, recordings: content.recordings.count),
+              content.recordings.indices.contains(index) else {
             return []
         }
         return openEditor()
@@ -326,15 +359,11 @@ struct DialNavigator {
         case (.recordings, "edit"):
             return doublePress()
         case (.recordings, "more"):
-            guard let item = content.recordings[safe: level.highlighted] else { return [.feedback(.limit)] }
+            guard case .recording(let index)? = RecordingsRow.at(level.highlighted, recordings: content.recordings.count),
+                  let item = content.recordings[safe: index] else { return [.feedback(.limit)] }
             return open(.actions(itemID: item.id))
         case (.recordings, "record"):
             return startRecording()
-        // Import moved off the home menu and onto this screen. It stays put rather than opening a
-        // route, exactly as it did on the library — the picker is the host's, and the screen you
-        // come back to is the one the files land in.
-        case (.recordings, "import"):
-            return [.importFiles, .feedback(.commit)]
 
         // The tri-state's two ends. Reusing `.action` rather than inventing commands: previous and
         // next were already sayable, and a spring-return switch is a new *affordance* for them, not
@@ -386,13 +415,32 @@ struct DialNavigator {
     }
 
     private mutating func openEditor() -> [DialEffect] {
-        guard let item = content.recordings[safe: level.highlighted] else { return [.feedback(.limit)] }
-        return open(.edit(itemID: item.id))
+        guard case .recording(let index)? = RecordingsRow.at(level.highlighted, recordings: content.recordings.count),
+              let item = content.recordings[safe: index] else { return [.feedback(.limit)] }
+        return openEditor(itemID: item.id)
     }
 
+    /// Both of these silence playback first — see `DialEffect.pausePlayback` for why the microphone
+    /// and the trim preview cannot share the session with a track.
+    ///
+    /// The navigator marks its own copy paused in the same breath. Without it the Now playing row
+    /// keeps its play glyph until the host answers, and on the recording screen that is a picture
+    /// of audio still running while the meter says otherwise.
     private mutating func startRecording() -> [DialEffect] {
+        let silence = pausePlaybackIfNeeded()
         push(.recording)
-        return [.startRecording, .feedback(.commit)]
+        return silence + [.startRecording, .feedback(.commit)]
+    }
+
+    private mutating func openEditor(itemID: String) -> [DialEffect] {
+        let silence = pausePlaybackIfNeeded()
+        return silence + open(.edit(itemID: itemID))
+    }
+
+    private mutating func pausePlaybackIfNeeded() -> [DialEffect] {
+        guard content.playback?.isPlaying == true else { return [] }
+        content.playback?.isPlaying = false
+        return [.pausePlayback]
     }
 
     /// Fills in the playback state optimistically so the pushed Now Playing screen is right on the
@@ -431,7 +479,7 @@ struct DialNavigator {
         switch route {
         case .chooseMode: 2
         case .library: content.sections.count
-        case .recordings: content.recordings.count
+        case .recordings: RecordingsRow.rowCount(recordings: content.recordings.count)
         case .actions: DialItemAction.allCases.count
         case .nowPlaying, .recording, .edit: 0
         }

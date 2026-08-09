@@ -43,6 +43,8 @@ final class PlayerViewModel {
     var originalQueue: [AudioFile] = []
 
     var isPlaying = false
+    /// `0...1`, this app's own gain. See `setVolume(_:)` for why it is not the system volume.
+    var volume: Double = 1
     var currentTime: TimeInterval = 0
     var duration: TimeInterval = 0
     var isLoadingTrack = false
@@ -266,6 +268,19 @@ final class PlayerViewModel {
         UserDefaults.standard.savedPlaybackSpeed = speed
         let rate = speed.rawValue
         Task { [audioPlayer] in await audioPlayer.setRate(rate) }
+    }
+
+    /// This app's output level, `0...1`. **Not the device volume** — that belongs to the hardware
+    /// buttons and `MPVolumeView`, and fighting them was the reason the dial's volume axis went
+    /// unwired for so long. `AVPlayer.volume` is per-player gain, so the wheel can turn this
+    /// without the system slider moving under anyone.
+    ///
+    /// Not persisted: a level chosen for one listening session is not a preference, and coming back
+    /// to an app that is quiet with no memory of why is worse than starting at full.
+    func setVolume(_ value: Double) {
+        volume = min(max(0, value), 1)
+        let level = Float(volume)
+        Task { [audioPlayer] in await audioPlayer.setVolume(level) }
     }
 
     func setSkipDuration(_ duration: SkipDuration) {

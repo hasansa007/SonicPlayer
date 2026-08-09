@@ -19,6 +19,29 @@ final class DialViewModel {
 
     var onPlay: ((String) -> Void)?
     var onTogglePlayPause: (() -> Void)?
+    /// Recording and trimming both want the audio session to themselves.
+    var onPausePlayback: (() -> Void)?
+    /// `0...1`, already clamped by the navigator.
+    var onSetVolume: ((Double) -> Void)?
+    /// Raised only after the user has confirmed. The composition root does the deleting, because a
+    /// file leaving disk concerns the player, the markers and the waveform cache as well.
+    var onDeleteItem: ((String) -> Void)?
+
+    /// The recording `Delete` was pressed on, held while the alert is up.
+    ///
+    /// **It carries the title, not just the id.** A confirmation that cannot name what it is about
+    /// to destroy is a speed bump rather than a safeguard — and the actions menu is reached by
+    /// wheel, so the row under your thumb when you pressed is not necessarily the one you meant.
+    struct PendingDelete: Equatable, Identifiable {
+        var id: String
+        var title: String
+    }
+
+    var pendingDelete: PendingDelete?
+
+    /// Surfaced when a delete fails. The file is still there and the user has to be told, or the
+    /// list quietly disagreeing with disk is the only clue.
+    var operationError: String?
     var onSeek: ((TimeInterval) -> Void)?
     var onSelectTrack: ((Int) -> Void)?
     var onStartRecording: (() -> Void)?
@@ -67,6 +90,17 @@ final class DialViewModel {
         receive(.action("nowPlaying"))
     }
 
+    /// Goes through with the deletion the alert is asking about.
+    func confirmDelete() {
+        guard let pending = pendingDelete else { return }
+        pendingDelete = nil
+        onDeleteItem?(pending.id)
+    }
+
+    func cancelDelete() {
+        pendingDelete = nil
+    }
+
     /// The single entry point. Every turn, press and chip tap arrives here.
     func receive(_ command: DialCommand) {
         for effect in navigator.receive(command) {
@@ -80,7 +114,7 @@ final class DialViewModel {
     /// against the new content, so a list shrinking under a screen you are not looking at cannot
     /// leave a highlight pointing past the end.
     func refresh(
-        recentFiles: [AudioFile],
+        allFiles: [AudioFile],
         player: PlayerViewModel,
         recorder: RecordingViewModel,
         markers: MarkerRegistry
@@ -98,7 +132,7 @@ final class DialViewModel {
                 id: "recordings",
                 icon: .library,
                 title: String(localized: "Library"),
-                count: recentFiles.count,
+                count: allFiles.count,
                 destination: .recordings,
                 // What is inside, not how much — the count is already the row's trailing value, and
                 // a card that says `12` and "12 recordings" is one fact wearing two hats. Short
@@ -116,31 +150,15 @@ final class DialViewModel {
             )
         ]
 
-        // **Now Playing is the fast way back, so it goes first.**
+        // **There is no Now Playing row, and the corner label is why.**
         //
-        // It appears only when something is loaded, which is what stops it being the dead entry it
-        // was the first time. First rather than in the middle because that is what makes it fast:
-        // the highlight rests on row 0, so returning to what is playing is one press from the menu
-        // and needs no turn at all. `hold` still reaches it from anywhere; this is the visible
-        // partner for that gesture, in the same card style as its neighbours.
-        if let track = player.currentTrack {
-            content.sections.insert(
-                DialContent.Section(
-                    id: "nowPlaying",
-                    icon: .session,
-                    // The existing key, not a title-cased twin of it. `DialChrome` already localises
-                    // "Now playing" into all nine languages, and two keys differing by one capital
-                    // is two things for a translator to keep in sync and one of them to miss.
-                    title: String(localized: "Now playing"),
-                    count: nil,
-                    destination: .nowPlaying,
-                    subtitle: track.title
-                ),
-                at: 0
-            )
-        }
+        // It was a row here for two rounds — a card, first in the list, naming the track the way a
+        // corner label never could. What that could not do is exist anywhere else: two levels into
+        // the library there was no visible way back to what was playing, because the row lives on
+        // this screen only. The label in `DialChrome` follows you down, and following you down is
+        // the whole job. See `DialNavigatorScreen.status`.
 
-        content.recordings = recentFiles.map { file in
+        content.recordings = allFiles.map { file in
             DialContent.Item(
                 id: file.url.absoluteString,
                 title: file.title,
@@ -156,13 +174,18 @@ final class DialViewModel {
                 position: player.currentTime,
                 duration: player.duration,
                 isPlaying: player.isPlaying,
+                // **The second half of the volume bug.** `DialContent.Playback.volume` defaults to
+                // 1, and this omitted it — so every refresh handed the navigator a full-volume
+                // picture and overwrote whatever the wheel had just set. Even with the effect
+                // wired, the arc would have snapped back to full on the next tick of the clock.
+                volume: player.volume,
                 queueIndex: player.currentIndex,
                 queueCount: max(1, player.queue.count)
             )
         }
 
         content.capture = capture(from: recorder)
-        content.editing = editable(from: recentFiles, markers: markers)
+        content.editing = editable(from: allFiles, markers: markers)
 
         navigator.update(content)
     }
@@ -203,10 +226,10 @@ final class DialViewModel {
     /// decides where you are. It also means the material necessarily arrives one refresh *after*
     /// the push, which is exactly what `DialNavigator.currentTrim` is written to absorb.
     private func editable(
-        from recentFiles: [AudioFile], markers: MarkerRegistry
+        from allFiles: [AudioFile], markers: MarkerRegistry
     ) -> DialContent.Editable? {
         guard case .edit(let itemID) = navigator.route,
-              let file = recentFiles.first(where: { $0.url.absoluteString == itemID })
+              let file = allFiles.first(where: { $0.url.absoluteString == itemID })
         else { return nil }
 
         return DialContent.Editable(
@@ -263,6 +286,8 @@ final class DialViewModel {
             onPlay?(itemID)
         case .togglePlayPause:
             onTogglePlayPause?()
+        case .pausePlayback:
+            onPausePlayback?()
         case .seek(let time):
             onSeek?(time)
         case .selectTrack(let index):
@@ -294,18 +319,28 @@ final class DialViewModel {
             // change twice.
             break
 
-        case .setVolume:
-            // Volume belongs to `MPVolumeView`, which owns the system slider and publishes no
-            // setter worth having. `AppViewModel.wire()` records the same decision for the shell's
-            // `onVolumeBy`: an effect that silently does nothing beats one that fights the hardware
-            // buttons.
-            break
+        case .setVolume(let value):
+            // **This used to be `break`**, under a note saying volume belongs to `MPVolumeView`,
+            // which owns the system slider and offers no setter worth having — so an effect that
+            // did nothing beat one that fought the hardware buttons.
+            //
+            // Right about the system volume, wrong as a conclusion. `AVPlayer.volume` is this
+            // player's own gain: the wheel changes how loud the app is and the hardware buttons and
+            // their slider are untouched. The nudges, the clamp and the ring's arc were all already
+            // here; this was the only missing link, and it was silent because a `break` is.
+            onSetVolume?(value)
+
+        // **Delete stops here and asks.** The navigator has already popped the menu by the time
+        // this arrives — pressing a row is what closes it — so the alert rises over the recordings
+        // list, which is where you were and where the file is about to vanish from.
+        case .item(.delete, let itemID):
+            guard let title = navigator.content.item(itemID)?.title else { return }
+            pendingDelete = PendingDelete(id: itemID, title: title)
 
         case .item(let action, let itemID):
-            // Share, rename and delete are the browser's flows, and the actions screen is its own
-            // slice. Named rather than defaulted so a new effect cannot join it by accident, and
-            // routed through a closure so wiring it later is one line in `wire()` rather than a
-            // change here.
+            // Share and rename are the browser's flows, and the actions screen is its own slice.
+            // Named rather than defaulted so a new effect cannot join it by accident, and routed
+            // through a closure so wiring it later is one line in `wire()` rather than a change here.
             onItemAction?(action, itemID)
         }
     }

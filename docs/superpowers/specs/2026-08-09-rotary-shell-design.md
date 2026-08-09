@@ -59,9 +59,27 @@ argument that moving it off 12 o'clock is itself the differentiator. That argume
 the word is the single most recognisable token of the interface being avoided, and it is free to
 change. The safe default is a different word (`BROWSE`, `LIBRARY`) or a glyph.
 
-**Never, anywhere:** the words *iPod* or *Click Wheel* (both Apple trademarks) in the UI, the store
-copy, the screenshots, the type names or the commit messages; "looks like an iPod" as marketing; an
-app icon depicting the device; Apple product photography.
+**Never, anywhere:** the words *iPod*, *Click Wheel*, *Classic Player*, *Retro* or *Nostalgia* in
+the UI, the store copy, the release notes, the App Store keyword metadata, the screenshots, the type
+names or the commit messages; "looks like an iPod" as marketing; an app icon depicting the device;
+Apple product photography.
+
+The three added to that list are not trademarks, which is exactly why they are worth naming. *iPod*
+and *Click Wheel* are refused on trademark grounds; *Classic Player*, *Retro* and *Nostalgia* are
+refused because they are the words a reviewer reaches for when arguing that an app is trading on a
+resemblance. Guideline 5.2.5 turns on whether something "appears confusingly similar" — copy that
+invites the comparison is evidence for the reading we are trying to avoid, and none of these words
+is load-bearing enough to be worth it.
+
+**Positioning, in the affirmative.** Describe this as **precision dial navigation** and
+**gesture-based scrubbing**, framed for modern use — long lectures, podcasts, recordings you have to
+land on a moment inside. That is what the control actually is, and it is a claim about capability
+rather than about resembling anything.
+
+**The visual rules follow from the same place.** Flat and matte, the app's dark palette and its
+gradients; never a white or grey plastic wheel, a chrome bevel, brushed metal or gloss. The table
+above is the concrete version and this is the standing rule: no skeuomorphic mimicry of Apple
+hardware, in the app or in anything that depicts it.
 
 **Rejected — a radial "bloom" menu around the wheel.** Items pinned to fixed angles build strong
 muscle memory and would have been the more distinctive design. Rejected because fixed-angle labels

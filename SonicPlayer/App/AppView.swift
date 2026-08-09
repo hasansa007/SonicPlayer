@@ -83,7 +83,7 @@ struct AppView: View {
                     .onAppear {
                         if !ScreenshotMode.isEnabled {
                             filesRoot.onAppear()
-                            home.loadRecentFiles()
+                            home.loadAllFiles()
                         }
                     }
                     .navigationDestination(for: URL.self) { folderURL in
@@ -222,7 +222,7 @@ private extension AppView {
                 // the track lands a moment later. This is where that arrival is noticed.
                 if track != nil { app.dial.showNowPlayingIfIdle() }
             }
-            .onChange(of: app.home.recentFiles) { _, _ in app.refreshDial() }
+            .onChange(of: app.home.allFiles) { _, _ in app.refreshDial() }
             .onChange(of: app.recording.isRecording) { _, _ in app.refreshDial() }
             .onChange(of: app.recording.peakLevel) { _, _ in app.refreshDial() }
             // Pausing stops the meter, so `peakLevel` stops changing — without this the screen
@@ -230,6 +230,32 @@ private extension AppView {
             .onChange(of: app.recording.isPaused) { _, _ in app.refreshDial() }
             // A marker must appear under the thumb, not up to a meter interval later.
             .onChange(of: app.recording.markers) { _, _ in app.refreshDial() }
+            // **The only destructive thing the dial can do, and the only one that stops to ask.**
+            // It names the recording: the actions menu is reached by wheel, so the row under your
+            // thumb when you pressed is not guaranteed to be the one you meant.
+            .alert(
+                Text("Delete \(app.dial.pendingDelete?.title ?? "")?"),
+                isPresented: Binding(
+                    get: { app.dial.pendingDelete != nil },
+                    set: { if !$0 { app.dial.cancelDelete() } }
+                )
+            ) {
+                Button("Cancel", role: .cancel) { app.dial.cancelDelete() }
+                Button("Delete", role: .destructive) { app.dial.confirmDelete() }
+            } message: {
+                Text("This cannot be undone.")
+            }
+            .alert(
+                "Action Failed",
+                isPresented: Binding(
+                    get: { app.dial.operationError != nil },
+                    set: { if !$0 { app.dial.operationError = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) { app.dial.operationError = nil }
+            } message: {
+                Text(app.dial.operationError ?? "")
+            }
             .toolbar(.hidden, for: .navigationBar)
     }
 
@@ -240,7 +266,7 @@ private extension AppView {
             if filesRoot.isLoading && filesRoot.items.isEmpty {
                 ProgressView()
                     .tint(.sonicPrimary)
-            } else if filesRoot.items.isEmpty && home.recentFiles.isEmpty {
+            } else if filesRoot.items.isEmpty && home.allFiles.isEmpty {
                 // Empty state
                 VStack(spacing: 20) {
                     Spacer()
@@ -304,7 +330,7 @@ private extension AppView {
                 }
                 .refreshable {
                     filesRoot.refreshFiles()
-                    home.loadRecentFiles()
+                    home.loadAllFiles()
                 }
             }
         }
@@ -314,7 +340,7 @@ private extension AppView {
 
     @ViewBuilder
     var recentFilesSection: some View {
-        if !home.recentFiles.isEmpty {
+        if !home.allFiles.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Recent Media")
@@ -332,7 +358,7 @@ private extension AppView {
                 .padding(.horizontal)
 
                 List {
-                    ForEach(home.recentFiles) { file in
+                    ForEach(home.allFiles) { file in
                         recentFileRow(file: file)
                             .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
                             .listRowBackground(Color.clear)
@@ -368,7 +394,7 @@ private extension AppView {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .scrollDisabled(true)
-                .frame(height: CGFloat(home.recentFiles.count) * Sizing.rowHeight)
+                .frame(height: CGFloat(home.allFiles.count) * Sizing.rowHeight)
             }
         }
     }

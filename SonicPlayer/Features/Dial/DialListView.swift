@@ -200,12 +200,25 @@ private struct DialRowView: View {
         }
     }
 
+    /// **The filled gradient is a card's, and a tint is a list's.**
+    ///
+    /// Both are the same thing — the wheel's cursor, the row the hub is about to act on — but they
+    /// were drawn identically and that made them read differently. On a menu of two or three
+    /// destinations the fill *is* the offer. On a menu of verbs it made the first row look like the
+    /// recommended one: `Rename` arrived at the top of the actions list and immediately read as a
+    /// primary button, when all it had done was be row 0.
+    ///
+    /// Flattening it entirely was the other option and is worse — a list you turn through with no
+    /// cursor has nothing saying where the press will land.
     @ViewBuilder
     private var background: some View {
-        if isHighlighted {
-            RoundedRectangle(cornerRadius: isProminent ? Radius.sheet : Radius.md)
+        if isHighlighted && isProminent {
+            RoundedRectangle(cornerRadius: Radius.sheet)
                 .fill(DialSurface.fill)
                 .sonicShadow(Elevation.control)
+        } else if isHighlighted {
+            RoundedRectangle(cornerRadius: Radius.md)
+                .fill(Color.sonicPrimary.opacity(ControlTint.on))
         } else if isProminent {
             // A prominent row that is not highlighted still needs an edge, or the chooser reads as
             // one card and an orphaned label.
@@ -220,20 +233,26 @@ private struct DialRowView: View {
 
     private var titleFont: Font { isProminent ? .title3 : .body }
 
+    // **Destructive now outranks highlighted**, which is the other half of the same change: on the
+    // old filled row `Delete` went white like everything else, so the one row you most want to look
+    // dangerous lost its colour exactly when the thumb was on it. Over a tint it stays red.
+
     private var titleColor: Color {
-        if isHighlighted { return .white }
         if isDestructive { return .red }
+        if isHighlighted && isProminent { return .white }
         return .sonicTextPrimary
     }
 
     private var iconColor: Color {
-        if isHighlighted { return .white }
         if isDestructive { return .red }
-        return .sonicTextSecondary
+        if isHighlighted && isProminent { return .white }
+        return isHighlighted ? .sonicTextPrimary : .sonicTextSecondary
     }
 
     private var secondaryColor: Color {
-        isHighlighted ? Color.white.opacity(Self.onFillSecondary) : .sonicTextSecondary
+        isHighlighted && isProminent
+            ? Color.white.opacity(Self.onFillSecondary)
+            : .sonicTextSecondary
     }
 
     private static let onFillSecondary: Double = 0.75

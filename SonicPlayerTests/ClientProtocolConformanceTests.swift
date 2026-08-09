@@ -57,6 +57,11 @@ struct ClientProtocolConformanceTests {
             Forward("changeRate", { flag in
                 player { $0.setRate = { _ in flag.fire() } }
             }, { await $0.changeRate(to: 1.5) }),
+            // Rate and volume are both `(Float) async -> Void`, so nothing in the type system stops
+            // one forwarding to the other. That is precisely what this suite exists to catch.
+            Forward("changeVolume", { flag in
+                player { $0.setVolume = { _ in flag.fire() } }
+            }, { await $0.changeVolume(to: 0.5) }),
 
             Forward("skipAhead", { flag in
                 player { $0.skipForward = { _ in flag.fire() } }

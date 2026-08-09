@@ -27,6 +27,7 @@ protocol AudioPlaying: Sendable {
     func stopPlayback() async
     func seekToTime(_ time: TimeInterval) async
     func changeRate(to rate: Float) async
+    func changeVolume(to volume: Float) async
     func skipAhead(by interval: TimeInterval) async
     func skipBack(by interval: TimeInterval) async
     func refreshNowPlaying() async
@@ -45,6 +46,7 @@ extension AudioPlayerClient: AudioPlaying {
     func stopPlayback() async { await stop() }
     func seekToTime(_ time: TimeInterval) async { await seek(time) }
     func changeRate(to rate: Float) async { await setRate(rate) }
+    func changeVolume(to volume: Float) async { await setVolume(volume) }
     func skipAhead(by interval: TimeInterval) async { await skipForward(interval) }
     func skipBack(by interval: TimeInterval) async { await skipBackward(interval) }
     func refreshNowPlaying() async { await updateNowPlaying() }

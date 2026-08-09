@@ -10,6 +10,16 @@ struct AudioPlayerClient: Sendable {
     var stop: @Sendable () async -> Void
     var seek: @Sendable (TimeInterval) async -> Void
     var setRate: @Sendable (Float) async -> Void
+    /// **This player's output level, not the device's.**
+    ///
+    /// The dial's volume axis had nowhere to land before this: the effect was emitted, clamped and
+    /// then dropped, under a note saying volume belongs to `MPVolumeView`, which owns the system
+    /// slider and offers no setter worth having. That was right about the *system* volume and wrong
+    /// as a conclusion — `AVPlayer.volume` is per-player gain, so turning the wheel changes how loud
+    /// this app is without touching the hardware buttons or the slider they drive.
+    ///
+    /// Defaulted, so every `.test` client and every existing initialiser keeps compiling.
+    var setVolume: @Sendable (Float) async -> Void = { _ in }
     var skipForward: @Sendable (TimeInterval) async -> Void
     var skipBackward: @Sendable (TimeInterval) async -> Void
     var updateNowPlaying: @Sendable () async -> Void
@@ -45,6 +55,9 @@ extension AudioPlayerClient {
             },
             setRate: { rate in
                 await player.setRate(rate)
+            },
+            setVolume: { volume in
+                await player.setVolume(volume)
             },
             skipForward: { interval in
                 await player.skip(by: interval)
@@ -83,6 +96,8 @@ extension AudioPlayerClient {
 
 private final class AudioPlayerManager: NSObject, ObservableObject {
     private var player: AVPlayer?
+    /// Survives the player it applies to — see `setVolume(_:)`.
+    private var volume: Float = 1
     private var timeObserver: Any?
     private var continuation: AsyncStream<TimeInterval>.Continuation?
     private var nextTrackHandler: (() -> Void)?
@@ -139,6 +154,9 @@ private final class AudioPlayerManager: NSObject, ObservableObject {
         } else {
             player?.replaceCurrentItem(with: playerItem)
         }
+        // A new `AVPlayer` starts at full volume, so the level the user chose has to be reapplied
+        // here or the next track is abruptly loud.
+        player?.volume = volume
 
         // Wait for the player item to be ready
         guard let currentItem = player?.currentItem else { return }
@@ -202,6 +220,15 @@ private final class AudioPlayerManager: NSObject, ObservableObject {
     @MainActor
     func setRate(_ rate: Float) {
         player?.rate = rate
+    }
+
+    /// Held as well as applied, because `player` is replaced on every track change and a fresh
+    /// `AVPlayer` starts at 1. Without the stored copy, volume would silently reset to full the
+    /// moment you moved to the next track — which is worse than not having the control.
+    @MainActor
+    func setVolume(_ volume: Float) {
+        self.volume = min(max(0, volume), 1)
+        player?.volume = self.volume
     }
 
     @MainActor

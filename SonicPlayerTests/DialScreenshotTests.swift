@@ -27,6 +27,8 @@ struct DialScreenshotTests {
         let screen = navigator.screen
 
         #expect(screen.chrome.breadcrumb == ["LIBRARY"])
+        // The gear and the label share the corner. The label was briefly a row here instead, which
+        // could name the track — and could not follow you down into the library, which is the job.
         #expect(screen.chrome.status == "20:34 ▸ playing")
         #expect(rows(navigator)?.rows.map(\.title) == [
             "Playlists", "Recordings", "Focus Sessions", "Podcasts", "Stats"
@@ -47,15 +49,19 @@ struct DialScreenshotTests {
         let screen = navigator.screen
 
         #expect(screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS"])
-        #expect(rows(navigator)?.position == "1 of 12")
-        #expect(rows(navigator)?.rows.first?.trailing == "01:00")
-        #expect(rows(navigator)?.rows.first?.subtitle == "Today 14:02 · 2 markers")
-        #expect(rows(navigator)?.rows.dropFirst().first?.subtitle == nil)
-        // Back moved to the top bar; Edit and the actions menu moved onto the stick. Import is the
-        // one chip left, having moved off the home menu onto the library it operates on.
-        #expect(screen.actions.map(\.id) == ["import"])
-        #expect(screen.ring.directions?.right?.id == "edit")
-        #expect(screen.ring.directions?.left?.id == "more")
+        // Thirteen rows, and the helper has ticked past Import onto the first recording.
+        #expect(rows(navigator)?.position == "2 of 13")
+        #expect(rows(navigator)?.rows.first?.id == "import")
+        #expect(rows(navigator)?.rows.dropFirst().first?.trailing == "01:00")
+        #expect(rows(navigator)?.rows.dropFirst().first?.subtitle == "Today 14:02 · 2 markers")
+        #expect(rows(navigator)?.rows.dropFirst(2).first?.subtitle == nil)
+        // Back moved to the top bar. Edit came off the stick's right nudge and into the actions
+        // menu as its top row, leaving one nudge — upward, because a lone sideways one on a
+        // four-way stick reads as though the others are broken.
+        #expect(screen.actions.isEmpty)
+        #expect(screen.ring.directions?.up?.id == "more")
+        #expect(screen.ring.directions?.right == nil)
+        #expect(screen.ring.directions?.left == nil)
         #expect(screen.chrome.canGoBack)
         #expect(screen.ring.hub == .label("OPEN"))
         #expect(screen.hint == "rotate to scroll · press to open · double-press to edit")
@@ -66,7 +72,7 @@ struct DialScreenshotTests {
 
         _ = navigator.receive(.tick(6))
 
-        #expect(rows(navigator)?.position == "7 of 12")
+        #expect(rows(navigator)?.position == "8 of 13")
     }
 
     // MARK: - 1c Now playing
@@ -162,8 +168,10 @@ struct DialScreenshotTests {
         _ = navigator.receive(.action("more"))
         let screen = navigator.screen
 
+        // Rename and Edit lead — the two that change the recording itself, ahead of the two that
+        // move it somewhere. `Export as MP3` is gone: Share already hands the file to another app.
         #expect(rows(navigator)?.rows.map(\.title) == [
-            "Share file…", "Add to playlist", "Export as MP3", "Rename", "Delete"
+            "Rename", "Edit", "Share file…", "Add to playlist", "Delete"
         ])
         #expect(rows(navigator)?.position == "1 of 5")
         #expect(screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS", "RECORDING 1"])
@@ -177,7 +185,7 @@ struct DialScreenshotTests {
 
         // Export gets its own glyph. Reusing `.share` would put one symbol on two rows of the five
         // above and read as a bug rather than as a pair.
-        #expect(rows(navigator)?.rows.map(\.icon) == [.share, .playlist, .export, .rename, .delete])
+        #expect(rows(navigator)?.rows.map(\.icon) == [.rename, .edit, .share, .playlist, .delete])
     }
 
     // MARK: - 1g Empty
@@ -188,24 +196,26 @@ struct DialScreenshotTests {
         _ = navigator.receive(.press)
         let screen = navigator.screen
 
-        guard case .message(let message) = screen.content else {
-            Issue.record("expected the empty state, got \(screen.content)")
+        // **The empty state is a one-row list now, not a message.** Import has to be reachable when
+        // there is nothing else, and a row cannot live inside a message. What the message *said*
+        // survives on that row's second line.
+        guard case .list(let list) = screen.content else {
+            Issue.record("expected the one-row list, got \(screen.content)")
             return
         }
-        #expect(message.icon == .recording)
-        #expect(message.title == "No recordings yet")
+        #expect(list.rows.map(\.id) == ["import"])
+        #expect(list.rows.first?.subtitle == "No recordings yet · bring audio in")
 
         #expect(screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS"])
-        // Import is here too, and the empty state is exactly why it is a chip rather than a row —
-        // there is no list to be a row in, and this is the state where importing matters most.
-        #expect(screen.actions.map(\.id) == ["import", "record"])
+        // `Record` stays, and is now the *only* way to start one from here — the hub imports.
+        #expect(screen.actions.map(\.id) == ["record"])
         #expect(screen.chrome.canGoBack)
         // Destructive, not primary. It is the obvious action on this screen *and* the one you
         // cannot casually undo, and the design draws it red for that reason — `.primary` renders
         // in the accent, which would make starting a recording look like opening a playlist.
         #expect(screen.actions.last?.emphasis == .destructive)
-        #expect(screen.ring.hub == .label("RECORD"))
-        #expect(screen.hint == "press to start recording · nothing to scroll yet")
+        #expect(screen.ring.hub == .label("IMPORT"))
+        #expect(screen.hint == "press to import · or use Record below")
     }
 
     // MARK: - 1h Listen vs record
@@ -238,24 +248,28 @@ struct DialScreenshotTests {
     /// shrinks under a highlight near its end must not hand the UI an out-of-range index.
     @Test func aShrinkingListPullsTheHighlightBackIntoRange() {
         var navigator = DialSample.inRecordings()
-        _ = navigator.receive(.tick(11))
+        _ = navigator.receive(.tick(11))            // the last recording, row 12
 
         navigator.update(DialSample.content(recordingCount: 3))
 
-        #expect(rows(navigator)?.highlighted == 2)
-        #expect(rows(navigator)?.position == "3 of 3")
+        #expect(rows(navigator)?.highlighted == 3, "Import plus three recordings is four rows")
+        #expect(rows(navigator)?.position == "4 of 4")
     }
 
-    @Test func aListThatEmptiesFallsBackToTheEmptyState() {
+    /// A list that empties is now a one-row list rather than a message, and the row is Import.
+    /// The clamp still has to pull the highlight all the way back onto it.
+    @Test func aListThatEmptiesLeavesOnlyTheImportRow() {
         var navigator = DialSample.inRecordings()
         _ = navigator.receive(.tick(5))
 
         navigator.update(DialSample.content(recordingCount: 0))
 
-        guard case .message = navigator.screen.content else {
-            Issue.record("expected the empty state, got \(navigator.screen.content)")
+        guard case .list(let list) = navigator.screen.content else {
+            Issue.record("expected the one-row list, got \(navigator.screen.content)")
             return
         }
-        #expect(navigator.screen.ring.hub == .label("RECORD"))
+        #expect(list.rows.map(\.id) == ["import"])
+        #expect(list.highlighted == 0)
+        #expect(navigator.screen.ring.hub == .label("IMPORT"))
     }
 }

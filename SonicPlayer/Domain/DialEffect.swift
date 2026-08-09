@@ -18,6 +18,17 @@ enum DialEffect: Equatable {
 
     case play(itemID: String)
     case togglePlayPause
+    /// Silence whatever is playing, because the screen being opened needs the audio to itself.
+    ///
+    /// **Recording and trimming both take the audio session.** A capture with a lecture playing
+    /// records the lecture through the microphone; the trim editor previews the region under the
+    /// handles, and previewing one file over another playing file is two things at once with one
+    /// pair of ears. Neither is a state the user would choose deliberately, and both are reached in
+    /// one press from a list of things they were listening to.
+    ///
+    /// Pause rather than stop: the track, its position and the queue survive, so Now Playing is
+    /// still there to go back to when the recording ends.
+    case pausePlayback
     /// Absolute, already inside `0...duration`.
     case seek(to: TimeInterval)
     /// Absolute, already inside `0...1`.

@@ -84,11 +84,17 @@ enum DialSample {
         )
     }
 
-    /// Drills library → recordings, which is the starting point of most of the deeper tests.
+    /// Drills library → recordings, **landing on the first recording rather than on Import.**
+    ///
+    /// Import is row 0 of this list now, so the highlight arrives on it. Almost every test built on
+    /// this helper means "I am on a recording" — `press` plays, `doublePress` edits, the stick
+    /// offers its menu — so the tick belongs here rather than being repeated, and forgotten, in
+    /// twenty places. `DialImportRowTests` is where the Import row itself is exercised.
     static func inRecordings(recordingCount: Int = 12) -> DialNavigator {
         var navigator = navigator(recordingCount: recordingCount)
         _ = navigator.receive(.tick(1))     // Playlists → Recordings
         _ = navigator.receive(.press)
+        _ = navigator.receive(.tick(1))     // Import → the first recording
         return navigator
     }
 
@@ -96,8 +102,11 @@ enum DialSample {
     static func whileRecording() -> DialNavigator {
         var navigator = navigator(recordingCount: 0, capture: capture)
         _ = navigator.receive(.tick(1))
-        _ = navigator.receive(.press)       // opens the empty list
-        _ = navigator.receive(.press)       // which starts a recording
+        _ = navigator.receive(.press)             // opens the list, highlight on Import
+        // **The chip, not a second press.** An empty list used to be a message whose hub started a
+        // recording; it is now a one-row list whose hub imports. `Record` is on screen for exactly
+        // this reason, and going through it is what the user does.
+        _ = navigator.receive(.action("record"))
         return navigator
     }
 
@@ -160,7 +169,7 @@ struct DialNavigationTests {
     @Test func poppingRestoresTheHighlightYouLeft() {
         var navigator = DialSample.inRecordings()
         _ = navigator.receive(.tick(4))
-        _ = navigator.receive(.press)          // opens row 4 → now playing
+        _ = navigator.receive(.press)          // opens row 5 → now playing
 
         _ = navigator.receive(.action("back"))
 
@@ -168,7 +177,7 @@ struct DialNavigationTests {
             Issue.record("expected the recordings list back")
             return
         }
-        #expect(list.highlighted == 4)
+        #expect(list.highlighted == 5, "opened from row 5 — the helper starts on 1, past Import")
     }
 
     @Test func aSectionWithNowhereToGoIsALimit() {

@@ -88,7 +88,7 @@ enum ScreenshotDemoData {
 
     // MARK: - Audio Files
 
-    static let recentFiles: [AudioFile] = [
+    static let allFiles: [AudioFile] = [
         AudioFile(
             url: documentsURL.appendingPathComponent("Deep Focus Session.mp3"),
             title: "Deep Focus Session",
@@ -215,28 +215,28 @@ extension ScreenshotDemoData {
         filesRoot: CollectionsViewModel,
         for screen: ScreenshotMode.Screen
     ) {
-        home.recentFiles = recentFiles
-        filesRoot.seed(items: collections.map { .folder($0) } + recentFiles.prefix(5).map { .file($0) })
+        home.allFiles = allFiles
+        filesRoot.seed(items: collections.map { .folder($0) } + allFiles.prefix(5).map { .file($0) })
 
         switch screen {
         case .homeWithMiniPlayer:
-            let track = recentFiles[0]
+            let track = allFiles[0]
             player.currentTrack = track
             player.isPlaying = true
             player.isExpanded = false
             player.duration = track.duration
             player.currentTime = 847 // ~14 min into the track
-            player.queue = [track] + Array(recentFiles.dropFirst().prefix(3))
+            player.queue = [track] + Array(allFiles.dropFirst().prefix(3))
             player.currentIndex = 0
 
         case .player:
-            let track = recentFiles[0]
+            let track = allFiles[0]
             player.currentTrack = track
             player.isPlaying = true
             player.isExpanded = true
             player.duration = track.duration
             player.currentTime = 1234
-            player.queue = Array(recentFiles.prefix(5))
+            player.queue = Array(allFiles.prefix(5))
             player.currentIndex = 0
 
         // The three states, each pinned to the exact condition the view branches on.
@@ -247,7 +247,7 @@ extension ScreenshotDemoData {
         case .playerLoading:
             // "Loading" is not "no track": `loadTrack` sets both in the same breath, and the view
             // gates on a zero duration so the state stays off screen during a track *switch*.
-            player.currentTrack = recentFiles[0]
+            player.currentTrack = allFiles[0]
             player.isExpanded = true
             player.isLoadingTrack = true
             player.duration = 0

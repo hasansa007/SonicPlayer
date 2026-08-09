@@ -32,13 +32,20 @@ extension DialNavigator {
         )
     }
 
-    /// **Nothing, now that the corner is Settings.**
+    /// `00:49 ▸ playing`, on every screen you can still be browsing from.
     ///
-    /// Kept as a field rather than deleted because the recorder may yet want a word up there, and
-    /// because removing it from the contract would touch every screenshot test to prove a negative.
+    /// **This is the fast path back, and it beat the row that briefly replaced it.** The row could
+    /// name the track, which the corner cannot — but it only existed on home, so the moment you
+    /// were two levels into the library there was no visible way back to what was playing at all.
+    /// `hold` reaches it from anywhere and is invisible; a label that is already on screen saying
+    /// something is playing costs nothing to make the door.
+    ///
+    /// Absent on the three screens that would be lying or shouting: Now Playing *is* the
+    /// destination, and Recording and Edit have taken the audio session — playback is paused there
+    /// by the time you arrive, so a line reporting it as playing would be stale on arrival.
     private var status: String? {
         switch route {
-        case .nowPlaying, .recording:
+        case .nowPlaying, .recording, .edit:
             return nil
         default:
             guard let playback = content.playback else { return nil }
@@ -57,14 +64,12 @@ extension DialNavigator {
         case .library:
             return .list(list(rows: libraryRows))
 
+        // **Always a list, never the empty-state message it used to fall back to.** Import is a row
+        // here now and has to be reachable when there is nothing else — and a message is not a list,
+        // so a row inside one could not exist. What the message said survives on the Import row's
+        // own second line; what it *did* — press to start recording — is the `Record` chip, which
+        // this screen keeps for exactly that reason.
         case .recordings:
-            guard !content.recordings.isEmpty else {
-                return .message(.init(
-                    icon: .recording,
-                    title: "No recordings yet",
-                    body: "Press the hub to record the first one."
-                ))
-            }
             return .list(list(rows: recordingRows))
 
         case .nowPlaying:
@@ -182,8 +187,21 @@ extension DialNavigator {
         }
     }
 
+    /// Import first, then the recordings. `RecordingsRow` owns that offset and everything reading
+    /// the highlight goes through it — this is only the drawing half of the same fact.
     private var recordingRows: [DialScreen.List.Row] {
-        content.recordings.map {
+        let importRow = DialScreen.List.Row(
+            id: "import",
+            icon: .importFile,
+            title: "Import",
+            // The empty state's sentence, folded into the row that answers it. With no recordings
+            // this is the only row on the screen, so it has to say why the screen is bare.
+            subtitle: content.recordings.isEmpty
+                ? "No recordings yet · bring audio in"
+                : "Bring audio in from Files"
+        )
+
+        return [importRow] + content.recordings.map {
             .init(
                 id: $0.id,
                 icon: .recording,
@@ -214,28 +232,21 @@ extension DialNavigator {
             return []
 
         case .recordings:
-            // **Import lives here now, not on the home menu.**
+            // Import was briefly a chip here and is a row now. What the chip was avoiding — the
+            // index shift it causes in everything that reads the highlight — is paid properly by
+            // `RecordingsRow` instead.
             //
-            // It is a chip rather than a row on purpose. As a row it would have to sit at index 0
-            // of a list whose every other index means "the recording at that position" — and
-            // `press`, `doublePress`, `defersPress` and the stick's directions all read
-            // `content.recordings[safe: level.highlighted]` directly. One inserted row shifts the
-            // meaning of that subscript in five places at once, and the failure is silent: the
-            // wheel lands on a recording and the hub opens the one before it.
-            //
-            // A chip also survives the empty state, where there is no list to be a row in — and
-            // that is the state where importing matters most.
+            // `Record` stays on the empty screen because the message that used to carry "press the
+            // hub to record the first one" is gone: the hub now imports, so the one-tap way to
+            // record has to be visible rather than implied.
             guard !content.recordings.isEmpty else {
                 // Destructive rather than primary: starting a recording is the obvious action here
                 // and also the one you cannot casually undo, and those must not look alike.
-                return [
-                    .init(id: "import", label: "Import"),
-                    .init(id: "record", label: "Record", emphasis: .destructive)
-                ]
+                return [.init(id: "record", label: "Record", emphasis: .destructive)]
             }
             // `Edit` is the visible partner for `.doublePress`; the contract requires one.
             // Both moved onto the stick — right nudges to Edit, left to the actions menu.
-            return [.init(id: "import", label: "Import")]
+            return []
 
         // Nothing at all: the wheel seeks, the segments do volume and track, and Back is in the
         // top bar. A screen can legitimately have no chips.
@@ -287,7 +298,16 @@ extension DialNavigator {
     /// Everywhere else a press is instant, because there is no second meaning to wait for.
     private var defersPress: Bool {
         guard case .recordings = route else { return false }
-        return content.recordings.indices.contains(level.highlighted)
+        // Not on the Import row: there is no second meaning there, so waiting to find out whether a
+        // second press is coming would put a delay on the one press that has nothing to wait for.
+        guard case .recording(let index)? = highlightedRecordingsRow else { return false }
+        return content.recordings.indices.contains(index)
+    }
+
+    /// What the highlight is pointing at on the recordings list, or `nil` anywhere else.
+    private var highlightedRecordingsRow: RecordingsRow? {
+        guard case .recordings = route else { return nil }
+        return RecordingsRow.at(level.highlighted, recordings: content.recordings.count)
     }
 
     /// What the gear stick does here.
@@ -317,11 +337,16 @@ extension DialNavigator {
                 )
             )
 
+        // **One nudge, upward.** Edit had the right nudge and now lives inside this menu as its top
+        // row, which leaves a single direction — and a lone sideways nudge on a stick that can go
+        // four ways reads as though the other three are broken. Up is where a menu comes from.
+        //
+        // Absent on the Import row: the menu acts on *the highlighted recording*, and offering
+        // `Delete` while the highlight is on Import is offering to delete nothing.
         case .recordings:
-            guard !content.recordings.isEmpty else { return nil }
+            guard case .recording? = highlightedRecordingsRow else { return nil }
             return DialScreen.Directions(
-                left: .init(id: "more", icon: .more, label: "More actions"),
-                right: .init(id: "edit", icon: .edit, label: "Edit")
+                up: .init(id: "more", icon: .more, label: "More actions")
             )
 
         default:
@@ -362,7 +387,9 @@ extension DialNavigator {
         switch route {
         case .chooseMode: .label("CHOOSE")
         case .library: .label("OPEN")
-        case .recordings: content.recordings.isEmpty ? .label("RECORD") : .label("OPEN")
+        // The hub says what *this row* does, which is the whole point of one button meaning
+        // something different everywhere. On Import it cannot say OPEN.
+        case .recordings: highlightedRecordingsRow == .importFiles ? .label("IMPORT") : .label("OPEN")
         case .nowPlaying: .glyph(content.playback?.isPlaying == false ? "play.fill" : "pause.fill")
         case .recording: .recordDot
         case .edit: .label("DONE")
@@ -384,9 +411,12 @@ extension DialNavigator {
             return "rotate to browse · press to open · hold for now playing"
 
         case .recordings:
-            return content.recordings.isEmpty
-                ? "press to start recording · nothing to scroll yet"
-                : "rotate to scroll · press to open · double-press to edit"
+            if highlightedRecordingsRow == .importFiles {
+                return content.recordings.isEmpty
+                    ? "press to import · or use Record below"
+                    : "press to import · rotate for your recordings"
+            }
+            return "rotate to scroll · press to open · double-press to edit"
 
         case .nowPlaying:
             // One sentence, because the wheel does one thing. The segments beside and above it

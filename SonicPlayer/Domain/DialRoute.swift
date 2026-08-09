@@ -130,36 +130,45 @@ struct DialMode: Equatable, Identifiable {
     var axis: DialAxis
 }
 
-/// The five rows of 1f.
+/// The rows of 1f.
 ///
 /// `CaseIterable` in this order *is* the screen's row order, so there is one list rather than an
 /// enum and a parallel array that can disagree about where `Delete` sits.
 enum DialItemAction: String, Equatable, CaseIterable {
+    /// Rename first, Edit second — the two that change the recording itself, ahead of the three
+    /// that move it somewhere. The highlight rests on row 0, so the cheapest thing to reach is the
+    /// one most often wanted.
+    case rename
+    /// **Second, having come off the stick's right nudge.** It is also the one case here the host
+    /// never sees — `DialNavigator` turns it into a push of `.edit`, because the editor is a
+    /// *place* and the rest of these are things done to a file.
+    case edit
     case share
     case addToPlaylist
-    case export
-    case rename
+    /// **`export` is gone.** Sharing already hands the file to another app, and the row below it
+    /// offering a second, format-converting way to do nearly the same thing was a choice nobody
+    /// wanted to have to make.
     case delete
 
     var label: String {
         switch self {
+        case .rename: "Rename"
+        case .edit: "Edit"
         case .share: "Share file…"
         case .addToPlaylist: "Add to playlist"
-        case .export: "Export as MP3"
-        case .rename: "Rename"
         case .delete: "Delete"
         }
     }
 
-    /// `.export` is its own role rather than a second use of `.share`, which would put one glyph on
-    /// two rows of a five-row list and read as a bug. Handing a file to another app and writing a
-    /// copy out are different promises.
+    /// One glyph per row, still — which used to be worth saying because `.export` and `.share`
+    /// were two rows making nearly the same promise. Removing `export` settled that argument by
+    /// deleting one side of it.
     var icon: DialScreen.Icon {
         switch self {
+        case .rename: .rename
+        case .edit: .edit
         case .share: .share
         case .addToPlaylist: .playlist
-        case .export: .export
-        case .rename: .rename
         case .delete: .delete
         }
     }

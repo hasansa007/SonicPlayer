@@ -241,7 +241,7 @@ final class AppViewModel {
             guard let self else { return }
             isRecordingSheetPresented = false
             filesRoot.refreshFiles()
-            home.loadRecentFiles()
+            home.loadAllFiles()
         }
 
         // The root browser's out-edges — what the `AppCommand` channel used to carry (#18).
@@ -261,7 +261,7 @@ final class AppViewModel {
             }
         }
         // Any reload of the root browser refreshes Home's recents, which are drawn from it.
-        filesRoot.onItemsLoaded = { [home] in home.loadRecentFiles() }
+        filesRoot.onItemsLoaded = { [home] in home.loadAllFiles() }
 
         // The shell's out-edges (#6). Closures rather than direct calls for the reason every other
         // edge here is one: it makes the edge reachable from a test without rendering a view.
@@ -274,18 +274,51 @@ final class AppViewModel {
             guard let index = all.firstIndex(of: player.playbackSpeed) else { return }
             player.setPlaybackSpeed(all[min(max(0, index + steps), all.count - 1)])
         }
-        // `onVolumeBy` is deliberately unwired. Volume belongs to `MPVolumeView`, which owns the
-        // system slider and offers no setter worth having — an effect that silently does nothing
-        // beats one that fights the hardware buttons.
+        // **`onVolumeBy` is the shell's, and it is now wired** — the note that used to sit here said
+        // volume belongs to `MPVolumeView` and had no setter worth having, which was true of the
+        // *system* volume and became an argument for having no volume control at all. `AVPlayer`
+        // has per-player gain; nothing here touches the hardware buttons.
+        shell.onVolumeBy = { [player] delta in player.setVolume(player.volume + delta) }
 
         // The dial's out-edges (#6). It navigates on its own; these are the moments it needs
         // something that owns hardware.
         dial.onPlay = { [player, home] itemID in
-            guard let file = home.recentFiles.first(where: { $0.url.absoluteString == itemID })
+            guard let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
             else { return }
-            player.loadTrack(file, queue: home.recentFiles, source: nil)
+            player.loadTrack(file, queue: home.allFiles, source: nil)
         }
         dial.onTogglePlayPause = { [player] in player.playPauseTapped() }
+        // Opening the recorder or the trim editor silences whatever is playing. `pauseIfPlaying`
+        // rather than a stop: the track and its position survive, so Now Playing is still there to
+        // come back to.
+        dial.onPausePlayback = { [player] in player.pauseIfPlaying() }
+        dial.onSetVolume = { [player] value in player.setVolume(value) }
+
+        // **Deleting from the dial goes through the browser's own edge, not around it.**
+        //
+        // `onWillRemoveItems` is what stops playback of a file about to vanish, forgets its markers
+        // and drops its cached waveform — three things that are easy to forget and silent when you
+        // do. Calling it here rather than re-implementing them means the dial's delete and the
+        // browser's delete cannot drift apart.
+        dial.onDeleteItem = { [weak self] itemID in
+            guard let self,
+                  let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
+            else { return }
+
+            filesRoot.onWillRemoveItems([.file(file)])
+
+            Task { [fileManager] in
+                do {
+                    try await fileManager.deleteItem(file.url)
+                } catch {
+                    self.dial.operationError = error.localizedDescription
+                    return
+                }
+                self.home.loadAllFiles()
+                self.filesRoot.refreshFiles()
+                self.refreshDial()
+            }
+        }
         dial.onSeek = { [player] time in player.seek(to: time) }
         dial.onSelectTrack = { [player] index in player.jumpToTrack(index) }
         // **Drives the recorder directly rather than presenting the old sheet.** Raising
@@ -311,7 +344,7 @@ final class AppViewModel {
         // Trimming (#74).
         dial.onPreviewTrim = { [weak self] itemID, start, end in
             guard let self,
-                  let file = home.recentFiles.first(where: { $0.url.absoluteString == itemID })
+                  let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
             else { return }
             // The preview takes the shared engine, so the transport must stop claiming it is
             // playing something it no longer owns.
@@ -320,7 +353,7 @@ final class AppViewModel {
         }
         dial.onCommitTrim = { [weak self] itemID, start, end in
             guard let self,
-                  let file = home.recentFiles.first(where: { $0.url.absoluteString == itemID })
+                  let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
             else { return }
             commitTrim(on: file.url, start: start, end: end)
         }
@@ -355,7 +388,7 @@ final class AppViewModel {
             }
             dial.forgetWaveform(for: url)
             filesRoot.refreshFiles()
-            home.loadRecentFiles()
+            home.loadAllFiles()
             refreshDial()
         }
     }
@@ -364,7 +397,7 @@ final class AppViewModel {
     /// because the navigator holds a snapshot rather than reaching back into the view models.
     func refreshDial() {
         dial.refresh(
-            recentFiles: home.recentFiles, player: player, recorder: recording, markers: markers
+            allFiles: home.allFiles, player: player, recorder: recording, markers: markers
         )
     }
 }

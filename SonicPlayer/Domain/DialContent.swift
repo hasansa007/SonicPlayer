@@ -24,8 +24,7 @@ struct DialContent: Equatable {
         /// What pressing it *does*, for a section that is an action rather than a place. Import is
         /// the first of these: it opens a picker and stays where it is.
         var effect: DialEffect?
-        /// A second line. Now Playing uses it to name the track, which is the whole reason it can
-        /// be a row where a corner label could not.
+        /// A second line, e.g. what a section contains.
         var subtitle: String?
     }
 

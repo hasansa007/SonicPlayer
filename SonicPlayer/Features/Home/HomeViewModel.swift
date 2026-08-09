@@ -23,7 +23,7 @@ final class HomeViewModel {
     /// replaces the mirror.
     let player: PlayerViewModel
 
-    var recentFiles: [AudioFile] = []
+    var allFiles: [AudioFile] = []
 
     // Formerly `.none // Handled by parent` cases in HomeFeature.
     var onFileTapped: (AudioFile) -> Void = { _ in }
@@ -47,19 +47,19 @@ final class HomeViewModel {
         self.fileManager = fileManager
     }
 
-    func loadRecentFiles() {
+    func loadAllFiles() {
         // Screenshot mode seeds demo data; loading real files would wipe it.
-        if ScreenshotMode.isEnabled && !recentFiles.isEmpty { return }
+        if ScreenshotMode.isEnabled && !allFiles.isEmpty { return }
 
         Task { [weak self, fileManager] in
-            guard let files = try? await Self.recentFiles(fileManager: fileManager) else { return }
-            await MainActor.run { self?.recentFiles = files }
+            guard let files = try? await Self.allAudioFiles(fileManager: fileManager) else { return }
+            await MainActor.run { self?.allFiles = files }
         }
     }
 
     /// Tapping a recent file plays it, with the recents list as the queue.
     func fileTapped(_ file: AudioFile) {
-        player.loadTrack(file, queue: recentFiles, source: .singleFile)
+        player.loadTrack(file, queue: allFiles, source: .singleFile)
         onFileTapped(file)
     }
 
@@ -81,14 +81,23 @@ final class HomeViewModel {
 
 private extension HomeViewModel {
 
-    /// Unchanged from `HomeFeature.swift`, where it was already a free function taking the client
-    /// as a plain parameter rather than through `@Dependency`.
-    static func recentFiles(fileManager: FileManagerClient) async throws -> [AudioFile] {
+    /// **Every audio file, newest first — the `prefix(3)` that used to end this is gone.**
+    ///
+    /// That cap was right when this fed a "Recently added" strip on a Home screen: three rows on a
+    /// dashboard is a preview, and a preview is what it was. Home is now the dial, and the same
+    /// property became the dial's entire library, the count on the Library card, and the queue a
+    /// track is played into. None of those wanted three.
+    ///
+    /// So the library screen showed at most three recordings however many existed, the card's
+    /// number was pinned at 3, and playing anything gave you a two-track queue. One property whose
+    /// meaning did not survive the move it was carried through, and nothing failed — it just quietly
+    /// answered a smaller question than it was being asked.
+    static func allAudioFiles(fileManager: FileManagerClient) async throws -> [AudioFile] {
         var allFiles: [AudioFile] = []
         var seenNames: Set<String> = []
         try await collect(from: nil, into: &allFiles, seenNames: &seenNames, fileManager: fileManager)
         allFiles.sort { $0.creationDate > $1.creationDate }
-        return Array(allFiles.prefix(3))
+        return allFiles
     }
 
     /// Deduplicates by filename, so the same recording surfaced in two collections appears once.

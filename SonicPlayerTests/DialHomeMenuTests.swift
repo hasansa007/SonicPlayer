@@ -50,7 +50,7 @@ struct DialHomeMenuTests {
     @Test func aShortRecordingsListIsNotCards() {
         let navigator = DialSample.inRecordings(recordingCount: 2)
 
-        #expect(list(navigator)?.rows.count == 2)
+        #expect(list(navigator)?.rows.count == 3, "two recordings and the Import row")
         #expect(list(navigator)?.isProminent == false, "two recordings are a list, not a menu")
     }
 
@@ -63,42 +63,41 @@ struct DialHomeMenuTests {
 
     // MARK: - Import moved onto the library
 
-    @Test func importIsAChipOnTheLibrary_notARowOnHome() {
+    @Test func importIsARowOnTheLibrary_notOnHome() {
         let home = DialSample.navigator()
-        #expect(home.screen.actions.isEmpty, "home is a menu of destinations, not of file operations")
-
-        let library = DialSample.inRecordings()
-        #expect(library.screen.actions.map(\.id) == ["import"])
+        #expect(
+            !home.screen.actions.contains { $0.id == "import" },
+            "home is a menu of destinations, not of file operations"
+        )
+        #expect(
+            list(home)?.rows.contains { $0.id == "import" } == false,
+            "and not a row there either — it moved to the library it operates on"
+        )
     }
 
-    @Test func theImportChipAsksTheHostToImport() {
-        var navigator = DialSample.inRecordings()
+    /// **The corner label follows you down, which is why it outlived the row that replaced it.**
+    /// The row could name the track and the corner cannot — but the row only existed on home, so
+    /// two levels into the library there was no visible way back to what was playing.
+    @Test func theCornerReportsPlaybackWhereverYouCanStillBeBrowsing() {
+        #expect(DialSample.navigator().screen.chrome.status == "20:34 ▸ playing")
+        #expect(DialSample.inRecordings().screen.chrome.status == "20:34 ▸ playing")
 
-        let effects = navigator.receive(.action("import"))
-
-        #expect(effects.contains(.importFiles))
+        var actions = DialSample.inRecordings()
+        _ = actions.receive(.action("more"))
+        #expect(actions.screen.chrome.status == "20:34 ▸ playing")
     }
 
-    /// Import must not navigate. The picker belongs to the host and the files land in the list you
-    /// are looking at, so leaving it would be a round trip back to where you already were.
-    @Test func importingStaysOnTheLibrary() {
-        var navigator = DialSample.inRecordings()
+    /// Absent where it would be the destination, or stale on arrival: Recording and Edit both pause
+    /// playback as you enter, so a line calling it playing is wrong by the time it is drawn.
+    @Test func theCornerIsSilentWhereItWouldLie() {
+        var nowPlaying = DialSample.navigator()
+        _ = nowPlaying.receive(.hold)
+        #expect(nowPlaying.screen.chrome.status == nil)
 
-        _ = navigator.receive(.action("import"))
+        var editing = DialSample.inRecordings()
+        _ = editing.receive(.doublePress)
+        #expect(editing.screen.chrome.status == nil)
 
-        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY", "RECORDINGS"])
-    }
-
-    /// The empty library is the state where importing matters most, and the state a row could not
-    /// have served — there is no list to be a row in.
-    @Test func theEmptyLibraryCanStillImport() {
-        var navigator = DialSample.navigator(recordingCount: 0)
-        _ = navigator.receive(.tick(1))
-        _ = navigator.receive(.press)
-
-        #expect(navigator.screen.actions.map(\.id) == ["import", "record"])
-
-        let effects = navigator.receive(.action("import"))
-        #expect(effects.contains(.importFiles))
+        #expect(DialSample.whileRecording().screen.chrome.status == nil)
     }
 }
