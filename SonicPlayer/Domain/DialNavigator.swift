@@ -500,6 +500,21 @@ struct DialNavigator {
     }
 
 
+    /// **Open the editor on a take that has just been written.**
+    ///
+    /// Called by the host rather than reached by a press, because the id is a URL and the URL does
+    /// not exist until the recorder has closed the file — there is nothing for the hub to name at
+    /// the moment it is pressed.
+    ///
+    /// Guarded on still being at the recorder: a take can finish while you have already walked
+    /// away, and a screen arriving under a thumb that went somewhere else is worse than a take you
+    /// have to open yourself. **Pushed rather than replacing**, so Back from the editor is the
+    /// recorder again — ready for the next take, which is where you were.
+    mutating func openEditorForFinishedTake(itemID: String) -> [DialEffect] {
+        guard case .recording = route, content.capture == nil else { return [] }
+        return openEditor(itemID: itemID)
+    }
+
     /// Jump to Now Playing from anywhere.
     ///
     /// Nothing playing is a limit — there is a destination, it is simply empty. Already being there

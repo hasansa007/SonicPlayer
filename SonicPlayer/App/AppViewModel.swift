@@ -253,6 +253,16 @@ final class AppViewModel {
             markers.set(recording.markers, for: url)
             home.loadAllFiles()
             filesRoot.refreshFiles()
+
+            // **Stopping a take opens it.** The take you just made is the one you want to name or
+            // trim, and the editor is the screen that does both — rename is a nudge there and the
+            // trim is the whole of it. Nothing else was reachable: the naming sheet is rendered by
+            // `RecordingView`, which the dial never presents, so every take kept its generated
+            // filename and the trim step existed only from the library.
+            //
+            // The material arrives one refresh later, which the editor already expects — it is
+            // built from the route, so the host can only know what to load once the push happened.
+            dial.openEditorForFinishedTake(itemID: url.absoluteString)
         }
 
         recording.onFinished = { [weak self] in

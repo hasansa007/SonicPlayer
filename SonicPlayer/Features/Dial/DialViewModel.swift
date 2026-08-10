@@ -88,6 +88,16 @@ final class DialViewModel {
         receive(.action("nowPlaying"))
     }
 
+    /// The take that just landed is the one you want to name or trim, so the editor opens on it.
+    ///
+    /// Routed through the same `apply` every command uses, so the effects it produces — pausing
+    /// playback, the commit pulse — happen exactly as they would from a press.
+    func openEditorForFinishedTake(itemID: String) {
+        let routeBefore = navigator.route
+        for effect in navigator.openEditorForFinishedTake(itemID: itemID) { apply(effect) }
+        if navigator.route != routeBefore { onNeedsRefresh?() }
+    }
+
     /// The single entry point. Every turn, press and chip tap arrives here.
     ///
     /// **A route change asks to be fed.** Some screens are drawn from data the host only knows to
