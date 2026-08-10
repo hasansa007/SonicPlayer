@@ -79,12 +79,13 @@ final class DialViewModel {
     /// **The guard is the whole design.** Coming back to the app with audio running and landing on
     /// the library is wrong — you returned *because* of the audio. But backgrounding deliberately
     /// while three levels into a list and coming back to Now Playing is worse: it throws away a
-    /// place you chose. So this only acts at the root, where there is no place to lose.
+    /// place you chose. So this only acts at the root — which is the library itself now that the
+    /// fork above it is gone — where there is no place to lose.
     ///
     /// It is safe to call whenever. The navigator refuses when nothing is playing, and refuses
     /// again when Now Playing is already on top, so neither case needs checking here.
     func showNowPlayingIfIdle() {
-        guard navigator.route == .library else { return }
+        guard navigator.route == .recordings else { return }
         receive(.action("nowPlaying"))
     }
 

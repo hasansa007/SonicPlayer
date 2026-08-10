@@ -32,7 +32,7 @@ struct AppViewModelTests {
 
         app.quickActionRecord()
 
-        #expect(app.dial.screen.chrome.breadcrumb == ["HOME", "LIBRARY", "RECORDING"])
+        #expect(app.dial.screen.chrome.breadcrumb == ["LIBRARY", "RECORDING"])
         #expect(app.dial.screen.ring.hub == .recordDot, "arrived, not started")
     }
 
@@ -41,14 +41,12 @@ struct AppViewModelTests {
     @MainActor
     @Test func test_quickActionRecord_startsFromTheRootWhereverYouWere() {
         let app = makeApp()
-        app.dial.receive(.press)            // into the library
-        app.dial.receive(.press)            // and deeper still
+        app.dial.receive(.press)            // into whatever the first row is
 
         app.quickActionRecord()
 
         app.dial.receive(.action("back"))
-        app.dial.receive(.action("back"))
-        #expect(app.dial.screen.chrome.breadcrumb == ["HOME"], "two levels, and no further")
+        #expect(app.dial.screen.chrome.breadcrumb == ["LIBRARY"], "one level, and no further")
     }
 
     @MainActor
@@ -104,7 +102,6 @@ struct AppViewModelTests {
     @Test func test_theDialsImportOpensTheImportSheet() {
         let app = makeApp()
 
-        app.dial.receive(.press)                    // Listen → the library
         app.dial.receive(.action("import"))
 
         #expect(app.isImportSheetPresented)

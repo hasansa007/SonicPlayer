@@ -62,12 +62,8 @@ struct DialNavigator {
     /// Never empty: the root is placed at construction and `pop` refuses to remove it.
     private(set) var stack: [Level]
 
-    /// **Which job you are doing.** Set by the fork at the root and unchanged until you go back to
-    /// it — see `DialActivity` for why this is a mode rather than two screens.
-    private(set) var mode: DialActivity = .listen
 
-
-    init(content: DialContent = DialContent(), root: DialRoute = .library) {
+    init(content: DialContent = DialContent(), root: DialRoute = .recordings) {
         self.content = content
         self.stack = [Level(route: root)]
     }
@@ -365,16 +361,6 @@ struct DialNavigator {
         //
         // A separate `chooseMode` screen was written for this and never reached, because a second
         // two-card screen in front of a two-card screen is the same screen twice.
-        case .library:
-            guard let chosen = DialActivity.at(level.highlighted) else { return [.feedback(.limit)] }
-            mode = chosen
-            // Entering Record lets go of whatever was loaded. The editor rewrites files on disk, and
-            // a player still holding one holds a stale duration and position — see `DialActivity`.
-            let release: [DialEffect] = chosen == .record
-                ? pausePlaybackIfNeeded() + [.releasePlayer]
-                : []
-            return release + open(.recordings)
-
         case .settings:
             guard let setting = DialSetting.allCases[safe: level.highlighted] else {
                 return [.feedback(.limit)]
@@ -390,10 +376,11 @@ struct DialNavigator {
             guard let item = currentItems[safe: level.highlighted] else { return [.feedback(.limit)] }
             // A folder opens in both modes: it is the same shelf whichever job you are doing.
             guard !item.isFolder else { return open(.folder(itemID: item.id)) }
-            // A file plays or opens for editing, and that is the whole of what the mode decides.
-            return mode.opensEditor
-                ? openEditor(itemID: item.id)
-                : playItem(item, at: level.highlighted)
+            // **A file plays. Always.** It opened the editor instead when you had arrived through
+            // Record, which meant one hub meaning two things on two screens that looked identical.
+            // Editing is the stick's up nudge now — a deliberate second gesture for the act that
+            // rewrites a file, rather than the same press with a different history behind it.
+            return playItem(item, at: level.highlighted)
 
         case .nowPlaying:
             content.playback?.isPlaying.toggle()
@@ -494,8 +481,9 @@ struct DialNavigator {
     /// anything at all. Buzzing there would teach the gesture is available everywhere.
     private mutating func doublePress() -> [DialEffect] {
         // **Nothing here answers a second press.** It used to open the editor on the library, which
-        // is what Record mode's press does now — so a double press would be a second, slower way to
-        // do the same thing, and it made every single press wait to find out it was not coming.
+        // was the editor's way in for a while, and the editor is a nudge now — so a double press
+        // would be a second, slower way to do the same thing, and it made every single press wait
+        // to find out it was not coming.
         return []
     }
 
@@ -511,13 +499,9 @@ struct DialNavigator {
     /// holds — arriving is not starting. The old sheet behaved the same way; it simply had a
     /// different screen to say it on.
     ///
-    /// The mode goes to Record and the fork's highlight with it, so going back lands on a home that
-    /// agrees with where you just were rather than on Listen.
     mutating func openRecorder() -> [DialEffect] {
         let release = pausePlaybackIfNeeded() + [.releasePlayer]
-        mode = .record
-        stack = [Level(route: .library, highlighted: 1)]
-        push(.recordings)
+        stack = [Level(route: .recordings)]
         push(.recording)
         return release + [.feedback(.commit)]
     }
@@ -572,16 +556,12 @@ struct DialNavigator {
         }
 
         switch (route, id) {
-        case (.library, "nowPlaying"):
-            return hold()
-
         // Available wherever files are listed, and it stays put — you are reloading the list you
         // are looking at, so leaving it would be the one thing you did not ask for.
         // The bottom bar's two library actions. They stay put: the picker's files and the new
         // folder both land in the list you are looking at, so going anywhere would be leaving the
         // only place that shows what just happened.
         case (.recordings, "import"), (.folder, "import"):
-            guard mode == .listen else { return [.feedback(.limit)] }
             return [.importFiles(intoItemID: currentFolderID), .feedback(.commit)]
 
         // **Cycles and stays put**, like the settings rows: the thing that just changed is the list
@@ -593,10 +573,14 @@ struct DialNavigator {
             stack[stack.count - 1].sort = level.sort.next
             clampHighlight(atDepth: stack.count - 1)
             return [.feedback(.commit)]
-        // **No `edit` nudge any more.** In Record mode the press opens the editor, so a nudge for
-        // it would be a second way to do the thing the hub already does.
+        // **Editing is a nudge again, and it releases the player rather than merely pausing it.**
+        // The mode used to let go on entry, which is what made trimming safe: the editor rewrites
+        // the file, and a player still holding it holds a stale duration and position. With no
+        // mode, that release has to happen here — the same guarantee, moved from mode-entry to
+        // edit-entry, which is the whole of what the fork was buying.
         case (.recordings, "edit"), (.folder, "edit"):
-            return [.feedback(.limit)]
+            guard let item = highlightedFile else { return [.feedback(.limit)] }
+            return pausePlaybackIfNeeded() + [.releasePlayer] + openEditor(itemID: item.id)
         // **The stick's four nudges, each acting on the highlighted recording.** They were rows on
         // a pushed menu, which cost a nudge, a turn and a press to do one thing.
         // **Rename and Delete take folders too.** They were guarded on `highlightedFile`, which is
@@ -604,7 +588,7 @@ struct DialNavigator {
         // other two verbs stay file-only for reasons a folder genuinely cannot answer: there is no
         // single URL to share, and adding a folder to a playlist is a move this slice does not do.
         case (.recordings, "rename"), (.folder, "rename"):
-            guard mode == .record, let item = highlightedRecording else { return [.feedback(.limit)] }
+            guard let item = highlightedRecording else { return [.feedback(.limit)] }
             return [.renameItem(itemID: item.id), .feedback(.commit)]
 
         // Stays put: the folder lands in the list you are looking at, so going anywhere would be
@@ -613,28 +597,31 @@ struct DialNavigator {
             return [.createFolder(inItemID: currentFolderID), .feedback(.commit)]
 
         // Opens the recorder; the hub there starts the take. Arriving is not starting.
+        // **Opening the recorder lets go of the player, the same way opening the editor does.**
+        // The microphone takes the audio session; a player still holding a track would be recorded
+        // through it. This used to happen at mode-entry, which is where the fork was carrying its
+        // weight — with one library it belongs to the two screens that actually take the session.
         case (.recordings, "record"), (.folder, "record"):
-            guard mode == .record else { return [.feedback(.limit)] }
-            return open(.recording)
+            return pausePlaybackIfNeeded() + [.releasePlayer] + open(.recording)
 
-        // **Filing is a screen, not a sheet.** The left nudge was the one direction Record mode
-        // never used, and moving a recording is the verb that was missing from it — a library that
-        // grows folders needs a way to put things in them.
+        // **Filing is a screen, not a sheet.** Moving a recording is the verb the stick was
+        // missing — a library that grows folders needs a way to put things in them.
         case (.recordings, "move"), (.folder, "move"):
-            guard mode == .record, let item = highlightedFile else { return [.feedback(.limit)] }
+            guard let item = highlightedFile else { return [.feedback(.limit)] }
             return open(.move(itemID: item.id))
 
         case (.recordings, "share"), (.folder, "share"):
             guard let item = highlightedFile else { return [.feedback(.limit)] }
             return [.item(.share, itemID: item.id), .feedback(.commit)]
         case (.recordings, "add"), (.folder, "add"):
-            guard mode == .listen, let item = highlightedFile else { return [.feedback(.limit)] }
+            guard let item = highlightedFile else { return [.feedback(.limit)] }
             return [.item(.addToPlaylist, itemID: item.id), .feedback(.commit)]
-        // **Destruction is Record's alone.** Listen is a mode where nothing can be lost, which is
-        // the point of having modes at all — and the price is that an import can only be deleted
-        // from the Files sheet.
+        // **Destruction is always reachable, and guarded instead of hidden.** It used to be
+        // Record's alone — Listen was a mode where nothing could be lost — which cost two
+        // identical-looking screens to express. The two-row confirmation is what makes it safe;
+        // the mode was a second lock on a door that already had one.
         case (.recordings, "delete"), (.folder, "delete"):
-            guard mode == .record, let item = highlightedRecording else { return [.feedback(.limit)] }
+            guard let item = highlightedRecording else { return [.feedback(.limit)] }
             return open(.confirmDelete(itemID: item.id))
 
         // **Renaming is the editor's, not the stick's.** Four directions cannot hold five verbs, and
@@ -776,16 +763,9 @@ struct DialNavigator {
         clampHighlight(atDepth: stack.count - 1)
     }
 
-    /// Returning to home clears the mode. Landing back on the fork still in `.record` would make
-    /// the next Listen press behave as an edit until something happened to reset it.
-    private mutating func popToRootResetsMode() {
-        if stack.count == 1, case .library = route { mode = .listen }
-    }
-
     private mutating func pop() {
         guard stack.count > 1 else { return }
         stack.removeLast()
-        popToRootResetsMode()
     }
 
     // MARK: - Rows
@@ -853,47 +833,43 @@ struct DialNavigator {
     ///
     /// It lives here rather than in the projection so that the thing drawn and the thing pressed
     /// cannot drift apart: the view reads this to label the row, and `press` reads it to run it.
-    func pinnedActionID(atDepth depth: Int) -> String? {
-        switch stack[depth].route {
-        case .recordings, .folder: return mode == .record ? "record" : "import"
-        default: return nil
-        }
-    }
+    /// **Nothing is drawn above the list any more**, so the ring starts at row 0. Record and
+    /// Import were the last things up there and they are chips now.
+    func leadingActionID(atDepth depth: Int) -> String? { nil }
 
-    var pinnedActionID: String? { pinnedActionID(atDepth: stack.count - 1) }
+    var leadingActionID: String? { nil }
 
-    /// What the stop before the first row does: **the verb pinned above the list**, and only that.
-    /// Nothing else is drawn up there.
-    func leadingActionID(atDepth depth: Int) -> String? { pinnedActionID(atDepth: depth) }
-
-    var leadingActionID: String? { leadingActionID(atDepth: stack.count - 1) }
-
-    /// **The chip row, in the order it is drawn — and the navigator owns it.**
+    /// **Back leads, Settings trails, and what the screen does sits between them.**
     ///
-    /// It lived in the projection, which built the chips and named them; the ring then knew about
-    /// exactly two of them, Back and Settings, because those were the two somebody had thought to
-    /// wire. Sort arrived and was tap-only, and would have stayed tap-only until it was noticed.
-    /// A list the ring reads and the projection draws cannot grow a control the wheel misses.
+    /// One layout everywhere, so the two controls that mean the same thing on every screen are
+    /// always in the same place and only the middle changes. Back's slot is *reserved* at the root
+    /// rather than absent — there is nowhere to pop, and a chip that appeared one level down would
+    /// shove every other one sideways under a thumb that had learned where they were.
+    ///
+    /// **Record and Import are in here**, not pinned above the list. They are the same kind of
+    /// thing — the two ways material comes in — and pinning one while the other sat in the row was
+    /// the mode fork's leftover. With both here the card holds a list and nothing else.
+    ///
+    /// The navigator owns this list because the ring walks it: the projection used to build the
+    /// chips *and* name them, which is how Sort shipped drawn-but-unreachable. One list, read by
+    /// both halves, cannot grow a control the wheel misses.
     func chipIDs(atDepth depth: Int) -> [String] {
-        var ids: [String] = []
         // **The guard screen is deliberately two rows.** `Cancel` is already the way back, so a
         // Back chip beside it would be a second one, differently worded.
-        if depth > 0, case .confirmDelete = stack[depth].route {} else if depth > 0 {
-            ids.append("back")
-        }
+        if case .confirmDelete = stack[depth].route { return [] }
 
+        var ids = ["back"]
         switch stack[depth].route {
-        case .library: ids.append("settings")
-        // **New folder is back, and on the wheel this time.** It was a bar button, removed with the
-        // bar — which left no way to make a folder from the dial at all, so folders could be
-        // browsed and filed into and never created. The chip row is reachable by the wheel now,
-        // which is what makes this the right home rather than the last one that was tried.
-        case .recordings, .folder: ids += ["newFolder", "sort"]
+        case .recordings, .folder: ids += ["record", "import", "newFolder", "sort"]
         case .nowPlaying where content.playback != nil: ids += ["repeat", "shuffle"]
         default: break
         }
+        ids.append("settings")
         return ids
     }
+
+    /// Whether Back is real here, or a reserved gap holding the row's shape.
+    func canGoBack(atDepth depth: Int) -> Bool { depth > 0 }
 
     var chipIDs: [String] { chipIDs(atDepth: stack.count - 1) }
 
@@ -922,11 +898,6 @@ struct DialNavigator {
     var firstIndex: Int { firstIndex(atDepth: stack.count - 1) }
     var lastIndex: Int { lastIndex(atDepth: stack.count - 1) }
 
-    /// Whether the highlight is resting on the pinned verb rather than on a row or a chip.
-    var isPinnedActionHighlighted: Bool {
-        pinnedActionID != nil && level.highlighted == Self.pinnedIndex
-    }
-
     /// Which chip the wheel is on, if it is on one. The projection reads this to mark it selected,
     /// so a chip added to `chipIDs` gets its cursor without anyone remembering to add it.
     var highlightedChipID: String? {
@@ -941,7 +912,6 @@ struct DialNavigator {
     func rowCount(atDepth depth: Int) -> Int {
         let items = items(atDepth: depth)
         switch stack[depth].route {
-        case .library: return DialActivity.all.count
         case .settings: return DialSetting.allCases.count
         case .recordings, .folder: return items.count
         case .confirmDelete: return DialRoute.DeleteChoice.allCases.count

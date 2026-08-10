@@ -61,11 +61,10 @@ struct DialDeleteConfirmationTests {
         app.home.allFiles = [file()]
         app.refreshDial()
 
-        // **Delete lives in Record mode only.** Listen is the mode where nothing can be lost, so
-        // reaching the guard means taking the other side of the fork first.
-        app.dial.receive(.tick(1))          // home → Record
-        app.dial.receive(.press)            // → the library, highlight on the only file
-        app.dial.receive(.action("delete"))     // the stick's down nudge
+        // **The library is the root, so there is nothing to press through.** Delete used to be
+        // Record's alone, which meant taking the far side of a fork to reach it; the fork is gone
+        // and the two-row guard is what makes it safe.
+        app.dial.receive(.action("delete"))     // the stick's down nudge, on the only file
     }
 
     @MainActor
@@ -126,27 +125,21 @@ struct DialDeleteConfirmationTests {
         #expect(app.dial.screen.chrome.breadcrumb.last == "LIBRARY")
     }
 
-    /// **The dial can no longer delete something the player is holding, and the guard is upstream
-    /// of the guard.**
+    /// **The release belongs to editing, which is the thing that rewrites a file.**
     ///
-    /// This used to press Delete with a track loaded and check the player let go — the dial's delete
-    /// travels through `onWillRemoveItems`, the same edge the browser uses. That edge still exists
-    /// and still does that job; what changed is that this route can no longer reach it with anything
-    /// loaded, because deleting means Record mode and entering Record releases the player first.
-    ///
-    /// Asserting the old way would now pass for the wrong reason — `currentTrack` is nil before the
-    /// delete is even offered. So this asserts the fact that actually holds.
+    /// It sat on mode-entry while the fork existed — entering Record let go of the player, so the
+    /// editor could never rewrite a file something was holding. With one library it moves to the
+    /// edit nudge, which is the moment it was always about.
     @MainActor
-    @Test func enteringRecordModeReleasesWhateverWasLoaded() {
+    @Test func openingTheEditorReleasesWhateverWasLoaded() {
         let app = makeApp()
         app.home.allFiles = [file()]
         app.player.currentTrack = file()
         app.refreshDial()
 
-        app.dial.receive(.tick(1))          // home → Record
-        app.dial.receive(.press)
+        app.dial.receive(.action("edit"))
 
-        #expect(app.player.currentTrack == nil, "before any edit or delete is even offered")
+        #expect(app.player.currentTrack == nil, "before the editor can rewrite it")
     }
 
     /// The browser's edge is where "stop playing what is about to vanish" lives, and it is still

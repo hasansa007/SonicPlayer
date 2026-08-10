@@ -48,7 +48,7 @@ struct QuickActionTests {
 
         AppDelegate().handleShortcut(shortcut(.record), target: app)
 
-        #expect(app.dial.screen.chrome.breadcrumb == ["HOME", "LIBRARY", "RECORDING"])
+        #expect(app.dial.screen.chrome.breadcrumb == ["LIBRARY", "RECORDING"])
         #expect(!app.isImportSheetPresented)
     }
 

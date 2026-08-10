@@ -20,9 +20,7 @@ struct DialSortTests {
     }
 
     private static func inLibrary(_ titles: [String]) -> DialNavigator {
-        var navigator = DialNavigator(content: named(titles), root: .library)
-        _ = navigator.receive(.press)       // home → Listen → the library
-        return navigator
+        DialNavigator(content: named(titles), root: .recordings)
     }
 
     private func titles(_ navigator: DialNavigator) -> [String] {
@@ -66,8 +64,7 @@ struct DialSortTests {
         content.recordings.append(
             DialContent.Item(id: "folder-1", title: "Middle", duration: 0, children: [])
         )
-        var navigator = DialNavigator(content: content, root: .library)
-        _ = navigator.receive(.press)
+        var navigator = DialNavigator(content: content, root: .recordings)
 
         _ = navigator.receive(.action("sort"))
         #expect(titles(navigator) == ["Middle", "Apple", "Zebra"])
@@ -89,8 +86,7 @@ struct DialSortTests {
                 DialContent.Item(id: "rec-a", title: "Alpha", duration: 60)
             ])
         ]
-        var navigator = DialNavigator(content: content, root: .library)
-        _ = navigator.receive(.press)
+        var navigator = DialNavigator(content: content, root: .recordings)
         _ = navigator.receive(.action("sort"))      // A–Z at the root
 
         _ = navigator.receive(.press)               // into the folder
@@ -111,8 +107,7 @@ struct DialSortTests {
             DialContent.Item(id: "rec-z", title: "Zebra", duration: 60),
             DialContent.Item(id: "rec-a", title: "Apple", duration: 60)
         ]
-        var navigator = DialNavigator(content: content, root: .library)
-        _ = navigator.receive(.press)
+        var navigator = DialNavigator(content: content, root: .recordings)
         _ = navigator.receive(.action("sort"))      // A–Z
         _ = navigator.receive(.press)               // into the folder
 

@@ -101,7 +101,6 @@ struct DialScreenView: View {
     private var stage: some View {
         VStack(spacing: Spacing.md) {
             if hasChrome { topBar }
-            primaryAction
 
             // **Static until it cannot be, then scrollable.**
             //
@@ -217,58 +216,6 @@ struct DialScreenView: View {
     /// How long the volume arc stays after the last nudge. Long enough that a run of nudges reads
     /// as one gesture rather than a flicker, short enough to be gone before you look away.
     private static let volumeLinger: Double = 1.5
-
-    /// The mode's one verb, pinned under the header and never scrolling away.
-    ///
-    /// **New folder and Refresh are gone rather than moved.** Refresh existed as a backstop for
-    /// staleness the automatic reload already handles, and a control that should never be needed is
-    /// a control that reads as an admission. New folder went with it — there is no way to make one
-    /// from the dial now, which is a real loss and a deliberate one.
-    @ViewBuilder
-    private var primaryAction: some View {
-        if let action = screen.chrome.primaryAction {
-            Button {
-                onCommand(.action(action.id))
-            } label: {
-                HStack(spacing: Spacing.md) {
-                    Image(systemName: DialIcon.systemImage(for: action.icon) ?? "questionmark")
-                        .font(.subheadline)
-                        .foregroundColor(action.isLive ? .red : .sonicPrimary)
-                        // The list's icon column, so the verb and the files it acts on share one
-                        // left margin instead of sitting a few points out from each other.
-                        .frame(width: Spacing.xxl)
-
-                    VStack(alignment: .leading, spacing: Spacing.xxs) {
-                        Text(action.title)
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.sonicTextPrimary)
-                        if let subtitle = action.subtitle {
-                            Text(subtitle)
-                                .font(.caption)
-                                .foregroundColor(.sonicTextSecondary)
-                        }
-                    }
-
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, Spacing.md)
-                .padding(.vertical, Spacing.md)
-                // **The same cursor a row wears, drawn the same way**, because it is selected the
-                // same way: turning back off the first file lands here. A stop that does not light
-                // up is a stop nobody has reason to believe the hub will act on — which is how this
-                // one spent its first day reachable by tap alone.
-                .background(
-                    RoundedRectangle(cornerRadius: Radius.md)
-                        .fill(Color.sonicPrimary.opacity(action.isHighlighted ? ControlTint.on : 0))
-                )
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text(action.title))
-            .accessibilityAddTraits(action.isHighlighted ? [.isSelected] : [])
-        }
-    }
 
     private static let washTint: Double = 0.15
 

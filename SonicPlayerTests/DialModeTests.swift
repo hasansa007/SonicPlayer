@@ -37,7 +37,7 @@ struct DialModeTests {
         // volume and track, so nothing here chooses an axis. The row is not empty — Back and the
         // two queue toggles live in it — so the assertion names the absence it means.
         #expect(!navigator.screen.actions.contains { navigator.route.modes.map(\.id).contains($0.id) })
-        #expect(navigator.screen.actions.map(\.id) == ["back", "repeat", "shuffle"])
+        #expect(navigator.screen.actions.map(\.id) == ["back", "repeat", "shuffle", "settings"])
         #expect(navigator.screen.chrome.canGoBack)
         #expect(navigator.axis == .seek)
     }
@@ -49,7 +49,7 @@ struct DialModeTests {
         let navigator = DialSample.whileEditing()
 
         #expect(navigator.route.modes.map(\.id) == ["trimStart", "trimEnd"])
-        #expect(navigator.screen.actions.map(\.id) == ["back"], "the way out, and nothing else")
+        #expect(navigator.screen.actions.map(\.id) == ["back", "settings"], "the two fixed ends, and nothing between")
     }
 
     /// The selection has to reach the *screen* now, because the handle drawn filled is the only

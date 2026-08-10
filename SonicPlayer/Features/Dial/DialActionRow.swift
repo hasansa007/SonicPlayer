@@ -7,13 +7,15 @@ import SwiftUI
 /// screen at four actions and made each of them tiny; moving them here is what let `DialCommand`
 /// collapse to a single `.action(id:)` case.
 ///
-/// **The row wraps to two lines rather than scrolling**, so a screen may carry two chips or five
-/// without the layout deciding which. The trim editor is the five.
+/// **Back leads, Settings trails, and the screen's own verbs sit between them.** The two controls
+/// that mean the same thing everywhere never move; only the middle changes. Back's slot is
+/// reserved rather than empty at the root, because a chip appearing one level down would shove
+/// every other one sideways under a thumb that had learned where they were.
 ///
-/// Scrolling was the first attempt and was wrong: chips four and five sat off the right edge with
-/// nothing saying they existed, on the one screen that needs all five reachable. A second line
-/// costs 30 points and shows everything. The horizontal scroll survives only as the last resort
-/// for a chip so long that even half a row cannot hold it.
+/// **It falls back to two lines rather than scrolling** when it cannot fit — which is what happens
+/// at accessibility text sizes, since the glyphs scale. Scrolling was the first attempt and was
+/// wrong: a chip off the right edge has nothing saying it exists, and every chip here is now a stop
+/// on the wheel as well, so an invisible one is a stop nobody knows to turn to.
 struct DialActionRow: View {
 
     let actions: [DialScreen.Action]
@@ -21,43 +23,56 @@ struct DialActionRow: View {
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            chips(actions)
-            wrapped
-            ScrollView(.horizontal) { chips(actions) }
-                .scrollIndicators(.hidden)
+            oneLine
+            twoLines
         }
     }
 
-    /// Split down the middle with the remainder on the first line, which keeps the heavier row on
-    /// top and reads as one block rather than as a row and an afterthought.
-    private var wrapped: some View {
-        let split = (actions.count + 1) / 2
-        return VStack(spacing: Spacing.sm) {
-            chips(Array(actions.prefix(split)))
-            chips(Array(actions.dropFirst(split)))
-        }
-    }
-
-    private func chips(_ actions: [DialScreen.Action]) -> some View {
+    private var oneLine: some View {
         HStack(spacing: Spacing.sm) {
-            ForEach(actions) { action in
+            if let leading = actions.first, leading.id == "back" {
+                chip(leading)
+            }
+
+            Spacer(minLength: 0)
+
+            // **What this screen does, and only this screen.** Between the two fixed ends, so the
+            // controls that mean the same thing everywhere never move and the middle is free to
+            // change per screen without dragging them sideways.
+            ForEach(middle) { action in
                 chip(action)
+            }
+
+            Spacer(minLength: 0)
+
+            if let trailing = actions.last, trailing.id == "settings" {
+                chip(trailing)
             }
         }
         .padding(.horizontal, Spacing.xxs)
     }
 
-    /// **A glyph in a circle where the action has one, a word in a capsule where it does not.**
-    ///
-    /// The words were the original design and they cost a band of the card's height on every
-    /// screen: five chips across a phone wrapped to two lines at ordinary text sizes in Arabic, and
-    /// at AX3 in English. A symbol says `Back` in the space the word `‹ Back` needed for its
-    /// chevron alone.
-    ///
-    /// The label has not gone anywhere — it is the accessibility label, so nothing is lost to
-    /// VoiceOver, and a chip with no icon still draws it. That fallback is not decorative: an
-    /// action whose meaning has no honest symbol should say so in words rather than pick a vague
-    /// one, which is how a glyph row turns into a guessing game.
+    /// The ends keep their corners; the middle drops below them. Used only when the row genuinely
+    /// cannot fit, which on a 393pt screen means accessibility text sizes.
+    private var twoLines: some View {
+        VStack(spacing: Spacing.sm) {
+            HStack(spacing: Spacing.sm) {
+                if let leading = actions.first, leading.id == "back" { chip(leading) }
+                Spacer(minLength: 0)
+                if let trailing = actions.last, trailing.id == "settings" { chip(trailing) }
+            }
+            HStack(spacing: Spacing.sm) {
+                ForEach(middle) { action in chip(action) }
+            }
+        }
+        .padding(.horizontal, Spacing.xxs)
+    }
+
+    /// Everything that is neither of the two fixed ends.
+    private var middle: [DialScreen.Action] {
+        actions.filter { $0.id != "back" && $0.id != "settings" }
+    }
+
     private func chip(_ action: DialScreen.Action) -> some View {
         Button {
             onCommand(.action(action.id))
@@ -84,10 +99,15 @@ struct DialActionRow: View {
             // than as a button. Shared by both forms so a mixed row lines up.
             //
             // Wider than it is tall on purpose: a capsule whose ends are a semicircle needs visible
-            // straight sides or it reads as a circle, which is a different control. `xxl` against
-            // `sm` is what gives it those sides at a 28pt glyph.
+            // straight sides or it reads as a circle, which is a different control.
+            //
+            // **`md` rather than the `xxl` this started at, because the row grew.** At 24pt of
+            // horizontal padding a chip is 76 wide, and six of them — Back, Record, Import, New
+            // folder, Sort, Settings — is 456 against roughly 345 of usable screen. 12pt gives 52,
+            // and six of those fit with room over. It is still a capsule; it is not the bare 28pt
+            // square this replaced.
             .frame(minHeight: Sizing.compactControl)
-            .padding(.horizontal, Spacing.xxl)
+            .padding(.horizontal, Spacing.md)
             .padding(.vertical, Spacing.sm)
             .foregroundColor(foreground(action.emphasis))
             .background(background(action.emphasis), in: Capsule())

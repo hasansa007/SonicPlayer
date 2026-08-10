@@ -46,34 +46,6 @@ struct DialScreen: Equatable {
         /// the fact the emphasis is derived *from*.
         var isSettingsHighlighted: Bool = false
 
-        /// The one thing this screen exists to let you add, pinned to the top of the card.
-        ///
-        /// **It has been a home card, a chip, a row, a pinned bottom row and a bar button.** Every
-        /// version put it somewhere it competed with something: with the files for the highlight,
-        /// or with Back and Refresh for the corner your thumb rests in. At the top of the card it
-        /// competes with nothing and never scrolls away — which is what "always available" meant
-        /// each of the times it was asked for.
-        ///
-        /// One per mode, because each mode has exactly one way to bring material in: Listen imports,
-        /// Record records.
-        var primaryAction: PrimaryAction?
-
-        struct PrimaryAction: Equatable {
-            var id: String
-            var icon: Icon
-            var title: String
-            var subtitle: String?
-            /// Drawn in red — the only one that starts something rather than opening a picker.
-            var isLive: Bool = false
-            /// Whether the wheel is resting on it.
-            ///
-            /// **It is a stop on the ring, not only a button.** Pinned above the list it was
-            /// reachable by tap alone, which made the one verb each mode exists for the one thing
-            /// the dial could not do. It draws its highlight the way a row does, because it is
-            /// selected the way a row is.
-            var isHighlighted: Bool = false
-        }
-
         /// Whether the **card's** border cycles while audio moves.
         ///
         /// It used to be the wheel's, and the wheel is the wrong place for it: an animated rainbow

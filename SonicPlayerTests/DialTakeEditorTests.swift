@@ -19,10 +19,8 @@ struct DialTakeEditorTests {
     private func whileRecording() -> DialNavigator {
         var navigator = DialNavigator(
             content: DialSample.content(recordingCount: 0, capture: DialSample.capture),
-            root: .library
+            root: .recordings
         )
-        _ = navigator.receive(.tick(1))             // home → Record
-        _ = navigator.receive(.press)               // → the library
         _ = navigator.receive(.action("record"))    // → the recorder
         return navigator
     }

@@ -33,15 +33,11 @@ struct DialFolderTests {
             DialContent.Item(id: "rec-1", title: "Recording 2", duration: 30),
         ]
 
-        // Home is the fork: row 0 is Listen, row 1 is Record. A tick here would choose the other
-        // mode, and these tests are about browsing.
-        var navigator = DialNavigator(content: content, root: .library)
-        _ = navigator.receive(.press)       // home → Listen
-        return navigator
+        return DialNavigator(content: content, root: .recordings)
     }
 
-    /// Folders sort first, so the highlight opens on one — no tick needed since Import and New
-    /// folder became buttons rather than rows.
+    /// Folders sort first, so the highlight opens on one — the library is the root now, so there
+    /// is nothing to press through to reach it.
     private static func atFolderRow() -> DialNavigator { navigator() }
 
     @Test func theLibraryListsFoldersBeforeFiles() {
@@ -80,7 +76,7 @@ struct DialFolderTests {
         var navigator = Self.atFolderRow()
         _ = navigator.receive(.press)
 
-        #expect(navigator.screen.chrome.breadcrumb == ["HOME", "LIBRARY", "LECTURES"])
+        #expect(navigator.screen.chrome.breadcrumb == ["LIBRARY", "LECTURES"])
     }
 
     @Test func backLeavesTheFolder() {
@@ -113,19 +109,24 @@ struct DialFolderTests {
         #expect(DialSample.playedID(effects) == "rec-b")
     }
 
-    /// The four nudges all act on a file. A folder answers none of them, so the stick draws nothing
-    /// rather than offering four controls that would refuse.
-    @Test func theStickIsBlankOverAFolder() {
-        let navigator = Self.atFolderRow()
+    /// **A folder answers two of the four.** Share takes a file URL and adding a folder to a
+    /// playlist is a move this slice does not do; renaming and deleting one were never the problem,
+    /// and the stick sat blank over folders long enough that a library could grow them and never
+    /// touch them again.
+    @Test func theStickOffersAFolderTheTwoVerbsItCanAnswer() {
+        let directions = Self.atFolderRow().screen.ring.directions
 
-        #expect(navigator.screen.ring.directions == nil)
+        #expect(directions?.up?.id == "rename")
+        #expect(directions?.down?.id == "delete")
+        #expect(directions?.left == nil)
+        #expect(directions?.right == nil)
     }
 
-    @Test func nudgingOverAFolderIsRefused() {
+    @Test func theVerbsAFolderCannotAnswerAreRefused() {
         var navigator = Self.atFolderRow()
 
         #expect(navigator.receive(.action("share")) == [.feedback(.limit)])
-        #expect(navigator.receive(.action("delete")) == [.feedback(.limit)])
+        #expect(navigator.receive(.action("add")) == [.feedback(.limit)])
         #expect(navigator.route == .recordings, "and nothing was opened")
     }
 
@@ -163,27 +164,27 @@ struct DialFolderTests {
     }
 
     /// The wheel wraps inside a folder the same way it does everywhere, and against its own count
-    /// rather than the root's — **plus the folder's own controls**, Import above and the chip row
-    /// below, which are stops here exactly as they are at the root. Two files is six positions.
+    /// rather than the root's — **plus the folder's six chips**, which are stops here exactly as
+    /// they are at the root. Two files is eight positions.
     @Test func theWheelWrapsWithinTheFolder() {
         var navigator = Self.atFolderRow()
         _ = navigator.receive(.press)
 
-        _ = navigator.receive(.tick(6))
+        _ = navigator.receive(.tick(8))
 
         let effects = navigator.receive(.press)
         #expect(DialSample.playedID(effects) == "rec-a")
     }
 
-    /// And the stop it gains is that folder's, not the library's — the reason Import carries a
+    /// And the chip it gains is that folder's, not the library's — the reason Import carries a
     /// destination id at all.
-    @Test func theFoldersVerbImportsIntoTheFolder() {
+    @Test func theFoldersImportChipTargetsTheFolder() {
         var navigator = Self.atFolderRow()
         _ = navigator.receive(.press)
 
-        _ = navigator.receive(.tick(-1))
+        _ = navigator.receive(.tick(-4))            // back past settings, sort, new folder, import
 
-        #expect(navigator.isPinnedActionHighlighted)
+        #expect(navigator.highlightedChipID == "import")
         #expect(
             navigator.receive(.press)
                 == [.importFiles(intoItemID: "folder-lectures"), .feedback(.commit)]

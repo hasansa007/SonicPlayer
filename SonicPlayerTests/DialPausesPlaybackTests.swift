@@ -15,21 +15,16 @@ import Testing
 @Suite
 struct DialPausesPlaybackTests {
 
-    /// **The silence now happens at the fork, one screen earlier than it used to.**
+    /// **The release moved twice, and the guarantee never did.**
     ///
-    /// This asserted that starting a take pauses playback, and force-unwrapped the index of
-    /// `.pausePlayback` to prove it came first. After the mode split that array no longer contains
-    /// it — entering Record releases the player, so by the time the recorder opens there is nothing
-    /// playing left to pause — and the force unwrap **crashed the whole test process**, which is
-    /// why suites with no connection to any of this were reported as failing.
-    ///
-    /// The guarantee has not weakened; it has moved earlier. Both halves are asserted below.
-    @Test func enteringRecordModePausesPlaybackAndLetsGoOfIt() {
-        let content = DialSample.content(recordingCount: 0, playback: DialSample.playback)
-        var navigator = DialNavigator(content: content, root: .library)
-        _ = navigator.receive(.tick(1))             // home → Record
+    /// It was here originally, then went to mode-entry when the fork arrived — entering Record let
+    /// go of the player, so the editor could rewrite a file nothing was holding. The fork is gone
+    /// and the release comes back to the edit nudge, which is the moment it was always about.
+    @Test func openingTheEditorPausesPlaybackAndLetsGoOfIt() {
+        let content = DialSample.content(playback: DialSample.playback)
+        var navigator = DialNavigator(content: content, root: .recordings)
 
-        let effects = navigator.receive(.press)     // → the library, Record's verbs
+        let effects = navigator.receive(.action("edit"))
 
         #expect(effects.contains(.pausePlayback))
         #expect(effects.contains(.releasePlayer))
@@ -39,47 +34,43 @@ struct DialPausesPlaybackTests {
         )
     }
 
-    /// And the microphone opens onto a session nothing else is holding.
-    @Test func byTheTimeTheTakeStartsThereIsNothingLeftToPause() {
+    /// **Opening the recorder releases too**, so the microphone starts onto a session nothing else
+    /// is holding — and the take itself has nothing left to pause.
+    @Test func openingTheRecorderReleasesAndTheTakeThenHasNothingToPause() {
         let content = DialSample.content(recordingCount: 0, playback: DialSample.playback)
-        var navigator = DialNavigator(content: content, root: .library)
-        _ = navigator.receive(.tick(1))
+        var navigator = DialNavigator(content: content, root: .recordings)
+
+        let opening = navigator.receive(.action("record"))
+        #expect(opening.contains(.pausePlayback))
+        #expect(opening.contains(.releasePlayer))
+
+        let starting = navigator.receive(.press)
+        #expect(starting == [.startRecording, .feedback(.commit)])
+    }
+
+    /// **The hub plays and the nudge edits**, so the press that used to open the editor cannot.
+    @Test func theHubPlaysRatherThanEditing() {
+        var navigator = DialSample.inRecordings()
+
         _ = navigator.receive(.press)
-        _ = navigator.receive(.action("record"))    // the pinned Record opens the recorder
 
-        let effects = navigator.receive(.press)     // and the hub starts the take
-
-        #expect(effects == [.startRecording, .feedback(.commit)])
+        #expect(navigator.route == .nowPlaying)
     }
 
-    /// The editor is the other screen that takes the session, and it is reached the same way — so
-    /// the same release covers it. Opening it from Record mode asks for no second pause.
-    @Test func theEditorIsReachedThroughTheSameRelease() {
-        var navigator = DialSample.inRecordMode()
-
-        let effects = navigator.receive(.press)     // a file, in Record mode → the editor
-
-        #expect(!effects.contains(.pausePlayback), "the fork already did it")
-        #expect(navigator.route == .edit(itemID: "rec-0"))
-    }
-
-    /// **Listen never opens either of them**, which is the point of having modes: the mode that can
-    /// take the audio session away from you is the one you have to choose.
-    @Test func listenModeCannotReachTheEditorAtAll() {
+    /// A double press has no second meaning left anywhere — it was the editor's way in twice over,
+    /// and both are gone.
+    @Test func aDoublePressMeansNothing() {
         var navigator = DialSample.inRecordings()
 
         #expect(navigator.receive(.doublePress).isEmpty)
-        #expect(navigator.receive(.action("edit")) == [.feedback(.limit)])
     }
 
     /// Nothing playing means nothing to silence — an effect asking the host to pause silence would
     /// be a lie about what happened, and `DialPressTests` reads these arrays exactly.
     @Test func nothingPlayingAsksForNoPause() {
         let content = DialSample.content(recordingCount: 0, playback: nil)
-        var navigator = DialNavigator(content: content, root: .library)
+        var navigator = DialNavigator(content: content, root: .recordings)
 
-        _ = navigator.receive(.tick(1))
-        _ = navigator.receive(.press)
         _ = navigator.receive(.action("record"))
         let effects = navigator.receive(.press)
 
@@ -97,8 +88,7 @@ struct DialPausesPlaybackTests {
         }
         #expect(before.isPlaying)
 
-        _ = navigator.receive(.tick(1))         // home → Record
-        _ = navigator.receive(.press)           // which silences playback
+        _ = navigator.receive(.action("edit"))  // which silences playback and lets go
 
         guard case .nowPlaying(let after) = nowPlayingContent(of: navigator) else {
             Issue.record("expected Now Playing")

@@ -11,8 +11,6 @@ import Foundation
 /// not a place you navigated to — making it a route would mean something had to decide to push it,
 /// and that decision would be wrong for exactly as long as it took to record something.
 enum DialRoute: Equatable {
-    /// 1a — library home.
-    case library
     /// 1b, or 1g when there are none.
     case recordings
     /// Preferences, as rows you turn to and press.
@@ -61,7 +59,6 @@ enum DialRoute: Equatable {
         //
         // Renaming only the second would have read `LIBRARY ▸ LIBRARY`, so the root took the name
         // it actually has: it is a menu you start from, not a library.
-        case .library: "HOME"
         case .settings: "SETTINGS"
         case .recordings: "LIBRARY"
         // The folder's own name, so the header reads HOME ▸ LIBRARY ▸ LECTURES rather than

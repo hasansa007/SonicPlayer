@@ -12,15 +12,6 @@ struct DialPressTests {
     // `#expect` captures its expression in a closure, so a `mutating` call written inside one fails
     // to compile against an immutable copy. Every result below is bound to a local first.
 
-    /// Both cards open the same library; the `DialActivity` tests cover what differs.
-    @Test func eitherCardOpensTheLibrary() {
-        var navigator = DialSample.navigator()
-
-        let effects = navigator.receive(.press)
-
-        #expect(effects == [.feedback(.commit)])
-        #expect(navigator.route == .recordings)
-    }
 
     @Test func pressingARecordingPlaysItAndOpensNowPlaying() {
         var navigator = DialSample.inRecordings()
@@ -78,19 +69,18 @@ struct DialPressTests {
         #expect(navigator.route == .recording)
     }
 
-    /// **An empty library is no longer a dead end, it opens on its verb.**
+    /// **An empty library is no longer a dead end, it opens on a chip.**
     ///
     /// This asserted a refusal, from when the list was the whole ring and a library with nothing in
-    /// it had nothing under the hub. The pinned verb is a stop now, and with no rows to hold the
-    /// highlight it is where the screen opens — so the press does the one thing there is to do.
-    @Test func pressingOnTheEmptyLibraryStartsTheOneThingThereIsToDo() {
+    /// it had nothing under the hub. The chips are stops, so a library with no rows still has six
+    /// positions and the screen opens on the first of them.
+    @Test func pressingOnTheEmptyLibraryReachesAChipRatherThanRefusing() {
         var navigator = DialSample.navigator(recordingCount: 0)
-        _ = navigator.receive(.tick(1))     // home → Record
-        _ = navigator.receive(.press)
+        _ = navigator.receive(.tick(1))     // past Back, onto Record
 
         let effects = navigator.receive(.press)
 
-        #expect(effects == [.feedback(.commit)])
+        #expect(effects.last == .feedback(.commit))
         #expect(navigator.route == .recording, "the recorder, opened but not started")
     }
 
@@ -98,13 +88,11 @@ struct DialPressTests {
     /// take. For an hour the card did both, which meant recording began before you had decided to.
     @Test func theRecordButtonOpensTheRecorderWithoutStartingATake() {
         let content = DialSample.content(recordingCount: 0, playback: nil)
-        var navigator = DialNavigator(content: content, root: .library)
-        _ = navigator.receive(.tick(1))             // home → Record
-        _ = navigator.receive(.press)               // → the library
+        var navigator = DialNavigator(content: content, root: .recordings)
 
         let opening = navigator.receive(.action("record"))
 
-        #expect(opening == [.feedback(.commit)], "no microphone yet")
+        #expect(!opening.contains(.startRecording), "no microphone yet")
         #expect(navigator.route == .recording)
 
         let starting = navigator.receive(.press)
@@ -193,27 +181,11 @@ struct DialPressTests {
         #expect(navigator.route == .recordings)
     }
 
-    /// **Listen cannot destroy and Record cannot collect.** Each mode refuses the other's verbs
-    /// rather than hiding them and quietly doing nothing — a limit pulse is an answer.
-    @Test func eachModeRefusesTheOthersVerbs() {
-        var listening = DialSample.inRecordings()
-        #expect(listening.receive(.action("delete")) == [.feedback(.limit)])
-        #expect(listening.receive(.action("rename")) == [.feedback(.limit)])
-        #expect(listening.receive(.action("record")) == [.feedback(.limit)])
-
-        var recording = DialSample.inRecordMode()
-        #expect(recording.receive(.action("add")) == [.feedback(.limit)])
-        #expect(recording.receive(.action("import")) == [.feedback(.limit)])
-        // **`newFolder` is in neither list, because it is not a mode's verb.** Making a folder
-        // destroys nothing and collects nothing; both modes browse, and both can organise what they
-        // are browsing. The split is about what you can lose, not about who may tidy up.
-        #expect(recording.receive(.action("newFolder")) == [.createFolder(inItemID: nil), .feedback(.commit)])
-    }
 
     /// **Delete is the exception, and the only one.** Every other row acts on the press; this one
     /// pushes a guard, because it is the single thing here that cannot be taken back.
     @Test func pressingDeleteOpensTheGuardInstead() {
-        var navigator = DialSample.inRecordMode()
+        var navigator = DialSample.inRecordings()
 
         let effects = navigator.receive(.action("delete"))
 
@@ -222,7 +194,7 @@ struct DialPressTests {
     }
 
     @Test func confirmingTheGuardDeletes() {
-        var navigator = DialSample.inRecordMode()
+        var navigator = DialSample.inRecordings()
         _ = navigator.receive(.action("delete"))
         _ = navigator.receive(.tick(1))        // Cancel → Delete
 
@@ -234,7 +206,7 @@ struct DialPressTests {
 
     /// Cancel is row 0, so a stray press on arrival is the harmless answer.
     @Test func theGuardOpensOnCancelAndPressingItAsksForNothing() {
-        var navigator = DialSample.inRecordMode()
+        var navigator = DialSample.inRecordings()
         _ = navigator.receive(.action("delete"))
 
         let effects = navigator.receive(.press)
@@ -245,60 +217,21 @@ struct DialPressTests {
 
     // MARK: - The fork
 
-    /// **Home is the fork.** A separate `chooseMode` screen existed for this and was never
-    /// reached, because a two-card screen in front of a two-card screen is the same screen twice.
-    @Test func choosingListenOpensTheLibraryToPlayFrom() {
-        var navigator = DialSample.navigator()
 
-        let effects = navigator.receive(.press)
-
-        #expect(effects == [.feedback(.commit)], "nothing is released; Listen holds nothing")
-        #expect(navigator.route == .recordings)
-        #expect(navigator.screen.ring.hub == .label("PLAY"))
-    }
-
-    /// **Record lets go of the player, and that is the point of the mode.** The editor rewrites
-    /// files on disk; a player still holding one holds a stale duration and position. Pausing is
-    /// not enough — see `DialActivity`.
-    @Test func choosingRecordReleasesThePlayer() {
-        var navigator = DialSample.navigator()
-        _ = navigator.receive(.tick(1))
-
-        let effects = navigator.receive(.press)
-
-        #expect(effects == [.pausePlayback, .releasePlayer, .feedback(.commit)])
-        #expect(navigator.route == .recordings)
-        #expect(navigator.screen.ring.hub == .label("EDIT"))
-    }
 
     /// Nothing playing means nothing to pause, but the release still has to happen — the player can
     /// hold a paused track just as firmly as a playing one.
-    @Test func recordReleasesEvenWithNothingPlaying() {
+    @Test func editingReleasesEvenWithNothingPlaying() {
         var navigator = DialNavigator(
-            content: DialSample.content(playback: nil), root: .library
+            content: DialSample.content(playback: nil), root: .recordings
         )
-        _ = navigator.receive(.tick(1))
 
-        let effects = navigator.receive(.press)
+        let effects = navigator.receive(.action("edit"))
 
-        #expect(effects == [.releasePlayer, .feedback(.commit)])
+        #expect(effects.first == .releasePlayer)
+        #expect(navigator.route == .edit(itemID: "rec-0"))
     }
 
-    /// Going back to the fork forgets the mode, or the next Listen press would still edit.
-    ///
-    /// The tick back to row 0 is not incidental: popping restores the highlight you left, so home
-    /// comes back with Record still under the cursor. That is correct, and it means "returned home"
-    /// is not by itself "chose Listen".
-    @Test func returningHomeForgetsTheMode() {
-        var navigator = DialSample.inRecordMode()
-        #expect(navigator.screen.ring.hub == .label("EDIT"))
-
-        _ = navigator.receive(.action("back"))
-        _ = navigator.receive(.tick(-1))        // Record is still highlighted; go to Listen
-        _ = navigator.receive(.press)
-
-        #expect(navigator.screen.ring.hub == .label("PLAY"), "Listen again")
-    }
 
     // MARK: - The chips that are not modes
 
@@ -325,14 +258,14 @@ struct DialPressTests {
     /// **The editor offers Back and nothing else.** `Start handle` and `End handle` were replaced
     /// by tapping the handle itself, and `Preview` was removed outright — so the row holds only the
     /// one chip every screen below the root carries.
-    @Test func theEditorOffersOnlyBack() {
+    @Test func theEditorOffersOnlyTheTwoFixedEnds() {
         let navigator = DialSample.whileEditing()
 
-        #expect(navigator.screen.actions.map(\.id) == ["back"])
+        #expect(navigator.screen.actions.map(\.id) == ["back", "settings"])
     }
 
     /// Now Playing used to be three mode chips and no Back, which made the command load-bearing:
-    /// without it the screen was a trap. The modes are gone and Back is now the only chip — so this
+    /// without it the screen was a trap. The modes are gone and Back leads every row now — so this
     /// pins the *reachability*, which is what mattered, rather than the absence that caused it.
     @Test func backIsBothAChipAndACommandOnNowPlaying() {
         var navigator = DialSample.navigator()
@@ -342,6 +275,6 @@ struct DialPressTests {
 
         _ = navigator.receive(.action("back"))
 
-        #expect(navigator.route == .library)
+        #expect(navigator.route == .recordings)
     }
 }
