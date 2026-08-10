@@ -19,10 +19,10 @@ import SwiftUI
 /// what a command *means* is decided here.
 struct DialScreenView: View {
 
-    /// The level the readout is showing, and whether it is showing at all.
+    /// The level the wheel's border is reporting, and whether it is reporting at all.
     ///
-    /// Held here rather than in the contract because it is *presentation timing*, not state — the
-    /// navigator knows the volume, and knows nothing about how long a transient should linger.
+    /// Held here rather than in the contract because it is *presentation timing*: the navigator
+    /// knows the volume and has no business knowing how long a transient lingers.
     @State private var shownVolume: Double?
     @State private var hideTask: Task<Void, Never>?
 
@@ -44,11 +44,6 @@ struct DialScreenView: View {
                 Spacer(minLength: 0)
 
                 DialActionRow(actions: screen.actions, onCommand: onCommand)
-                    .layoutPriority(1)
-
-                // Between the card and the dial, where there is already a gap — so appearing costs
-                // no layout anywhere else and the list underneath does not jump when it does.
-                volumeReadout
                     .layoutPriority(1)
 
                 dial
@@ -90,6 +85,9 @@ struct DialScreenView: View {
         HStack(spacing: 0) {
             backControl
             Spacer(minLength: 0)
+
+            transportControls
+            libraryActions
 
             // Opposite corner from Back, because they are opposite kinds of thing: one leaves, one
             // stays and re-reads. Sharing a corner would make the wrong one the easy tap.
@@ -204,9 +202,8 @@ struct DialScreenView: View {
         // grows exactly as far as it can — it just no longer *claims* the space when empty.
         .frame(maxWidth: .infinity)
         .background(Color.sonicSurface, in: RoundedRectangle(cornerRadius: Radius.stage))
-        .overlay(
-            RoundedRectangle(cornerRadius: Radius.stage).strokeBorder(Color.sonicBorder)
-        )
+        // **The card is what goes live**, not the wheel. See `LiveBorder`.
+        .overlay(LiveBorder(isLive: screen.chrome.isLive, cornerRadius: Radius.stage))
         // Content is windowed by the navigator, not scrolled here, so anything that overruns is
         // clipped rather than allowed to escape the card and collide with the action row.
         .clipShape(RoundedRectangle(cornerRadius: Radius.stage))
@@ -259,7 +256,7 @@ struct DialScreenView: View {
             hub: screen.ring.hub,
             defersPress: screen.ring.defersPress,
             directions: screen.ring.directions,
-            isLive: screen.ring.isLive,
+            volume: shownVolume,
             onCommand: onCommand
         )
         // The hint is no longer drawn, but it is still the sentence that explains the gestures —
@@ -267,29 +264,21 @@ struct DialScreenView: View {
         // a caption and becomes the dial's spoken description, which is where it was always most
         // useful.
         .accessibilityHint(Text(screen.hint))
-    }
-
-    /// The transient volume readout: present for a beat after the level moves, then gone.
-    ///
-    /// A fixed-height slot rather than an insertion, because a control that appears *between* two
-    /// others pushes both apart — and the thing it would push is the dial, which must not move
-    /// under a thumb that is mid-nudge. So the space is always there and only the contents fade.
-    @ViewBuilder
-    private var volumeReadout: some View {
-        VolumeSlider(volume: shownVolume ?? 0)
-            .opacity(shownVolume == nil ? 0 : 1)
-            .animation(Motion.settle, value: shownVolume == nil)
-            .onChange(of: currentVolume) { _, level in
-                guard let level else { return }
-                shownVolume = level
-                hideTask?.cancel()
-                hideTask = Task {
-                    try? await Task.sleep(for: .seconds(Self.readoutLinger))
-                    guard !Task.isCancelled else { return }
-                    shownVolume = nil
-                }
+        // **Hidden until it has something to say.** Drawn permanently the arc was a second coloured
+        // ring competing with the card's live border for the same glance, on a screen where the
+        // thing you are looking at is what is playing. The question it answers — did that do
+        // anything? — is only ever asked in the second after a nudge.
+        .onChange(of: currentVolume) { _, level in
+            guard let level else { return }
+            shownVolume = level
+            hideTask?.cancel()
+            hideTask = Task {
+                try? await Task.sleep(for: .seconds(Self.volumeLinger))
+                guard !Task.isCancelled else { return }
+                shownVolume = nil
             }
-            .onDisappear { hideTask?.cancel() }
+        }
+        .onDisappear { hideTask?.cancel() }
     }
 
     /// The volume this screen is currently reporting, or `nil` where volume is not on show.
@@ -301,9 +290,80 @@ struct DialScreenView: View {
         return playing.volume
     }
 
-    /// How long the readout stays after the last nudge. Long enough that a run of nudges reads as
-    /// one gesture rather than a flicker, short enough to be gone before you look away.
-    private static let readoutLinger: Double = 1.5
+    /// Import and New folder, on the screens that list files.
+    ///
+    /// **They were rows, and being rows was the problem.** A verb sitting among the nouns competed
+    /// for the highlight with the files and pushed every reader of that highlight through an
+    /// offset. Here they are beside Back and Refresh, which is where this app's other verbs live.
+    @ViewBuilder
+    private var libraryActions: some View {
+        if screen.chrome.showsLibraryActions {
+            barButton(icon: .importFile, label: "Import", command: "import")
+            barButton(icon: .add, label: "New folder", command: "newFolder")
+        }
+    }
+
+    private func barButton(
+        icon: DialScreen.Icon, label: String, command: String
+    ) -> some View {
+        Button {
+            onCommand(.action(command))
+        } label: {
+            Image(systemName: DialIcon.systemImage(for: icon) ?? "questionmark")
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundColor(.sonicTextSecondary)
+                .frame(width: Sizing.tapTarget, height: Sizing.tapTarget)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(label))
+    }
+
+    /// How long the volume arc stays after the last nudge. Long enough that a run of nudges reads
+    /// as one gesture rather than a flicker, short enough to be gone before you look away.
+    private static let volumeLinger: Double = 1.5
+
+    /// The transport toggles, on the screen that owns the queue.
+    @ViewBuilder
+    private var transportControls: some View {
+        if let transport = screen.chrome.transport {
+            HStack(spacing: Spacing.xs) {
+                transportButton(
+                    icon: transport.repeatMode == .one ? .repeatOne : .repeatAll,
+                    isOn: transport.repeatMode != .off,
+                    label: "Repeat",
+                    command: "repeat"
+                )
+                transportButton(
+                    icon: .shuffle,
+                    isOn: transport.isShuffled,
+                    label: "Shuffle",
+                    command: "shuffle"
+                )
+            }
+        }
+    }
+
+    /// Lit when on, muted when off — the only thing distinguishing three repeat states and two
+    /// shuffle ones, since neither has room for a word.
+    private func transportButton(
+        icon: DialScreen.Icon, isOn: Bool, label: String, command: String
+    ) -> some View {
+        Button {
+            onCommand(.action(command))
+        } label: {
+            Image(systemName: DialIcon.systemImage(for: icon) ?? "questionmark")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(isOn ? .sonicPrimary : .sonicTextMuted)
+                .frame(width: Sizing.tapTarget, height: Sizing.tapTarget)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(label))
+        .accessibilityAddTraits(isOn ? [.isSelected] : [])
+    }
 
     private static let washTint: Double = 0.15
 

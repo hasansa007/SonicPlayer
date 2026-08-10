@@ -304,12 +304,27 @@ final class AppViewModel {
             player.loadTrack(file, queue: siblings, source: nil)
         }
         dial.onTogglePlayPause = { [player] in player.playPauseTapped() }
+        dial.onCycleRepeat = { [player] in player.toggleRepeatMode() }
+        dial.onToggleShuffle = { [player] in player.toggleShuffle() }
         // Opening the recorder or the trim editor silences whatever is playing. `pauseIfPlaying`
         // rather than a stop: the track and its position survive, so Now Playing is still there to
         // come back to.
         dial.onPausePlayback = { [player] in player.pauseIfPlaying() }
         dial.onSetVolume = { [player] value in player.setVolume(value) }
-        dial.onImportFiles = { [weak self] in self?.isImportSheetPresented = true }
+        // **The picker lands where you are standing.** Import used to exist only at the library
+        // root, so there was one destination and no need to say which. A folder is somewhere you
+        // can put things, which is the whole reason the row is there at every depth now.
+        dial.onImportFiles = { [weak self] itemID in
+            guard let self else { return }
+            importDestination = itemID.flatMap(URL.init(string:))
+            isImportSheetPresented = true
+        }
+        dial.onCreateFolder = { [weak self] itemID in
+            guard let self else { return }
+            newFolderParent = itemID.flatMap(URL.init(string:))
+            newFolderName = ""
+            isNamingNewFolder = true
+        }
         dial.onReloadLibrary = { [weak self] in
             self?.home.loadAllFiles()
             self?.filesRoot.refreshFiles()
@@ -477,6 +492,45 @@ final class AppViewModel {
             filesRoot.refreshFiles()
             home.loadAllFiles()
             refreshDial()
+        }
+    }
+
+    /// Where the import picker's files should land — `nil` for the library root.
+    var importDestination: URL?
+
+    /// The new-folder prompt. Its own alert rather than the browser's, because the browser's
+    /// navigates into whatever it creates, and the dial has already got you where the folder will
+    /// appear — following it would be leaving the only place that shows what just happened.
+    var isNamingNewFolder = false
+    var newFolderName = ""
+    var newFolderParent: URL?
+
+    /// Imports into `importDestination` rather than into the root browser's directory.
+    func importPickedFiles(_ urls: [URL]) {
+        let destination = importDestination
+        importDestination = nil
+        Task { [fileManager] in
+            await FolderImport.run(urls: urls, into: destination, fileManager: fileManager)
+            await MainActor.run { [weak self] in
+                self?.filesRoot.refreshFiles()
+                self?.home.loadAllFiles()
+            }
+        }
+    }
+
+    func confirmNewFolder() {
+        let name = newFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parent = newFolderParent
+        isNamingNewFolder = false
+        newFolderParent = nil
+        guard !name.isEmpty else { return }
+
+        Task { [fileManager] in
+            try? await fileManager.createCollection(name, parent)
+            await MainActor.run { [weak self] in
+                self?.filesRoot.refreshFiles()
+                self?.home.loadAllFiles()
+            }
         }
     }
 

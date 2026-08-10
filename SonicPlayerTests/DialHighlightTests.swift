@@ -24,7 +24,7 @@ struct DialHighlightTests {
 
         let effects = navigator.receive(.tick(1))
 
-        #expect(highlight(navigator) == 2)
+        #expect(highlight(navigator) == 1)
         #expect(effects == [.feedback(.detent)])
     }
 
@@ -34,7 +34,7 @@ struct DialHighlightTests {
 
         _ = navigator.receive(.tick(5))
 
-        #expect(highlight(navigator) == 6)
+        #expect(highlight(navigator) == 5)
     }
 
     @Test func turningBackwardsMovesBackwards() {
@@ -43,7 +43,7 @@ struct DialHighlightTests {
 
         _ = navigator.receive(.tick(-2))
 
-        #expect(highlight(navigator) == 4)
+        #expect(highlight(navigator) == 3)
     }
 
     @Test func aZeroTickDoesNothingAtAll() {
@@ -62,17 +62,16 @@ struct DialHighlightTests {
     /// having to explain which end you are against through a pulse that means four other things.
     @Test func turningBackPastTheFirstRowLandsOnTheLast() {
         var navigator = DialSample.inRecordings(recordingCount: 3)
-        _ = navigator.receive(.tick(-1))            // onto Import, row 0
 
         let effects = navigator.receive(.tick(-1))
 
-        #expect(highlight(navigator) == 3, "Import plus three files — round to the last")
+        #expect(highlight(navigator) == 2, "three files — back off the first is the last")
         #expect(effects == [.feedback(.detent)], "a move is a detent, not a wall")
     }
 
     @Test func turningPastTheLastRowLandsOnTheFirst() {
         var navigator = DialSample.inRecordings(recordingCount: 3)
-        _ = navigator.receive(.tick(2))             // the last file, row 3
+        _ = navigator.receive(.tick(2))             // the last file, row 2
 
         let effects = navigator.receive(.tick(1))
 
@@ -83,11 +82,11 @@ struct DialHighlightTests {
     /// A flick far larger than the list still lands somewhere sensible rather than running out of
     /// bounds — `detents` is reduced modulo the row count before it is applied.
     @Test func aFlickLongerThanTheListStillLands() {
-        var navigator = DialSample.inRecordings(recordingCount: 3)   // 4 rows, highlight on 1
+        var navigator = DialSample.inRecordings(recordingCount: 3)   // 3 rows, highlight on 0
 
-        let effects = navigator.receive(.tick(41))                   // 41 % 4 == 1
+        let effects = navigator.receive(.tick(40))                   // 40 % 3 == 1
 
-        #expect(highlight(navigator) == 2)
+        #expect(highlight(navigator) == 1)
         #expect(effects == [.feedback(.detent)])
     }
 
@@ -95,18 +94,20 @@ struct DialHighlightTests {
     /// started, and a tick that changes nothing reports `.limit` — the law this suite opens with,
     /// which wrapping does not repeal.
     @Test func awholeNumberOfRevolutionsChangesNothing() {
-        var navigator = DialSample.inRecordings(recordingCount: 3)   // 4 rows
+        var navigator = DialSample.inRecordings(recordingCount: 3)   // 3 rows
 
-        let effects = navigator.receive(.tick(40))                   // 40 % 4 == 0
+        let effects = navigator.receive(.tick(39))                   // 39 % 3 == 0
 
-        #expect(highlight(navigator) == 1)
+        #expect(highlight(navigator) == 0)
         #expect(effects == [.feedback(.limit)])
     }
 
     // MARK: - Nothing to scroll
 
-    /// One row cannot wrap onto itself. An empty library is exactly that — the Import row alone.
-    @Test func aSingleRowListHasNothingToMoveAndSaysSo() {
+    /// One row cannot wrap onto itself, and neither can none. An empty library is now genuinely
+    /// empty — Import and New folder left the list for the bottom bar — so there is nothing to turn
+    /// through at all, and the wheel says so rather than pretending.
+    @Test func aListWithNothingInItHasNothingToMoveAndSaysSo() {
         var navigator = DialSample.navigator(recordingCount: 0)
         _ = navigator.receive(.tick(1))
         _ = navigator.receive(.press)
@@ -114,6 +115,13 @@ struct DialHighlightTests {
         let effects = navigator.receive(.tick(1))
 
         #expect(effects == [.feedback(.limit)])
+    }
+
+    /// A single file is the same fact one row up.
+    @Test func aSingleRowListCannotWrapOntoItself() {
+        var navigator = DialSample.inRecordings(recordingCount: 1)
+
+        #expect(navigator.receive(.tick(1)) == [.feedback(.limit)])
     }
 
     // MARK: - The ring follows the highlight
@@ -128,7 +136,7 @@ struct DialHighlightTests {
             Issue.record("expected browse ticks, got \(navigator.screen.ring.ticks)")
             return
         }
-        #expect(abs((thumb ?? .nan) - 0.6) < 1e-9)
+        #expect(abs((thumb ?? .nan) - 0.5) < 1e-9, "row 2 of five files")
     }
 
     /// A one-row list has no span to place a thumb along. Only an empty library is one row now —

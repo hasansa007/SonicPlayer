@@ -160,8 +160,8 @@ struct DialCaptureTests {
     /// The real ordering: the editor is pushed, and only then does the host discover which item it
     /// has to load and hand the material over.
     private static func editorOpenedBeforeTheMaterialLoads(thenLoad: Bool = true) -> DialNavigator {
+        // No tick: the list is only its contents now, so row 0 is the first recording.
         var navigator = DialNavigator(content: content(editing: nil), root: .recordings)
-        _ = navigator.receive(.tick(1))
         _ = navigator.receive(.doublePress)
         if thenLoad {
             navigator.update(content(editing: editable(markers: [])))

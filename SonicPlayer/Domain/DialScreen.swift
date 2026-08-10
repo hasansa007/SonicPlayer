@@ -55,6 +55,29 @@ struct DialScreen: Equatable {
         /// quitting. Only on the screens that show files, because it is the only thing it reloads.
         var showsSync: Bool = false
 
+        /// Whether the bottom bar offers Import and New folder.
+        ///
+        /// Both were rows in the list they act on. A thing you *do* sitting among the things you
+        /// *have* competed with the files for the highlight and forced an offset on everything that
+        /// read it; in the bar they sit with Back and Refresh, which are the app's other verbs.
+        var showsLibraryActions: Bool = false
+
+        /// Whether the **card's** border cycles while audio moves.
+        ///
+        /// It used to be the wheel's, and the wheel is the wrong place for it: an animated rainbow
+        /// on the one thing you are holding competes with the thing it is drawn on, and the wheel's
+        /// border has a better job now — it is the volume. The card is where you look to see what
+        /// is playing, so it is where "this is playing" belongs.
+        var isLive: Bool = false
+
+        /// The queue toggles, on screens that own the transport. `nil` everywhere else.
+        var transport: Transport?
+
+        struct Transport: Equatable {
+            var repeatMode: RepeatMode
+            var isShuffled: Bool
+        }
+
         /// Whether there is a level to pop to.
         ///
         /// Back lives in the top bar rather than the action row because it is *navigation*, not one
@@ -123,18 +146,6 @@ struct DialScreen: Equatable {
         /// navigator states it and the view obeys.
         var isProminent: Bool = false
 
-        /// How many leading rows do not scroll.
-        ///
-        /// **A count rather than a separate `pinned` row, and that is the whole reason it works.**
-        /// Lifting Import out into its own field would renumber everything below it: `highlighted`
-        /// would mean something different depending on where it pointed, and `RecordingsRow` — the
-        /// one place that owns the Import offset — would have to be taught a second numbering. Here
-        /// the rows and the highlight keep one absolute index space, and this says only which of
-        /// them the view draws outside the scroller.
-        ///
-        /// The highlight can still land on a pinned row. That is not a special case: the view
-        /// compares the same absolute index either side of the split.
-        var pinnedRows: Int = 0
     }
 
     struct NowPlaying: Equatable {
@@ -249,6 +260,10 @@ struct DialScreen: Equatable {
         case rename
         case delete
         case add
+        case repeatOff
+        case repeatOne
+        case repeatAll
+        case shuffle
         case none
     }
 

@@ -18,6 +18,9 @@ enum DialEffect: Equatable {
 
     case play(itemID: String)
     case togglePlayPause
+    /// Off → all → one, and round. The host owns the order; this only asks for the next.
+    case cycleRepeat
+    case toggleShuffle
     /// Silence whatever is playing, because the screen being opened needs the audio to itself.
     ///
     /// **Recording and trimming both take the audio session.** A capture with a lecture playing
@@ -78,7 +81,12 @@ enum DialEffect: Equatable {
 
     /// Open the system file picker. A library is the place you add to, and reaching one from a card
     /// marked `Library` with no way to put anything in is the gap this fills.
-    case importFiles
+    /// Bring audio in from Files. `intoItemID` is the folder to land in — `nil` for the library
+    /// root. It used to take no argument, because Import only existed at the root.
+    case importFiles(intoItemID: String?)
+
+    /// Make a folder inside `inItemID`, or at the library root when `nil`. The host asks for a name.
+    case createFolder(inItemID: String?)
 
     /// Re-read the library from disk. Raised by the bottom bar's sync control.
     case reloadLibrary

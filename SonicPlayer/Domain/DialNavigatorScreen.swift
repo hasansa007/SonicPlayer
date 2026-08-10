@@ -28,7 +28,10 @@ extension DialNavigator {
             status: status,
             isRecording: content.capture.map { !$0.isPaused } ?? false,
             showsSettings: stack.count == 1,
-            showsSync: route == .recordings || isFolder,
+            showsSync: isFileList,
+            showsLibraryActions: isFileList,
+            isLive: isLive,
+            transport: transport,
             canGoBack: stack.count > 1
         )
     }
@@ -68,7 +71,17 @@ extension DialNavigator {
         // **Always a list.** Import is row 0 and is always there, so there is never nothing to draw
         // — and the empty-state message could not have held a row anyway. What the message said
         // lives on that row's second line when the library is bare.
+        // **The empty state is a message again.** It was folded into the Import row's second line,
+        // which worked only while Import was a row — with the verbs in the bottom bar an empty
+        // library would otherwise be a blank card that says nothing about why.
         case .recordings, .folder:
+            guard !currentItems.isEmpty else {
+                return .message(.init(
+                    icon: .importFile,
+                    title: "Nothing here yet",
+                    body: "Import audio or make a folder using the buttons below."
+                ))
+            }
             return .list(list(rows: recordingRows))
 
         case .nowPlaying:
@@ -147,8 +160,7 @@ extension DialNavigator {
             rows: rows,
             highlighted: min(level.highlighted, max(0, rows.count - 1)),
             subject: subject,
-            isProminent: route.showsProminentRows,
-            pinnedRows: pinnedRowCount
+            isProminent: route.showsProminentRows
         )
     }
 
@@ -193,28 +205,18 @@ extension DialNavigator {
     ///
     /// **Import belongs to a library, which is what this screen turned out to be.** It was tried as
     /// a card on home, a chip here, a row here, and then removed altogether — the removal on the
-    /// reasoning that iOS already provides the share sheet and Open-in. What that missed is that a
-    /// library is the place you *add to*: reaching it from a card marked `Library` and finding no
-    /// way to put anything in is the gap that sent it back.
+    /// Every row is a file or a folder.
     ///
-    /// `RecordingsRow` owns the offset this creates, and everything that reads the highlight goes
-    /// through it. This is only the drawing half of the same fact.
+    /// **Import and New folder used to be here and are buttons now.** They were a row, then a
+    /// pinned row, and both versions had the same problem: a thing you *do* sitting in a list of
+    /// things you *have*, competing for the highlight with the files and forcing every reader of
+    /// that highlight through an offset. In the bottom bar they are next to Back and Refresh, which
+    /// are the app's other verbs, and this list went back to being only its contents.
     private var recordingRows: [DialScreen.List.Row] {
-        let importRow = DialScreen.List.Row(
-            id: "import",
-            icon: .importFile,
-            title: "Import",
-            // The empty state's sentence, folded into the row that answers it — with nothing else
-            // in the library this is the only row, so it has to say why the screen is bare.
-            subtitle: currentItems.isEmpty
-                ? "Nothing here yet · bring audio in"
-                : "Bring audio in from Files"
-        )
-
         // **Folders read as folders, not as silent recordings.** They carry the playlist glyph the
         // `Add to playlist` nudge already uses, and their trailing column counts what is inside
         // rather than showing a duration — a folder's total length is a number nobody navigates by.
-        let rows = currentItems.map { item in
+        currentItems.map { item in
             DialScreen.List.Row(
                 id: item.id,
                 icon: item.isFolder ? .playlist : .recording,
@@ -225,17 +227,6 @@ extension DialNavigator {
                 subtitle: item.subtitle
             )
         }
-
-        return hasImportRow ? [importRow] + rows : rows
-    }
-
-    /// Import does not scroll away.
-    ///
-    /// It is row 0 of a list that can be hundreds long, so on any real library it left the screen
-    /// on the second turn — an "always available" row that was available until you looked for it.
-    /// Pinned it keeps that promise, and the wheel still reaches it by turning back up.
-    private var pinnedRowCount: Int {
-        hasImportRow ? 1 : 0
     }
 
     private var deleteChoiceRows: [DialScreen.List.Row] {
@@ -324,21 +315,14 @@ extension DialNavigator {
         // press is coming would delay the one press that has nothing to wait for. Nor on a folder,
         // which has no editor behind it — waiting there would make opening one feel slow for a
         // second press that can never mean anything.
-        guard case .recording(let index)? = highlightedLibraryRow,
-              currentItems.indices.contains(index) else { return false }
-        return !currentItems[index].isFolder
+        highlightedLibraryItem?.isFolder == false
     }
 
     /// What the highlight is pointing at on a library list, or `nil` anywhere else. Folders count:
     /// they are the same list at a deeper level, drawn and turned through the same way.
-    private var highlightedLibraryRow: RecordingsRow? {
-        switch route {
-        case .recordings, .folder: break
-        default: return nil
-        }
-        return RecordingsRow.at(
-            level.highlighted, recordings: currentItems.count, hasImport: hasImportRow
-        )
+    private var highlightedLibraryItem: DialContent.Item? {
+        guard isFileList, currentItems.indices.contains(level.highlighted) else { return nil }
+        return currentItems[level.highlighted]
     }
 
     /// Whether this screen is a folder — asked in a couple of places that do not care which one.
@@ -347,12 +331,8 @@ extension DialNavigator {
         return false
     }
 
-    /// The item under the highlight on a library list, folder or file.
-    private var highlightedItem: DialContent.Item? {
-        guard case .recording(let index)? = highlightedLibraryRow,
-              currentItems.indices.contains(index) else { return nil }
-        return currentItems[index]
-    }
+    /// Whether this screen lists files, which is the library root and every folder under it.
+    private var isFileList: Bool { route == .recordings || isFolder }
 
     /// What the gear stick does here.
     ///
@@ -407,7 +387,7 @@ extension DialNavigator {
         case .recordings, .folder:
             // Not on a folder either: all four act on a file, and a stick that lights up over a
             // row none of them can answer is four controls promising something they refuse.
-            guard highlightedItem?.isFolder == false else { return nil }
+            guard highlightedLibraryItem?.isFolder == false else { return nil }
             return DialScreen.Directions(
                 up: .init(id: "edit", icon: .edit, label: "Edit"),
                 down: .init(id: "delete", icon: .delete, label: "Delete"),
@@ -418,6 +398,12 @@ extension DialNavigator {
         default:
             return nil
         }
+    }
+
+    /// The queue toggles, on the one screen that owns the queue.
+    private var transport: DialScreen.Chrome.Transport? {
+        guard case .nowPlaying = route, let playback = content.playback else { return nil }
+        return .init(repeatMode: playback.repeatMode, isShuffled: playback.isShuffled)
     }
 
     /// The border cycles while audio is moving, and only then.
@@ -455,8 +441,8 @@ extension DialNavigator {
         case .library: .label("OPEN")
         // The hub says what *this row* does, which is the whole point of one button meaning
         // something different everywhere. On Import it cannot say OPEN.
-        case .recordings, .folder:
-            highlightedLibraryRow == .importFiles ? .label("IMPORT") : .label("OPEN")
+        // Always OPEN: every row here is something to open, now that the two verbs are buttons.
+        case .recordings, .folder: .label("OPEN")
         case .nowPlaying: .glyph(content.playback?.isPlaying == false ? "play.fill" : "pause.fill")
         case .recording: .recordDot
         // One state, one meaning: `DONE` applies whichever operation the nudges armed. It briefly
@@ -481,12 +467,10 @@ extension DialNavigator {
             return "rotate to browse · press to open · hold for now playing"
 
         case .recordings, .folder:
-            if highlightedLibraryRow == .importFiles {
-                return currentItems.isEmpty
-                    ? "press to import · nothing else here yet"
-                    : "press to import · rotate for your files"
+            if currentItems.isEmpty {
+                return "nothing here yet · import or make a folder below"
             }
-            if highlightedItem?.isFolder == true {
+            if highlightedLibraryItem?.isFolder == true {
                 return "rotate to scroll · press to open the folder"
             }
             return "rotate to scroll · press to open · double-press to edit"

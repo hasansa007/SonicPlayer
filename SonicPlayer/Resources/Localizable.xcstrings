@@ -1539,6 +1539,9 @@
         }
       }
     },
+    "Group recordings together." : {
+
+    },
     "Help & Support" : {
       "localizations" : {
         "ar" : {
@@ -2450,7 +2453,6 @@
       }
     },
     "New Folder" : {
-      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {

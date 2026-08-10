@@ -305,22 +305,15 @@ struct DialNavigator {
             return open(destination)
 
         case .recordings, .folder:
-            switch RecordingsRow.at(
-                level.highlighted, recordings: currentItems.count, hasImport: hasImportRow
-            ) {
-            case .importFiles:
-                // Stays put. The picker belongs to the host and the files land in this very list,
-                // so navigating away would be a round trip back to where you already are.
-                return [.importFiles, .feedback(.commit)]
-            case .recording(let index):
-                guard let item = currentItems[safe: index] else { return [.feedback(.limit)] }
-                // **A folder opens; a file plays.** One press, two outcomes, decided by the row
-                // rather than by a mode — which is what keeps the hub saying OPEN on both.
-                guard !item.isFolder else { return open(.folder(itemID: item.id)) }
-                return playItem(item, at: index)
-            case nil:
-                return [.feedback(.limit)]
-            }
+            // **Every row here is a file or a folder.** Import and New folder were rows once, then
+            // pinned rows, and are now buttons in the bottom bar — so the list has no exceptions
+            // left and the highlight indexes the items directly. `RecordingsRow` existed to hold
+            // the offset that created; it is gone with it.
+            guard let item = currentItems[safe: level.highlighted] else { return [.feedback(.limit)] }
+            // **A folder opens; a file plays.** One press, two outcomes, decided by the row rather
+            // than by a mode — which is what keeps the hub saying OPEN on both.
+            guard !item.isFolder else { return open(.folder(itemID: item.id)) }
+            return playItem(item, at: level.highlighted)
 
         case .nowPlaying:
             content.playback?.isPlaying.toggle()
@@ -387,10 +380,7 @@ struct DialNavigator {
     /// Row 0 is Import, so this is `nil` there — and the stick's four nudges all act on a recording,
     /// which is why every one of them guards on it.
     private var highlightedRecording: DialContent.Item? {
-        guard case .recording(let index)? = RecordingsRow.at(
-            level.highlighted, recordings: currentItems.count, hasImport: hasImportRow
-        ) else { return nil }
-        return currentItems[safe: index]
+        currentItems[safe: level.highlighted]
     }
 
     /// The highlighted row when it is a file — which is what all four nudges and the editor need.
@@ -415,11 +405,7 @@ struct DialNavigator {
         case .recordings, .folder: break
         default: return []
         }
-        guard case .recording(let index)? = RecordingsRow.at(
-            level.highlighted, recordings: currentItems.count, hasImport: hasImportRow
-        ), let item = currentItems[safe: index], !item.isFolder else {
-            return []
-        }
+        guard let item = currentItems[safe: level.highlighted], !item.isFolder else { return [] }
         return openEditor()
     }
 
@@ -463,6 +449,14 @@ struct DialNavigator {
 
         // Available wherever files are listed, and it stays put — you are reloading the list you
         // are looking at, so leaving it would be the one thing you did not ask for.
+        // The bottom bar's two library actions. They stay put: the picker's files and the new
+        // folder both land in the list you are looking at, so going anywhere would be leaving the
+        // only place that shows what just happened.
+        case (.recordings, "import"), (.folder, "import"):
+            return [.importFiles(intoItemID: currentFolderID), .feedback(.commit)]
+        case (.recordings, "newFolder"), (.folder, "newFolder"):
+            return [.createFolder(inItemID: currentFolderID), .feedback(.commit)]
+
         case (.recordings, "sync"), (.folder, "sync"):
             return [.reloadLibrary, .feedback(.commit)]
 
@@ -513,6 +507,11 @@ struct DialNavigator {
             guard let trim = currentTrim else { return [.feedback(.limit)] }
             return [.previewTrim(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
 
+        case (.nowPlaying, "repeat"):
+            return [.cycleRepeat, .feedback(.commit)]
+        case (.nowPlaying, "shuffle"):
+            return [.toggleShuffle, .feedback(.commit)]
+
         case (.nowPlaying, "volumeUp"):
             return setVolume(by: WheelRouter.volumePerNudge)
         case (.nowPlaying, "volumeDown"):
@@ -542,9 +541,8 @@ struct DialNavigator {
     }
 
     private mutating func openEditor() -> [DialEffect] {
-        guard case .recording(let index)? = RecordingsRow.at(
-            level.highlighted, recordings: currentItems.count, hasImport: hasImportRow
-        ), let item = currentItems[safe: index], !item.isFolder else { return [.feedback(.limit)] }
+        guard let item = currentItems[safe: level.highlighted], !item.isFolder
+        else { return [.feedback(.limit)] }
         return openEditor(itemID: item.id)
     }
 
@@ -634,16 +632,18 @@ struct DialNavigator {
     /// What is on screen now.
     var currentItems: [DialContent.Item] { items(atDepth: stack.count - 1) }
 
-    /// Import is a row on the library root and nowhere else.
-    var hasImportRow: Bool { route == .recordings }
+    /// The folder the actions act on: the one you are standing in, or `nil` at the library root.
+    var currentFolderID: String? {
+        if case .folder(let itemID) = route { return itemID }
+        return nil
+    }
 
     func rowCount(atDepth depth: Int) -> Int {
         let items = items(atDepth: depth)
         switch stack[depth].route {
         case .chooseMode: return 2
         case .library: return content.sections.count
-        case .recordings: return RecordingsRow.rowCount(recordings: items.count)
-        case .folder: return RecordingsRow.rowCount(recordings: items.count, hasImport: false)
+        case .recordings, .folder: return items.count
         case .confirmDelete: return DialRoute.DeleteChoice.allCases.count
         case .nowPlaying, .recording, .edit: return 0
         }

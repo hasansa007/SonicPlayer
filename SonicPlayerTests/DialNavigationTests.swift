@@ -84,17 +84,17 @@ enum DialSample {
         )
     }
 
-    /// Drills home → library, **landing on the first file rather than on Import.**
+    /// Drills home → library, landing on the first file.
     ///
-    /// Import is row 0 of that list, so the highlight arrives on it. Almost every test built on this
-    /// helper means "I am on a file" — `press` plays, `doublePress` edits, the stick offers its menu
-    /// — so the tick belongs here rather than being repeated, and forgotten, in twenty places.
-    /// `DialImportRowTests` is where the Import row itself is exercised.
+    /// **The tick that used to be here is gone.** Import was row 0, so the highlight arrived on it
+    /// and every test meaning "I am on a file" needed one detent first. The action rows are at the
+    /// bottom of the list now, so row 0 *is* the first recording and the tick would have landed on
+    /// the second — which is the kind of change that turns twenty passing tests into twenty tests
+    /// asserting the wrong file.
     static func inRecordings(recordingCount: Int = 12) -> DialNavigator {
         var navigator = navigator(recordingCount: recordingCount)
         _ = navigator.receive(.tick(1))     // Playlists → Recordings
         _ = navigator.receive(.press)
-        _ = navigator.receive(.tick(1))     // Import → the first file
         return navigator
     }
 
@@ -174,7 +174,7 @@ struct DialNavigationTests {
     @Test func poppingRestoresTheHighlightYouLeft() {
         var navigator = DialSample.inRecordings()
         _ = navigator.receive(.tick(4))
-        _ = navigator.receive(.press)          // opens row 5 → now playing
+        _ = navigator.receive(.press)          // opens row 4 → now playing
 
         _ = navigator.receive(.action("back"))
 
@@ -182,7 +182,7 @@ struct DialNavigationTests {
             Issue.record("expected the recordings list back")
             return
         }
-        #expect(list.highlighted == 5, "opened from row 5 — the helper starts on 1, past Import")
+        #expect(list.highlighted == 4, "opened from row 4 — the helper starts on 0")
     }
 
     @Test func aSectionWithNowhereToGoIsALimit() {

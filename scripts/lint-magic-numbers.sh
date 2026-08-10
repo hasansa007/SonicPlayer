@@ -34,7 +34,7 @@ MIGRATED=(
   "SonicPlayer/Features/Dial/DialChrome.swift"
   "SonicPlayer/Features/Dial/DialActionRow.swift"
   "SonicPlayer/Features/Dial/DialListView.swift"
-  "SonicPlayer/Features/Dial/VolumeSlider.swift"
+  "SonicPlayer/DesignSystem/Components/LiveBorder.swift"
   "SonicPlayer/Features/Dial/DialNowPlayingView.swift"
   "SonicPlayer/Features/Dial/DialRecordingView.swift"
   "SonicPlayer/Features/Dial/DialEditView.swift"

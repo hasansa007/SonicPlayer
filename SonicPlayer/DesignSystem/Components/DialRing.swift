@@ -23,8 +23,10 @@ struct DialRing: View {
     var defersPress: Bool = false
     /// What the four nudges do here. `nil` leaves the hub a plain press.
     var directions: DialScreen.Directions?
-    /// Whether the border cycles. See `liveBorder`.
-    var isLive: Bool = false
+    /// The volume this ring reports as its own border, `0...1`. **`nil` most of the time** — the
+    /// arc is transient, so this is non-nil only for a beat after the level moves. See
+    /// `volumeBorder`.
+    var volume: Double?
     let onCommand: (DialCommand) -> Void
 
     /// A reference box rather than `@State var tracker = RotaryTracker()`. The tracker is a gesture
@@ -41,9 +43,6 @@ struct DialRing: View {
     /// How far the gear stick has been pushed, and in which direction.
     @State private var nudge: CGSize = .zero
     @State private var didNudge = false
-    /// The live border's rotation. Driven by a repeating animation rather than a timer, so it costs
-    /// nothing when it is not running.
-    @State private var spin: Double = 0
     /// A single press held back while we find out whether a second one is coming. Only ever
     /// non-nil on a screen whose `defersPress` is true.
     @State private var pendingPress: Task<Void, Never>?
@@ -113,7 +112,7 @@ struct DialRing: View {
                     endRadius: Sizing.dialDiameter
                 )
             )
-            .overlay(liveBorder)
+            .overlay(volumeBorder)
             .sonicShadow(Elevation.artwork)
             .accessibilityHidden(true)
     }
@@ -128,41 +127,48 @@ struct DialRing: View {
     ///
     /// The colours are `ColorPalette`'s, not a literal rainbow: the app already owns five hues and
     /// borrowing them keeps the dial inside the palette instead of beside it.
-    private var liveBorder: some View {
-        Circle()
-            .strokeBorder(
-                isLive
-                    ? AnyShapeStyle(AngularGradient(
-                        colors: Self.liveHues,
-                        center: .center,
-                        angle: .degrees(spin)
-                      ))
-                    : AnyShapeStyle(Color.sonicBorder),
-                lineWidth: isLive ? Sizing.wheelArcWidth : Sizing.hairlineTrackHeight / 2
-            )
-            .onChange(of: isLive) { _, live in
-                guard live else { return }
-                withAnimation(.linear(duration: Self.spinPeriod).repeatForever(autoreverses: false)) {
-                    spin = 360
-                }
-            }
-            .onAppear {
-                guard isLive else { return }
-                withAnimation(.linear(duration: Self.spinPeriod).repeatForever(autoreverses: false)) {
-                    spin = 360
-                }
-            }
+    /// **The ring's border is the volume**, and the rainbow that used to live here has gone to the
+    /// card. Two reasons it swapped. An animated gradient on the one thing you are holding competes
+    /// with the thing it is drawn on; and volume had no permanent home at all — it was a transient
+    /// that appeared and faded, so the level was unknowable unless you had just changed it.
+    ///
+    /// Full circle at 100%, nothing at 0%, over the faint track that is the wheel's ordinary
+    /// outline. **The arc is hidden until the level moves**, then fades back out: drawn permanently
+    /// it was a second coloured ring competing with the card's live border for one glance, and
+    /// there is no moment except just-after-a-nudge when the number matters.
+    ///
+    /// Dim rather than full strength for the same reason — it reports, it is not something to reach
+    /// for, and the thing you reach for on this screen is the wheel it is drawn on.
+    private var volumeBorder: some View {
+        ZStack {
+            Circle()
+                .strokeBorder(Color.sonicBorder, lineWidth: Sizing.hairlineTrackHeight / 2)
+
+            Circle()
+                // `strokeBorder` insets by half the line width; `trim` needs the path itself, so
+                // this insets by hand to sit exactly where the track does.
+                .inset(by: Sizing.wheelArcWidth / 2)
+                .trim(from: 0, to: (volume ?? 0).clampedFraction)
+                .stroke(
+                    AngularGradient(colors: Self.liveHues, center: .center, angle: .degrees(0)),
+                    style: StrokeStyle(lineWidth: Sizing.wheelArcWidth, lineCap: .round)
+                )
+                // From the top, clockwise — the direction the wheel turns to raise it.
+                .rotationEffect(.degrees(-90))
+                .opacity(volume == nil ? 0 : Self.volumeArcTint)
+                // Both animate: the length while it is on show, the whole arc as it comes and goes.
+                .animation(Motion.settle, value: volume)
+        }
     }
 
-    /// Closes the loop — the first hue repeats last so the seam does not read as a join.
-    private static let liveHues: [Color] = [
-        .sonicPrimary, .sonicGreen, .sonicBlue, .sonicPurple, .sonicOrange, .sonicPrimary
-    ]
+    /// Dim, because the arc reports rather than invites.
+    private static let volumeArcTint: Double = 0.7
 
-    /// One turn every eight seconds. Slow enough to read as breathing rather than spinning — this
-    /// sits under the thumb for a whole listening session, and anything faster becomes something to
-    /// look away from.
-    private static let spinPeriod: Double = 8
+    /// Closes the loop — the first hue repeats last so the seam does not read as a join.
+    ///
+    /// Shared with the card's live border by way of `LiveHues`, so the volume arc and the "this is
+    /// playing" outline are the same colours rather than two palettes that drifted.
+    private static let liveHues: [Color] = LiveHues.all
 
     private var tickMarks: some View {
         ForEach(0 ..< Self.tickCount, id: \.self) { index in

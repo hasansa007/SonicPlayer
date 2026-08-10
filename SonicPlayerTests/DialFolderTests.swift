@@ -39,12 +39,9 @@ struct DialFolderTests {
         return navigator
     }
 
-    /// Row 0 is Import, row 1 is the folder.
-    private static func atFolderRow() -> DialNavigator {
-        var navigator = navigator()
-        _ = navigator.receive(.tick(1))
-        return navigator
-    }
+    /// Folders sort first, so the highlight opens on one — no tick needed since Import and New
+    /// folder became buttons rather than rows.
+    private static func atFolderRow() -> DialNavigator { navigator() }
 
     @Test func theLibraryListsFoldersBeforeFiles() {
         let navigator = Self.navigator()
@@ -53,9 +50,9 @@ struct DialFolderTests {
             Issue.record("expected a list")
             return
         }
-        #expect(list.rows.map(\.title) == ["Import", "Lectures", "Recording 1", "Recording 2"])
-        #expect(list.rows[1].icon == .playlist, "a folder is not a silent recording")
-        #expect(list.rows[1].trailing == "2", "what is inside, not how long it is")
+        #expect(list.rows.map(\.title) == ["Lectures", "Recording 1", "Recording 2"])
+        #expect(list.rows[0].icon == .playlist, "a folder is not a silent recording")
+        #expect(list.rows[0].trailing == "2", "what is inside, not how long it is")
     }
 
     @Test func pressingAFolderOpensItRatherThanPlayingIt() {
@@ -75,7 +72,6 @@ struct DialFolderTests {
             Issue.record("expected a list")
             return
         }
-        // Import puts files in the library, not in whichever folder you are standing in.
         #expect(list.rows.map(\.title) == ["Lecture 1", "Lecture 2"])
     }
 
@@ -159,11 +155,10 @@ struct DialFolderTests {
         content.recordings = [DialContent.Item(id: "rec-0", title: "Recording 1", duration: 600)]
         navigator.update(content)
 
-        guard case .list(let list) = navigator.screen.content else {
-            Issue.record("expected a list")
+        guard case .message = navigator.screen.content else {
+            Issue.record("expected the empty message, got \(navigator.screen.content)")
             return
         }
-        #expect(list.rows.isEmpty)
     }
 
     /// The wheel wraps inside a folder the same way it does everywhere, and against its own count

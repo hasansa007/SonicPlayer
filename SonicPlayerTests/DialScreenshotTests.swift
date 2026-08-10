@@ -48,10 +48,10 @@ struct DialScreenshotTests {
         let screen = navigator.screen
 
         #expect(screen.chrome.breadcrumb == ["HOME", "LIBRARY"])
-        #expect(rows(navigator)?.rows.first?.id == "import")
-        #expect(rows(navigator)?.rows.dropFirst().first?.trailing == "01:00")
-        #expect(rows(navigator)?.rows.dropFirst().first?.subtitle == "Today 14:02 · 2 markers")
-        #expect(rows(navigator)?.rows.dropFirst(2).first?.subtitle == nil)
+        // The list is only its contents: Import and New folder are bar buttons, so row 0 is a file.
+        #expect(rows(navigator)?.rows.first?.trailing == "01:00")
+        #expect(rows(navigator)?.rows.first?.subtitle == "Today 14:02 · 2 markers")
+        #expect(rows(navigator)?.rows.dropFirst().first?.subtitle == nil)
         // Back moved to the top bar. Edit came off the stick's right nudge and into the actions
         // menu as its top row, leaving one nudge — upward, because a lone sideways one on a
         // four-way stick reads as though the others are broken.
@@ -187,15 +187,16 @@ struct DialScreenshotTests {
         _ = navigator.receive(.press)
         let screen = navigator.screen
 
-        // **An empty library is the Import row alone, not a message.** A row cannot live inside a
-        // message screen, and Import has to be reachable when there is nothing else — which is the
-        // state it matters most in.
-        guard case .list(let list) = screen.content else {
-            Issue.record("expected the one-row list, got \(screen.content)")
+        // **An empty library is a message again.** It was the Import row alone, whose second line
+        // carried the explanation — which worked exactly as long as Import was a row. With the
+        // verbs in the bottom bar, a list with nothing in it has nothing to say for itself.
+        guard case .message(let message) = screen.content else {
+            Issue.record("expected the empty message, got \(screen.content)")
             return
         }
-        #expect(list.rows.map(\.id) == ["import"])
-        #expect(list.rows.first?.subtitle == "Nothing here yet · bring audio in")
+        #expect(message.title == "Nothing here yet")
+        #expect(message.body == "Import audio or make a folder using the buttons below.")
+        #expect(screen.chrome.showsLibraryActions, "and the buttons it points at are there")
 
         #expect(screen.chrome.breadcrumb == ["HOME", "LIBRARY"])
         // **No chips at all.** A red `Record` used to sit in that band; it is dead space on every
@@ -203,8 +204,8 @@ struct DialScreenshotTests {
         // as an alert. Recording is a card on home.
         #expect(screen.actions.isEmpty)
         #expect(screen.chrome.canGoBack)
-        #expect(screen.ring.hub == .label("IMPORT"))
-        #expect(screen.hint == "press to import · nothing else here yet")
+        #expect(screen.ring.hub == .label("OPEN"), "nothing to open, but the verb has not changed")
+        #expect(screen.hint == "nothing here yet · import or make a folder below")
     }
 
     // MARK: - 1h Listen vs record
@@ -237,26 +238,24 @@ struct DialScreenshotTests {
     /// shrinks under a highlight near its end must not hand the UI an out-of-range index.
     @Test func aShrinkingListPullsTheHighlightBackIntoRange() {
         var navigator = DialSample.inRecordings()
-        _ = navigator.receive(.tick(11))            // the last recording, row 12
+        _ = navigator.receive(.tick(11))            // the last recording, row 11
 
         navigator.update(DialSample.content(recordingCount: 3))
 
-        #expect(rows(navigator)?.highlighted == 3, "Import plus three files is four rows")
+        #expect(rows(navigator)?.highlighted == 2, "three files is three rows")
     }
 
-    /// A library that empties is a one-row list, and the clamp must pull the highlight onto it.
-    @Test func aListThatEmptiesLeavesOnlyTheImportRow() {
+    /// A library that empties has no rows left at all, and says why rather than going blank.
+    @Test func aListThatEmptiesSaysSo() {
         var navigator = DialSample.inRecordings()
         _ = navigator.receive(.tick(5))
 
         navigator.update(DialSample.content(recordingCount: 0))
 
-        guard case .list(let list) = navigator.screen.content else {
-            Issue.record("expected the one-row list, got \(navigator.screen.content)")
+        guard case .message(let message) = navigator.screen.content else {
+            Issue.record("expected the empty message, got \(navigator.screen.content)")
             return
         }
-        #expect(list.rows.map(\.id) == ["import"])
-        #expect(list.highlighted == 0)
-        #expect(navigator.screen.ring.hub == .label("IMPORT"))
+        #expect(message.title == "Nothing here yet")
     }
 }

@@ -74,6 +74,10 @@ struct DialContent: Equatable {
         /// last track for ever.
         var queueIndex: Int = 0
         var queueCount: Int = 1
+        /// How the queue behaves when a track ends, and whether it was shuffled. Both were on the
+        /// player all along and reachable from nowhere on the dial.
+        var repeatMode: RepeatMode = .off
+        var isShuffled: Bool = false
 
         var progress: Double {
             guard duration > 0 else { return 0 }

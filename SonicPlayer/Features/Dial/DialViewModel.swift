@@ -23,7 +23,7 @@ final class DialViewModel {
     var onPausePlayback: (() -> Void)?
     /// `0...1`, already clamped by the navigator.
     var onSetVolume: ((Double) -> Void)?
-    var onImportFiles: (() -> Void)?
+    var onImportFiles: ((String?) -> Void)?
     /// Raised only after the user has confirmed. The composition root does the deleting, because a
     /// file leaving disk concerns the player, the markers and the waveform cache as well.
     var onDeleteItem: ((String) -> Void)?
@@ -54,6 +54,9 @@ final class DialViewModel {
     /// see change.
     var onNeedsRefresh: (() -> Void)?
     var onReloadLibrary: (() -> Void)?
+    var onCreateFolder: ((String?) -> Void)?
+    var onCycleRepeat: (() -> Void)?
+    var onToggleShuffle: (() -> Void)?
 
     private var navigator: DialNavigator
     private let haptics: HapticsClient
@@ -184,7 +187,9 @@ final class DialViewModel {
                 // wired, the arc would have snapped back to full on the next tick of the clock.
                 volume: player.volume,
                 queueIndex: player.currentIndex,
-                queueCount: max(1, player.queue.count)
+                queueCount: max(1, player.queue.count),
+                repeatMode: player.repeatMode,
+                isShuffled: player.isShuffleEnabled
             )
         }
 
@@ -296,11 +301,20 @@ final class DialViewModel {
             onSeek?(time)
         case .selectTrack(let index):
             onSelectTrack?(index)
+        case .cycleRepeat:
+            onCycleRepeat?()
+
+        case .toggleShuffle:
+            onToggleShuffle?()
+
         case .reloadLibrary:
             onReloadLibrary?()
 
-        case .importFiles:
-            onImportFiles?()
+        case .createFolder(let itemID):
+            onCreateFolder?(itemID)
+
+        case .importFiles(let itemID):
+            onImportFiles?(itemID)
         case .openSettings:
             onOpenSettings?()
         case .startRecording:

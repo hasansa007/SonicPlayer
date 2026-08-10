@@ -69,16 +69,16 @@ struct DialPressTests {
         #expect(navigator.route == .recordings)
     }
 
-    /// **The empty library's hub imports.** It is the Import row alone, and pressing a row does what
-    /// the row says — which is the whole of this screen now that the `Record` chip has gone.
-    @Test func pressingOnTheEmptyLibraryImports() {
+    /// **An empty library has nothing to press.** Import was a row here once, so the hub imported;
+    /// it is a button in the bottom bar now, and the hub refuses rather than inventing a meaning.
+    @Test func pressingOnTheEmptyLibraryIsRefused() {
         var navigator = DialSample.navigator(recordingCount: 0)
         _ = navigator.receive(.tick(1))
         _ = navigator.receive(.press)
 
         let effects = navigator.receive(.press)
 
-        #expect(effects == [.importFiles, .feedback(.commit)])
+        #expect(effects == [.feedback(.limit)])
         #expect(navigator.route == .recordings)
     }
 

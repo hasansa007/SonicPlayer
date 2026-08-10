@@ -118,8 +118,21 @@ struct AppView: View {
         .sheet(isPresented: isImportSheetPresented) {
             DocumentPicker { urls in
                 app.isImportSheetPresented = false
-                filesRoot.importFiles(urls)
+                app.importPickedFiles(urls)
             }
+        }
+        .alert("New Folder", isPresented: Binding(
+            get: { app.isNamingNewFolder },
+            set: { app.isNamingNewFolder = $0 }
+        )) {
+            TextField("Name", text: Binding(
+                get: { app.newFolderName },
+                set: { app.newFolderName = $0 }
+            ))
+            Button("Cancel", role: .cancel) { app.isNamingNewFolder = false }
+            Button("Create") { app.confirmNewFolder() }
+        } message: {
+            Text("Group recordings together.")
         }
         .onChange(of: scenePhase) { _, newPhase in
             app.scenePhaseChanged(newPhase)

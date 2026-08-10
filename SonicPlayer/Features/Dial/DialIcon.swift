@@ -32,6 +32,9 @@ enum DialIcon {
         case .rename: "pencil"
         case .delete: "trash"
         case .add: "plus"
+        case .repeatOff, .repeatAll: "repeat"
+        case .repeatOne: "repeat.1"
+        case .shuffle: "shuffle"
         case .none: nil
         }
     }

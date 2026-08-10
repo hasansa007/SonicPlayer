@@ -50,7 +50,7 @@ struct DialHomeMenuTests {
     @Test func aShortRecordingsListIsNotCards() {
         let navigator = DialSample.inRecordings(recordingCount: 2)
 
-        #expect(list(navigator)?.rows.count == 3, "two files and the Import row")
+        #expect(list(navigator)?.rows.count == 2, "two files, and the list holds nothing else")
         #expect(list(navigator)?.isProminent == false, "two recordings are a list, not a menu")
     }
 
@@ -65,13 +65,16 @@ struct DialHomeMenuTests {
     // MARK: - Import belongs to the library, not to home
 
     /// A library is the place you add to. Home is a menu of destinations, and Import is not one.
-    @Test func importIsARowOnTheLibrary_notOnHome() {
+    /// **Import is a bar button on the library, and absent from home.** It has been a home card, a
+    /// library row and a pinned row; what has never changed is that it belongs to the screen it
+    /// puts files into.
+    @Test func importBelongsToTheLibrary_notToHome() {
         let home = DialSample.navigator()
         #expect(list(home)?.rows.contains { $0.id == "import" } == false)
         #expect(!home.screen.actions.contains { $0.id == "import" })
+        #expect(!home.screen.chrome.showsLibraryActions)
 
-        let library = DialSample.inRecordings()
-        #expect(list(library)?.rows.first?.id == "import")
+        #expect(DialSample.inRecordings().screen.chrome.showsLibraryActions)
     }
 
     /// **The corner label follows you down, which is why it outlived the row that replaced it.**
