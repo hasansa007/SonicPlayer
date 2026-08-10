@@ -25,6 +25,13 @@ enum DialRoute: Equatable {
     case edit(itemID: String)
     /// 1f.
     case actions(itemID: String)
+    /// The guard in front of `Delete`.
+    ///
+    /// **A screen rather than a system alert.** Every other decision in this app is made by turning
+    /// to a row and pressing it, and the one place that handed over to UIKit chrome mid-flow was the
+    /// only irreversible one — so the gesture you had just been using stopped working exactly where
+    /// care mattered most.
+    case confirmDelete(itemID: String)
 
     /// The header segment, uppercased. `nil` contributes nothing — the mode chooser is a fork
     /// rather than a place, and `DialScreen.Chrome` says an empty breadcrumb is valid.
@@ -47,6 +54,7 @@ enum DialRoute: Equatable {
         case .recording: "RECORDING"
         case .edit: "EDIT"
         case .actions(let id): (content.item(id)?.title).map { $0.uppercased() } ?? "ACTIONS"
+        case .confirmDelete: "DELETE"
         }
     }
 
@@ -92,6 +100,27 @@ enum DialRoute: Equatable {
         switch self {
         case .actions: true
         default: false
+        }
+    }
+
+    /// The rows of the delete guard, in order. `Cancel` is first so the highlight rests on it —
+    /// the safe answer should be the one a press gives you when you arrived by accident.
+    enum DeleteChoice: String, CaseIterable {
+        case cancel
+        case delete
+
+        var label: String {
+            switch self {
+            case .cancel: "Cancel"
+            case .delete: "Delete"
+            }
+        }
+
+        var icon: DialScreen.Icon {
+            switch self {
+            case .cancel: .none
+            case .delete: .delete
+            }
         }
     }
 

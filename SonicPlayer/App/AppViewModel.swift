@@ -37,6 +37,13 @@ final class AppViewModel {
     // otherwise and is corrected here, since nothing outside this type reads it any more.
 
     var isRecordingSheetPresented = false
+    /// The file the share sheet is presenting.
+    ///
+    /// **It lived on `AppView` as `@State`, which is why sharing did not work from anywhere.** A
+    /// view model cannot set a view's private state, and the one place that assigned it —
+    /// `recentFilesSection`, inside `homeRootContent` — has been unreferenced since the dial
+    /// replaced Home. The sheet was there, its trigger was not.
+    var shareItem: ShareItem?
     var isSettingsPresented = false
     var isImportSheetPresented = false
 
@@ -358,9 +365,33 @@ final class AppViewModel {
             commitTrim(on: file.url, start: start, end: end)
         }
 
-        // `onItemAction` is deliberately unwired. Share, rename and delete are the browser's flows
-        // and the actions screen is its own slice — the closure exists so wiring it is one line
-        // here rather than a change inside `DialViewModel`.
+        // **The actions screen's rows, wired to the flows that already exist.**
+        //
+        // `.edit` never arrives here — the navigator turns it into a push, because the editor is a
+        // place. `.delete` does not either: it stops at `DialViewModel` to raise its confirmation,
+        // and comes back through `onDeleteItem`.
+        dial.onItemAction = { [weak self] action, itemID in
+            guard let self,
+                  let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
+            else { return }
+
+            switch action {
+            case .rename:
+                // The browser's own flow, and `AppView` already attaches its alert at the root —
+                // so it renders over the dial with nothing further to build.
+                filesRoot.renameItemTapped(.file(file))
+            case .share:
+                shareItem = ShareItem(url: file.url)
+            case .addToPlaylist:
+                // **The picker already existed and had one caller.** `InAppCollectionPicker` lists
+                // every collection and can create one, `moveToDestination` moves the file and tells
+                // the app to reload — which is the "files UI, with a way to add a folder, then
+                // refetch" this row was asking for, already built and already presented at the root.
+                filesRoot.moveItemTapped(.file(file))
+            case .edit, .delete:
+                break
+            }
+        }
 
         // The waveform is the one input the dial loads for itself, so it is the one that has to ask
         // to be fed again.

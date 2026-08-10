@@ -9,9 +9,14 @@ import Foundation
 ///
 /// Behaviour is preserved exactly, including the quiet ones:
 /// - a non-audio file is skipped, not reported
-/// - importing loose files **into the root** creates a new collection to hold them, but importing
-///   a folder does not
 /// - a per-file failure is counted and the import continues
+///
+/// **One behaviour is deliberately not preserved.** Importing loose files into the root used to
+/// create a collection to hold them, named uniquely from "New Collection" — so every import made
+/// another one, and a library that had been imported into five times held five numbered folders
+/// nobody chose. Nothing asserted it: `.test` returns the documents directory for
+/// `createCollectionForImport`, so no test could tell the difference. Files land where they are
+/// sent now, and filing them is `Add to playlist`'s job.
 enum FolderImport {
 
     struct Result: Equatable {
@@ -33,12 +38,18 @@ enum FolderImport {
             return (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
         }
 
-        // Loose files dropped on the root get a collection to live in; an imported folder already
-        // brings its own, so it is left alone.
-        var targetDirectory = directory
-        if directory == nil, !containsFolder {
-            targetDirectory = try? await fileManager.createCollectionForImport()
-        }
+        // **Loose files land in the root, not in a collection minted for them.**
+        //
+        // This used to call `createCollectionForImport()`, which resolves a *unique* name from
+        // "New Collection" and creates it — so every import made a fresh folder. Import twice and
+        // the library holds `New Collection` and `New Collection 2`; import ten times and it holds
+        // ten, each with whatever happened to be selected that minute. Nothing was duplicated but
+        // the folders, and the files scattered across numbered boxes nobody chose.
+        //
+        // An imported *folder* still brings its own, which is why `containsFolder` mattered and no
+        // longer needs to: neither branch invents a directory now. Filing is `Add to playlist`'s
+        // job, done deliberately and once, rather than a side effect of every import.
+        let targetDirectory = directory
 
         for url in urls {
             let accessing = url.startAccessingSecurityScopedResource()

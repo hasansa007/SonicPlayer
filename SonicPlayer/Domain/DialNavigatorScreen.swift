@@ -130,6 +130,11 @@ extension DialNavigator {
 
         case .actions(let itemID):
             return .list(list(rows: actionRows, subject: subject(for: itemID)))
+
+        // The subject is not decoration here — it is the whole guard. Two verbs with nothing
+        // naming what they act on is exactly the screen `Delete` must not be.
+        case .confirmDelete(let itemID):
+            return .list(list(rows: deleteChoiceRows, subject: subject(for: itemID)))
         }
     }
 
@@ -218,6 +223,12 @@ extension DialNavigator {
         }
     }
 
+    private var deleteChoiceRows: [DialScreen.List.Row] {
+        DialRoute.DeleteChoice.allCases.map {
+            .init(id: $0.rawValue, icon: $0.icon, title: $0.label)
+        }
+    }
+
     private var actionRows: [DialScreen.List.Row] {
         DialItemAction.allCases.map {
             .init(id: $0.rawValue, icon: $0.icon, title: $0.label)
@@ -262,7 +273,7 @@ extension DialNavigator {
         case .edit:
             return modeChips + [.init(id: "preview", label: "Preview")]
 
-        case .actions:
+        case .actions, .confirmDelete:
             return []
         }
     }
@@ -393,6 +404,7 @@ extension DialNavigator {
         case .recording: .recordDot
         case .edit: .label("DONE")
         case .actions: .label("SELECT")
+        case .confirmDelete: .label("CONFIRM")
         }
     }
 
@@ -431,6 +443,11 @@ extension DialNavigator {
 
         case .actions:
             return "rotate to highlight an action · press to confirm"
+
+        // Says what the press will do rather than how to press. This is the one screen where the
+        // wrong answer cannot be taken back, so the caption names the outcome.
+        case .confirmDelete:
+            return "deleting cannot be undone · rotate to choose · press to confirm"
         }
     }
 

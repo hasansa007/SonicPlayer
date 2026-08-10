@@ -7,7 +7,6 @@ struct AppView: View {
     @Environment(AppViewModel.self) private var app
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
-    @State private var shareItem: ShareItem?
 
     var body: some View {
         // Local `@Bindable` shadows: the documented way to get bindings out of an @Observable
@@ -77,7 +76,7 @@ struct AppView: View {
                             onCancel: { filesRoot.cancelMove() }
                         )
                     }
-                    .sheet(item: $shareItem) { item in
+                    .sheet(item: $app.shareItem) { item in
                         ActivityView(items: [item.url])
                     }
                     .onAppear {
@@ -230,21 +229,6 @@ private extension AppView {
             .onChange(of: app.recording.isPaused) { _, _ in app.refreshDial() }
             // A marker must appear under the thumb, not up to a meter interval later.
             .onChange(of: app.recording.markers) { _, _ in app.refreshDial() }
-            // **The only destructive thing the dial can do, and the only one that stops to ask.**
-            // It names the recording: the actions menu is reached by wheel, so the row under your
-            // thumb when you pressed is not guaranteed to be the one you meant.
-            .alert(
-                Text("Delete \(app.dial.pendingDelete?.title ?? "")?"),
-                isPresented: Binding(
-                    get: { app.dial.pendingDelete != nil },
-                    set: { if !$0 { app.dial.cancelDelete() } }
-                )
-            ) {
-                Button("Cancel", role: .cancel) { app.dial.cancelDelete() }
-                Button("Delete", role: .destructive) { app.dial.confirmDelete() }
-            } message: {
-                Text("This cannot be undone.")
-            }
             .alert(
                 "Action Failed",
                 isPresented: Binding(
@@ -383,7 +367,7 @@ private extension AppView {
                                 }
                                 .tint(.blue)
                                 Button {
-                                    shareItem = ShareItem(url: file.url)
+                                    app.shareItem = ShareItem(url: file.url)
                                 } label: {
                                     Label("Share", systemImage: "square.and.arrow.up")
                                 }

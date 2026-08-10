@@ -105,12 +105,51 @@ struct DialPressTests {
     @Test func pressingAnItemActionConfirmsItAndComesBack() {
         var navigator = DialSample.inRecordings()
         _ = navigator.receive(.action("more"))
+        _ = navigator.receive(.tick(2))        // Share, which acts immediately
+
+        let effects = navigator.receive(.press)
+
+        #expect(effects == [.item(.share, itemID: "rec-0"), .feedback(.commit)])
+        #expect(navigator.route == .recordings)
+    }
+
+    /// **Delete is the exception, and the only one.** Every other row acts on the press; this one
+    /// pushes a guard, because it is the single thing here that cannot be taken back.
+    @Test func pressingDeleteOpensTheGuardInstead() {
+        var navigator = DialSample.inRecordings()
+        _ = navigator.receive(.action("more"))
         _ = navigator.receive(.tick(4))        // Delete, the last row
+
+        let effects = navigator.receive(.press)
+
+        #expect(effects == [.feedback(.commit)], "nothing has been asked of the host yet")
+        #expect(navigator.route == .confirmDelete(itemID: "rec-0"))
+    }
+
+    @Test func confirmingTheGuardDeletes() {
+        var navigator = DialSample.inRecordings()
+        _ = navigator.receive(.action("more"))
+        _ = navigator.receive(.tick(4))
+        _ = navigator.receive(.press)          // the guard
+        _ = navigator.receive(.tick(1))        // Cancel → Delete
 
         let effects = navigator.receive(.press)
 
         #expect(effects == [.item(.delete, itemID: "rec-0"), .feedback(.commit)])
         #expect(navigator.route == .recordings)
+    }
+
+    /// Cancel is row 0, so a stray press on arrival is the harmless answer.
+    @Test func theGuardOpensOnCancelAndPressingItAsksForNothing() {
+        var navigator = DialSample.inRecordings()
+        _ = navigator.receive(.action("more"))
+        _ = navigator.receive(.tick(4))
+        _ = navigator.receive(.press)
+
+        let effects = navigator.receive(.press)
+
+        #expect(effects == [.feedback(.commit)])
+        #expect(navigator.route == .recordings, "and it leaves the guard")
     }
 
     // MARK: - The fork

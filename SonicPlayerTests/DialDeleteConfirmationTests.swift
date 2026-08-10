@@ -10,6 +10,10 @@ import Testing
 /// reached by turning, and the menu now wraps — so one detent past the first row is `Delete`. An
 /// unguarded destructive row one click from the top of a menu you scroll blind is a trap, and that
 /// is precisely why this and the wrap-around belong to the same change.
+///
+/// The guard is a **screen**, not an alert: two rows, `Cancel` first so the highlight rests on the
+/// safe answer, with the file named above them. Confirming is the same turn-and-press as everything
+/// else, which the system alert it replaced was the one place to interrupt.
 @Suite(.serialized)
 struct DialDeleteConfirmationTests {
 
@@ -67,13 +71,21 @@ struct DialDeleteConfirmationTests {
     }
 
     @MainActor
-    @Test func pressingDeleteAsksBeforeDoingAnything() {
+    @Test func pressingDeleteOpensTheGuardAndDoesNothingElse() {
         let deletions = Mutex<[URL]>([])
         let app = makeApp { url in deletions.withLock { $0.append(url) } }
 
         pressDelete(app)
 
-        #expect(app.dial.pendingDelete?.title == "Lecture", "the alert has to name what it will destroy")
+        let screen = app.dial.screen
+        #expect(screen.chrome.breadcrumb.last == "DELETE")
+        guard case .list(let list) = screen.content else {
+            Issue.record("expected the two-row guard, got \(screen.content)")
+            return
+        }
+        #expect(list.rows.map(\.id) == ["cancel", "delete"])
+        #expect(list.highlighted == 0, "the safe answer is the one a stray press gives you")
+        #expect(list.subject?.title == "Lecture", "it has to name what it will destroy")
         #expect(deletions.withLock { $0 }.isEmpty, "nothing may leave disk before the answer")
     }
 
@@ -83,9 +95,9 @@ struct DialDeleteConfirmationTests {
         let app = makeApp { url in deletions.withLock { $0.append(url) } }
         pressDelete(app)
 
-        app.dial.cancelDelete()
+        app.dial.receive(.press)            // Cancel is row 0
 
-        #expect(app.dial.pendingDelete == nil)
+        #expect(app.dial.screen.chrome.breadcrumb.last == "LIBRARY", "and it comes back")
         #expect(deletions.withLock { $0 }.isEmpty)
     }
 
@@ -108,11 +120,12 @@ struct DialDeleteConfirmationTests {
 
         let deleted = await withCheckedContinuation { (continuation: CheckedContinuation<URL, Never>) in
             pending.withLock { $0 = continuation }
-            app.dial.confirmDelete()
+            app.dial.receive(.tick(1))      // onto Delete
+            app.dial.receive(.press)
         }
 
         #expect(deleted == Self.url)
-        #expect(app.dial.pendingDelete == nil)
+        #expect(app.dial.screen.chrome.breadcrumb.last == "LIBRARY")
     }
 
     /// The dial's delete travels through `onWillRemoveItems`, the same edge the browser's delete
@@ -124,7 +137,8 @@ struct DialDeleteConfirmationTests {
         app.player.currentTrack = file()
         pressDelete(app)
 
-        app.dial.confirmDelete()
+        app.dial.receive(.tick(1))          // onto Delete
+        app.dial.receive(.press)
         await Task.yield()
 
         #expect(app.player.currentTrack == nil)

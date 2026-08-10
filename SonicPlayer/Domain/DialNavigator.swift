@@ -299,6 +299,15 @@ struct DialNavigator {
             pop()
             return [.commitTrim(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
 
+        case .confirmDelete(let itemID):
+            let choices = DialRoute.DeleteChoice.allCases
+            let choice = choices[min(level.highlighted, choices.count - 1)]
+            pop()
+            switch choice {
+            case .cancel: return [.feedback(.commit)]
+            case .delete: return [.item(.delete, itemID: itemID), .feedback(.commit)]
+            }
+
         case .actions(let itemID):
             let action = DialItemAction.allCases[min(level.highlighted, DialItemAction.allCases.count - 1)]
             pop()
@@ -306,6 +315,9 @@ struct DialNavigator {
             // others would hand it to `onItemAction`, which is deliberately unwired — the row would
             // have looked identical and done nothing at all.
             guard action != .edit else { return openEditor(itemID: itemID) }
+            // **Delete goes through its own screen.** The menu has already popped by the time this
+            // runs, so the guard rises over the library — where the file is about to vanish from.
+            guard action != .delete else { return open(.confirmDelete(itemID: itemID)) }
             return [.item(action, itemID: itemID), .feedback(.commit)]
         }
     }
@@ -483,6 +495,7 @@ struct DialNavigator {
         case .library: content.sections.count
         case .recordings: RecordingsRow.rowCount(recordings: content.recordings.count)
         case .actions: DialItemAction.allCases.count
+        case .confirmDelete: DialRoute.DeleteChoice.allCases.count
         case .nowPlaying, .recording, .edit: 0
         }
     }

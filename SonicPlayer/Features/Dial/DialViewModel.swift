@@ -28,18 +28,6 @@ final class DialViewModel {
     /// file leaving disk concerns the player, the markers and the waveform cache as well.
     var onDeleteItem: ((String) -> Void)?
 
-    /// The recording `Delete` was pressed on, held while the alert is up.
-    ///
-    /// **It carries the title, not just the id.** A confirmation that cannot name what it is about
-    /// to destroy is a speed bump rather than a safeguard — and the actions menu is reached by
-    /// wheel, so the row under your thumb when you pressed is not necessarily the one you meant.
-    struct PendingDelete: Equatable, Identifiable {
-        var id: String
-        var title: String
-    }
-
-    var pendingDelete: PendingDelete?
-
     /// Surfaced when a delete fails. The file is still there and the user has to be told, or the
     /// list quietly disagreeing with disk is the only clue.
     var operationError: String?
@@ -90,22 +78,25 @@ final class DialViewModel {
         receive(.action("nowPlaying"))
     }
 
-    /// Goes through with the deletion the alert is asking about.
-    func confirmDelete() {
-        guard let pending = pendingDelete else { return }
-        pendingDelete = nil
-        onDeleteItem?(pending.id)
-    }
-
-    func cancelDelete() {
-        pendingDelete = nil
-    }
-
     /// The single entry point. Every turn, press and chip tap arrives here.
+    ///
+    /// **A route change asks to be fed.** Some screens are drawn from data the host only knows to
+    /// load once the push has happened — the editor is the case: `content.editing` is built from
+    /// `navigator.route`, so the material can only arrive on the refresh *after* the push.
+    ///
+    /// Nothing was asking for that refresh. It used to arrive by accident, because playback carried
+    /// on into the editor and the player's clock ticked twice a second, and `AppView` refreshes on
+    /// every tick. Then opening the editor started pausing playback — the clock stopped, the
+    /// accident stopped with it, and the editor showed "Nothing to edit" for ever.
+    ///
+    /// So the request is explicit and tied to the thing that actually changed, rather than
+    /// depending on an unrelated value happening to move.
     func receive(_ command: DialCommand) {
+        let routeBefore = navigator.route
         for effect in navigator.receive(command) {
             apply(effect)
         }
+        if navigator.route != routeBefore { onNeedsRefresh?() }
     }
 
     /// Re-feeds the navigator from the app's current state.
@@ -329,12 +320,12 @@ final class DialViewModel {
             // here; this was the only missing link, and it was silent because a `break` is.
             onSetVolume?(value)
 
-        // **Delete stops here and asks.** The navigator has already popped the menu by the time
-        // this arrives — pressing a row is what closes it — so the alert rises over the recordings
-        // list, which is where you were and where the file is about to vanish from.
+        // **Delete arrives here already confirmed.** The guard is a screen now — `.confirmDelete`,
+        // two rows and a subject naming the file — so by the time this effect exists the answer has
+        // been given by the same turn-and-press as everything else. The alert this replaced was the
+        // one place the dial handed over to UIKit chrome mid-flow, at the only irreversible step.
         case .item(.delete, let itemID):
-            guard let title = navigator.content.item(itemID)?.title else { return }
-            pendingDelete = PendingDelete(id: itemID, title: title)
+            onDeleteItem?(itemID)
 
         case .item(let action, let itemID):
             // Share and rename are the browser's flows, and the actions screen is its own slice.
