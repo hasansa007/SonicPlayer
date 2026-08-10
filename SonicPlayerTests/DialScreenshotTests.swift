@@ -44,7 +44,11 @@ struct DialScreenshotTests {
         #expect(!screen.chrome.canGoBack, "the library is the root now")
         #expect(screen.actions.map(\.id) == ["back", "record", "import", "newFolder", "sort", "settings"])
         #expect(screen.ring.hub == .label("PLAY"))
-        #expect(screen.hint == "rotate to scroll · press to play · nudge to trim, move, delete or share")
+        // **The nudge clause has gone out of the caption and onto the stick.** It named the same
+        // four things `ring.directions` names, one line of prose away from them, so the sentence
+        // and the control could disagree — and it was permanent text describing gestures nobody
+        // was making while they read it.
+        #expect(screen.hint == "rotate to scroll · press to play")
     }
 
     // MARK: - 1c Now playing
@@ -78,9 +82,7 @@ struct DialScreenshotTests {
         #expect(screen.ring.directions?.right?.id == "next")
         #expect(screen.ring.isLive, "the border moves while audio moves")
         #expect(screen.ring.hub == .glyph("pause.fill"))
-        // The hint is no longer drawn — it is the dial's accessibility hint now — but it is still
-        // produced, and it is still what a VoiceOver user is told.
-        #expect(screen.hint == "rotate to seek · press to pause · nudge for track and volume")
+        #expect(screen.hint == "rotate to seek · press to pause")
     }
 
     // MARK: - 1d Recording
@@ -134,10 +136,9 @@ struct DialScreenshotTests {
         #expect(edit.activeHandle == .start)
         #expect(edit.operation == .keep)
         #expect(screen.ring.hub == .label("DONE"))
-        #expect(
-            screen.hint
-                == "press to trim to the selection · down to delete it instead · right to hear it"
-        )
+        // The editor's caption was three clauses, two of them naming directions — instructions
+        // rather than a caption. Keep, Delete and Preview are the stick's own names now.
+        #expect(screen.hint == "rotate to move the handle · press to trim to the selection")
     }
 
     // MARK: - 1f The four nudges that replaced the actions menu

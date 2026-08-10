@@ -215,7 +215,9 @@ struct DialModeTests {
         _ = navigator.receive(.volumeTick(2))
 
         #expect(navigator.screen.hint == before)
-        #expect(before == "rotate to seek · press to pause · nudge for track and volume")
+        // The third clause named the stick's four nudges, which `ring.directions` already names —
+        // the stick says them itself now, while it is being held.
+        #expect(before == "rotate to seek · press to pause")
     }
 
     // MARK: - Gain, which is a mode-less axis

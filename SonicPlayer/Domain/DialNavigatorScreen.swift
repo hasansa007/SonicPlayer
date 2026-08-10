@@ -16,7 +16,8 @@ extension DialNavigator {
             content: screenContent,
             actions: actions,
             ring: ring,
-            hint: hint
+            hint: hint,
+            chipsAreNext: isOnLastRow
         )
     }
 
@@ -428,8 +429,8 @@ extension DialNavigator {
                 // range was twenty of them.
                 up: .init(id: "volumeUp", icon: .volumeUp, label: "Volume up", repeatsWhenHeld: true),
                 down: .init(id: "volumeDown", icon: .volumeDown, label: "Volume down", repeatsWhenHeld: true),
-                left: .init(id: "previous", icon: .previous, label: "Previous track"),
-                right: .init(id: "next", icon: .next, label: "Next track")
+                left: .init(id: "previous", icon: .previous, label: "Previous"),
+                right: .init(id: "next", icon: .next, label: "Next")
             )
 
         // **Trim keeps the selection, delete removes it — the two things you can do to a region.**
@@ -438,19 +439,19 @@ extension DialNavigator {
         case .edit:
             guard content.editing != nil else { return nil }
             return DialScreen.Directions(
-                up: .init(id: "trim", icon: .trim, label: "Trim to selection"),
-                down: .init(id: "cut", icon: .delete, label: "Delete selection"),
+                up: .init(id: "trim", icon: .trim, label: "Keep"),
+                down: .init(id: "cut", icon: .delete, label: "Delete"),
                 // **Hearing the selection is the point of setting it.** Preview has moved three
                 // times — a chip, then the hub's settle state — and both homes were wrong for the
                 // same reason: it competed with the press that rewrites the file. On its own
                 // direction it competes with nothing.
-                right: .init(id: "preview", icon: .play, label: "Preview selection")
+                right: .init(id: "preview", icon: .play, label: "Preview")
             )
 
         case .recording:
             guard let capture = content.capture else { return nil }
             return DialScreen.Directions(
-                up: .init(id: "marker", icon: .marker, label: "Add marker"),
+                up: .init(id: "marker", icon: .marker, label: "Marker"),
                 left: .init(
                     id: "pause",
                     icon: capture.isPaused ? .play : .pause,
@@ -478,8 +479,8 @@ extension DialNavigator {
             // grow them and never touch them again.
             guard !item.isFolder else {
                 return DialScreen.Directions(
-                    up: .init(id: "rename", icon: .rename, label: "Rename folder"),
-                    down: .init(id: "delete", icon: .delete, label: "Delete folder")
+                    up: .init(id: "rename", icon: .rename, label: "Rename"),
+                    down: .init(id: "delete", icon: .delete, label: "Delete")
                 )
             }
 
@@ -490,7 +491,7 @@ extension DialNavigator {
             return DialScreen.Directions(
                 up: .init(id: "edit", icon: .trim, label: "Trim"),
                 down: .init(id: "delete", icon: .delete, label: "Delete"),
-                left: .init(id: "move", icon: .move, label: "Move to folder"),
+                left: .init(id: "move", icon: .move, label: "Move"),
                 right: .init(id: "share", icon: .share, label: "Share")
             )
 
@@ -586,9 +587,16 @@ extension DialNavigator {
 
     // MARK: - Hint
 
-    /// The only thing teaching rotate/press/hold, so it follows the mode rather than describing the
-    /// screen in general — a caption that says "rotate to seek" while the wheel is set to Volume is
-    /// worse than none.
+    /// **The turn and the press, and nothing about the nudges.**
+    ///
+    /// Every one of these ended with a clause naming the four directions — `"nudge to trim, move,
+    /// delete or share"` — which is the longest part of the sentence, changes on every row, and
+    /// describes gestures nobody is making while they are reading it. `ring.directions` carries
+    /// those names, and `DialRing` draws them the moment a thumb lands on the hub, which is the
+    /// moment they are about to be used. What is left is what is true at rest.
+    ///
+    /// It still follows the axis rather than describing the screen in general — a caption that says
+    /// "rotate to seek" while the wheel is set to Volume is worse than none.
     private func chipHint(_ id: String) -> String {
         switch id {
         case "back": return "go back"
@@ -611,7 +619,7 @@ extension DialNavigator {
             if highlightedLibraryItem?.isFolder == true {
                 return "rotate to scroll · press to open the folder"
             }
-            return "rotate to scroll · press to play · nudge to trim, move, delete or share"
+            return "rotate to scroll · press to play"
 
         case .settings:
             return highlightedSetting?.cycles == false
@@ -622,20 +630,21 @@ extension DialNavigator {
             return "rotate to choose a folder · press to file it there"
 
         case .nowPlaying:
-            // One sentence, because the wheel does one thing. The segments beside and above it
-            // are named in the third clause rather than getting a hint each.
+            // One sentence, because the wheel does one thing. Track and volume are the stick's, and
+            // the stick says so itself while it is being held.
             let press = content.playback?.isPlaying == false ? "press to play" : "press to pause"
-            return "rotate to seek · \(press) · nudge for track and volume"
+            return "rotate to seek · \(press)"
 
         case .recording:
             return "ring shows input level · rotate to set gain · press to stop"
 
         case .edit:
-            // Names the press, the way to change your mind, and the way to check first — in that
-            // order, because that is the order they are wanted in.
+            // **The whole of this was the nudges**, which is why it read as instructions rather than
+            // as a caption: three clauses, two of them naming directions. Keep, delete and preview
+            // are the stick's three names now, so what is left is the wheel and the button.
             return level.trimOperation == .remove
-                ? "press to delete the selection · up to keep it instead · right to hear it"
-                : "press to trim to the selection · down to delete it instead · right to hear it"
+                ? "rotate to move the handle · press to delete the selection"
+                : "rotate to move the handle · press to trim to the selection"
 
         // Says what the press will do rather than how to press. This is the one screen where the
         // wrong answer cannot be taken back, so the caption names the outcome.

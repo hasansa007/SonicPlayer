@@ -33,25 +33,42 @@ struct DialScreenView: View {
         ZStack {
             background
 
-            // **The card yields; the controls do not.** Both lower bands get layout priority, so
-            // when text grows the list gives up height rather than the hint losing its last words
-            // or the chips being clipped. At AX5 without this the hint truncated to
-            // "rotate to browse ·…", which is the one line on the screen that teaches the wheel.
+            // **The card yields; the controls do not.** Every band below the card gets layout
+            // priority, so when text grows the list gives up height rather than the caption losing
+            // its last words or the chips being clipped. At AX5 without this the caption truncated
+            // to "rotate to browse ·…" — and it is shorter now precisely so that there is less of
+            // it to lose.
             VStack(spacing: Spacing.lg) {
                 stage
                     .layoutPriority(0)
 
                 Spacer(minLength: 0)
 
-                DialActionRow(actions: screen.actions, onCommand: onCommand)
-                    .layoutPriority(1)
+                // The line and the chips are one band: an announcement about the row below it wants
+                // to arrive *next to* what it announces, not a full gap away from it. It also keeps
+                // what the line costs when it appears down to its own height plus four points,
+                // which the spacer above absorbs before the card is asked for anything.
+                VStack(spacing: Spacing.xs) {
+                    if screen.chipsAreNext { chipsAheadLine }
+                    DialActionRow(actions: screen.actions, onCommand: onCommand)
+                }
+                .animation(Motion.selection, value: screen.chipsAreNext)
+                .layoutPriority(1)
 
                 dial
+                    .layoutPriority(1)
+
+                caption
                     .layoutPriority(1)
             }
             .padding(.horizontal, Spacing.xxl)
             .padding(.top, Spacing.lg)
-            .padding(.bottom, Spacing.xl)
+            // **The wheel sits well clear of the bottom edge**, which is a screen inset rather than
+            // a gap between two things. The caption below it and this together lift the dial about
+            // fifty points into the thumb's arc; the card gives up that height, which is the trade
+            // taken knowingly — the wheel is what the hand is on for the whole session and the card
+            // is what it looks at between turns.
+            .padding(.bottom, Spacing.xxxl)
         }
     }
 
@@ -163,6 +180,45 @@ struct DialScreenView: View {
         }
     }
 
+    /// **The one thing nothing on screen admitted: the wheel does not stop at the last row.**
+    ///
+    /// Shown only where it is about to be true, which is what keeps it from being a fifth permanent
+    /// caption. A list that has run out looks exactly like a wheel that has run out, and the chips
+    /// became ring stops precisely so that no control on this screen could be drawn and unreachable
+    /// — an affordance nobody finds is the same defect one step further along.
+    private var chipsAheadLine: some View {
+        HStack(spacing: Spacing.xs) {
+            Text("keep turning for the buttons")
+            Image(systemName: "chevron.down")
+        }
+        .font(.caption2)
+        .foregroundColor(.sonicTextSecondary)
+        .dynamicTypeSize(...Self.captionCeiling)
+        .transition(.opacity)
+        // It describes the row below it, which VoiceOver reaches by swiping rather than by turning.
+        .accessibilityHidden(true)
+    }
+
+    /// **The caption is drawn again, and it is shorter than the one that was removed.**
+    ///
+    /// It went because it was the only thing teaching the gestures and it had grown to three
+    /// clauses to do it — long enough that at AX5 it took a third of the screen from the list it was
+    /// explaining. The four direction marks replaced it, and they are a legend: they say a stick
+    /// moves without saying what a push does, and nothing at all said what the *wheel* does.
+    ///
+    /// So the sentence is split rather than restored. The always-true half — turn, press — is here;
+    /// the four directions are names on the marks themselves, drawn while a thumb rests on the hub.
+    private var caption: some View {
+        Text(screen.hint)
+            .font(.caption)
+            .foregroundColor(.sonicTextSecondary)
+            .multilineTextAlignment(.center)
+            .dynamicTypeSize(...Self.captionCeiling)
+            // Spoken by the dial, in full and with the nudges named — see `spokenHint`. Read here
+            // as well it would be said twice, the second time without them.
+            .accessibilityHidden(true)
+    }
+
     /// The dial, and nothing else.
     ///
     /// **One component.** It briefly grew two spring-return segments beside it for volume and
@@ -170,9 +226,8 @@ struct DialScreenView: View {
     /// and the whole idea of the dial is that there is only ever one thing to touch. Those
     /// directions folded into the hub, which is now a gear stick.
     ///
-    /// The caption under it is gone too. It was the only thing teaching the gestures, so its
-    /// replacement is the four direction marks around the hub — smaller than a control and
-    /// permanent, rather than a sentence that had to change per mode.
+    /// The caption under it is back and shorter, and the four direction marks now say their own
+    /// names — see `caption` and `DialRing.directionMarks`.
     private var dial: some View {
         DialRing(
             ticks: screen.ring.ticks,
@@ -182,11 +237,7 @@ struct DialScreenView: View {
             volume: shownVolume,
             onCommand: onCommand
         )
-        // The hint is no longer drawn, but it is still the sentence that explains the gestures —
-        // and a VoiceOver user cannot see the direction marks that replaced it. So it stops being
-        // a caption and becomes the dial's spoken description, which is where it was always most
-        // useful.
-        .accessibilityHint(Text(screen.hint))
+        .accessibilityHint(spokenHint)
         // **Hidden until it has something to say.** Drawn permanently the arc was a second coloured
         // ring competing with the card's live border for the same glance, on a screen where the
         // thing you are looking at is what is playing. The question it answers — did that do
@@ -202,6 +253,26 @@ struct DialScreenView: View {
             }
         }
         .onDisappear { hideTask?.cancel() }
+    }
+
+    /// The caption plus the four nudges, which is the whole sentence the hint used to be.
+    ///
+    /// **Composed rather than stored.** The nudge clause was prose in the navigator — "nudge to
+    /// trim, move, delete or share" — beside a `Directions` value naming the same four things, so
+    /// the sentence and the control could disagree and once did. Reading the names off the control
+    /// makes that impossible, and it is the only way a VoiceOver user learns the stick at all: the
+    /// marks are decoration to VoiceOver, and the reveal that teaches everyone else needs a thumb
+    /// resting on a hub, which is not a gesture VoiceOver can make.
+    private var spokenHint: Text {
+        let names = [
+            screen.ring.directions?.up,
+            screen.ring.directions?.down,
+            screen.ring.directions?.left,
+            screen.ring.directions?.right
+        ].compactMap { $0?.label }
+
+        guard !names.isEmpty else { return Text(screen.hint) }
+        return Text("\(screen.hint) · push the hub for \(names.joined(separator: ", "))")
     }
 
     /// The volume this screen is currently reporting, or `nil` where volume is not on show.

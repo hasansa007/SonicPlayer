@@ -54,6 +54,10 @@ struct DialRing: View {
     /// A single press held back while we find out whether a second one is coming. Only ever
     /// non-nil on a screen whose `defersPress` is true.
     @State private var pendingPress: Task<Void, Never>?
+    /// Whether the four nudges are showing their names rather than their glyphs. See
+    /// `directionMarks`.
+    @State private var isNaming = false
+    @State private var namingTask: Task<Void, Never>?
 
     /// **One tick per detent**, taken from `RotaryTracker` rather than chosen here.
     ///
@@ -105,7 +109,10 @@ struct DialRing: View {
         .dynamicTypeSize(...DynamicTypeSize.large)
         .environment(\.layoutDirection, .leftToRight)
         .gesture(turn)
-        .onDisappear { holdTask?.cancel() }
+        .onDisappear {
+            holdTask?.cancel()
+            namingTask?.cancel()
+        }
     }
 
     // MARK: - Ring
@@ -246,12 +253,18 @@ struct DialRing: View {
         return min(raw, count - raw)
     }
 
-    /// The gear stick's four ways out, drawn just outside the hub.
+    /// The gear stick's four ways out: a glyph each at rest, **their names while a thumb is on the
+    /// hub.**
     ///
     /// **They come from the screen**, so the recorder shows a bookmark up and a pause left where
     /// Now Playing shows volume and track. They are the only thing announcing that the hub moves at
     /// all, which matters more since the chip row went — small and dim on purpose, because they are
     /// a legend, not four more buttons. The thing you touch is the hub.
+    ///
+    /// Four glyphs say a stick moves; they do not say what a push *does*, and the sentence that
+    /// used to say it was a permanent line of text under the wheel describing gestures nobody was
+    /// making. The names cost no permanent space and arrive at the only moment they are wanted —
+    /// the thumb is already down and has not yet chosen a direction.
     private var directionMarks: some View {
         ZStack {
             mark(directions?.up, x: 0, y: -1)
@@ -259,27 +272,61 @@ struct DialRing: View {
             mark(directions?.left, x: -1, y: 0)
             mark(directions?.right, x: 1, y: 0)
         }
+        .animation(Motion.settle, value: isNaming)
         .accessibilityHidden(true)
     }
 
     @ViewBuilder
     private func mark(_ direction: DialScreen.Direction?, x: CGFloat, y: CGFloat) -> some View {
-        if let direction, let glyph = DialIcon.systemImage(for: direction.icon) {
-            Image(systemName: glyph)
-                .font(.system(size: DialFont.directionMark, weight: .semibold))
-                // **`sonicTextMuted` was too quiet to survive daylight.** It is the right token for
-                // text that is genuinely secondary, and these are not: they are the only thing
-                // naming what the stick's four nudges do, so a glyph nobody can find is a control
-                // nobody knows exists. The accent gives them the app's own colour and enough
-                // contrast to read outdoors, without turning them into buttons — they are a legend,
-                // and the thing you touch is still the hub.
-                .foregroundColor(.sonicPrimary)
-                .offset(x: x * Self.markRadius, y: y * Self.markRadius)
+        if let direction {
+            ZStack {
+                if let glyph = DialIcon.systemImage(for: direction.icon) {
+                    Image(systemName: glyph)
+                        .font(.system(size: DialFont.directionMark, weight: .semibold))
+                        .offset(x: x * Self.markRadius, y: y * Self.markRadius)
+                        .opacity(isNaming ? 0 : 1)
+                }
+
+                // **Further out than the glyph, because a word needs the width the glyph did not.**
+                // At `nameRadius` the left and right names sit in the middle of the annulus between
+                // the hub and the ticks — 65 points there, which is what caps a `Direction.label` at
+                // a word or two. Up and down have the plate's whole width and are not the
+                // constraint.
+                Text(direction.label)
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .offset(x: x * Self.nameRadius, y: y * Self.nameRadius)
+                    .opacity(isNaming ? 1 : 0)
+            }
+            // **`sonicTextMuted` was too quiet to survive daylight.** It is the right token for
+            // text that is genuinely secondary, and these are not: they are the only thing
+            // naming what the stick's four nudges do, so a glyph nobody can find is a control
+            // nobody knows exists. The accent gives them the app's own colour and enough
+            // contrast to read outdoors, without turning them into buttons — they are a legend,
+            // and the thing you touch is still the hub.
+            .foregroundColor(.sonicPrimary)
         }
     }
 
     /// Just outside the hub, just inside the ticks.
     private static var markRadius: CGFloat { Sizing.dialHub / 2 + Spacing.lg }
+
+    /// Halfway between the hub's edge and the ticks' inner edge, which is where a word has the most
+    /// room on every axis at once.
+    private static var nameRadius: CGFloat {
+        let ticksInnerEdge = Sizing.dialDiameter / 2 - Spacing.sm - Sizing.dialTick
+        return (Sizing.dialHub / 2 + ticksInnerEdge) / 2
+    }
+
+    /// How long a thumb must rest on the hub before the names arrive.
+    ///
+    /// **A press is the app's most-used gesture, and it must not flash.** Without a delay, playing a
+    /// track lit four words for the 120ms a tap lasts — noise on the one thing you do most, to teach
+    /// something you were not asking about. Long enough that a tap never reaches it, short enough
+    /// that a thumb that has paused to think is already being answered.
+    private static let namingDelay: TimeInterval = 0.25
 
     // MARK: - Hub
 
@@ -426,6 +473,7 @@ struct DialRing: View {
                     isHubPressed = true
                     didHold = false
                     didNudge = false
+                    startNaming()
                     holdTask = Task {
                         try? await Task.sleep(for: .seconds(DialCommand.holdDuration))
                         guard !Task.isCancelled else { return }
@@ -447,6 +495,12 @@ struct DialRing: View {
                     didNudge = true
                     holdTask?.cancel()
                     holdTask = nil
+                    // **The names have done their job the moment a direction is chosen**, and the
+                    // geometry says they must go: the hub travels `nudgeTravel` toward the push,
+                    // which carries its edge past where that direction's name is drawn. Left
+                    // standing, the hub would slide over its own label. What you are doing is now
+                    // said by which way the stick has moved.
+                    stopNaming()
                     // Felt at the moment the stick engages, not on release — see
                     // `DialCommand.nudgeEngaged`.
                     onCommand(.nudgeEngaged)
@@ -466,6 +520,7 @@ struct DialRing: View {
                 holdTask = nil
                 isHubPressed = false
                 nudge = .zero
+                stopNaming()
 
                 let repeated = didRepeat
                 stopRepeating()
@@ -487,6 +542,23 @@ struct DialRing: View {
                 guard !didHold else { return }
                 registerPress()
             }
+    }
+
+    /// Arms the reveal. Nothing appears yet — see `namingDelay`.
+    private func startNaming() {
+        guard hasDirections else { return }
+        namingTask?.cancel()
+        namingTask = Task {
+            try? await Task.sleep(for: .seconds(Self.namingDelay))
+            guard !Task.isCancelled else { return }
+            isNaming = true
+        }
+    }
+
+    private func stopNaming() {
+        namingTask?.cancel()
+        namingTask = nil
+        isNaming = false
     }
 
     /// **Holding a repeatable direction keeps it firing**, after a pause long enough that an

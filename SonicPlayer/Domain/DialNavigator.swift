@@ -909,6 +909,20 @@ struct DialNavigator {
     var isSettingsHighlighted: Bool { highlightedChipID == "settings" }
     var isBackHighlighted: Bool { highlightedChipID == "back" }
 
+    /// Whether one more detent leaves the rows and lands on the first chip.
+    ///
+    /// **The chips became stops so that nothing drawn could be unreachable, and then said nothing
+    /// about it.** A wheel that has run out of list is indistinguishable from a wheel that has run
+    /// out of travel, so the row that is one turn short of the controls is where that gets said —
+    /// once, where it is true, rather than as a sentence on every screen.
+    ///
+    /// False on the screens the wheel does not scroll: `ringChipIDs` is empty there, so there is
+    /// nothing ahead to announce.
+    var isOnLastRow: Bool {
+        guard !ringChipIDs.isEmpty, currentRowCount > 0 else { return false }
+        return level.highlighted == currentRowCount - 1
+    }
+
     func rowCount(atDepth depth: Int) -> Int {
         let items = items(atDepth: depth)
         switch stack[depth].route {

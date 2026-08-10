@@ -24,9 +24,23 @@ struct DialScreen: Equatable {
     var content: Content
     var actions: [Action]
     var ring: Ring
-    /// The caption under the wheel. Plain language, lowercase, separated by `·` — it is the only
-    /// thing teaching rotate/press/hold, so it is content rather than decoration.
+    /// The caption under the wheel. Plain language, lowercase, separated by `·`.
+    ///
+    /// **It names the turn and the press, and stops there.** It used to name the nudges as well —
+    /// `"… · nudge to trim, move, delete or share"` — which made it the longest line on the screen
+    /// on the screens with the most to read, to describe four gestures nobody was making at the
+    /// time. Those four are `ring.directions`, and they teach themselves at the moment a thumb
+    /// lands on the hub. What is left here is the part that is true whether or not you are
+    /// touching anything.
     var hint: String
+    /// Whether one more detent leaves the last row and lands on the first chip.
+    ///
+    /// **The one thing nothing on screen admitted.** The chips became ring stops so that no control
+    /// could be drawn and not reachable, and then the ring gave no sign of it: you turned to the
+    /// bottom of the list and stopped, because a list that has ended looks like a wheel that has
+    /// ended. It is true only where it is about to happen, so it is a fact about *this* screen
+    /// rather than a sentence repeated on every one.
+    var chipsAreNext: Bool = false
 
     // MARK: - Chrome
 
@@ -353,7 +367,14 @@ struct DialScreen: Equatable {
     struct Direction: Equatable {
         var id: String
         var icon: Icon
-        /// What VoiceOver says. The glyph is a legend; this is the name.
+        /// The name of the nudge — **drawn** while a thumb rests on the hub, and spoken by
+        /// VoiceOver.
+        ///
+        /// **One or two words, because it is now something that has to fit.** These were sentences
+        /// — `"Move to folder"`, `"Preview selection"` — for as long as nothing read them at all:
+        /// the marks are `accessibilityHidden`, so the only consumer was a test. The reveal gives
+        /// them their first real one, and the annulus between the hub and the ticks is 65 points
+        /// wide on the left and right. The subject is on the card above; this says only the verb.
         var label: String
 
         /// Whether holding the stick here keeps firing.
