@@ -13,6 +13,19 @@ import Foundation
 /// round trip. The host's later `update(_:)` is the correction, and the source of truth.
 struct DialContent: Equatable {
 
+    /// The item with this id, at any depth. Used where only the id is to hand — a route carries
+    /// one, and the breadcrumb has to turn it back into a name.
+    func item(withID id: String) -> Item? {
+        func search(_ items: [Item]) -> Item? {
+            for item in items {
+                if item.id == id { return item }
+                if let children = item.children, let hit = search(children) { return hit }
+            }
+            return nil
+        }
+        return search(recordings)
+    }
+
     /// A row on the library home (1a). `destination` is what pressing it opens — nil for a section
     /// that counts something but has nowhere to go yet, which is most of them in this slice.
     struct Section: Equatable, Identifiable {
@@ -25,12 +38,23 @@ struct DialContent: Equatable {
         var subtitle: String?
     }
 
-    /// A recording (1b).
+    /// A recording, or a folder of them (1b).
+    ///
+    /// **One type for both, distinguished by `children`.** A separate `Folder` type would have
+    /// meant every list, row count and highlight in the navigator switching over two collections
+    /// that are always drawn together and always turned through together. `nil` children means a
+    /// file; an array means a folder, empty included — an empty folder still exists and still has
+    /// to be openable, which is exactly what a count could not express.
     struct Item: Equatable, Identifiable {
         var id: String
         var title: String
         var duration: TimeInterval
         var subtitle: String?
+        /// `nil` for a file. Folders carry their contents, so the whole library arrives in one
+        /// snapshot and the navigator never has to ask for a level it has just pushed.
+        var children: [Item]?
+
+        var isFolder: Bool { children != nil }
     }
 
     /// What the transport is doing (1c), and what the status line on every other screen reports.

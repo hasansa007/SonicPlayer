@@ -96,7 +96,7 @@ struct DialNavigator {
     mutating func update(_ content: DialContent) {
         self.content = content
         for index in stack.indices {
-            let rows = rowCount(stack[index].route)
+            let rows = rowCount(atDepth: index)
             stack[index].highlighted = min(max(0, stack[index].highlighted), max(0, rows - 1))
         }
     }
@@ -130,7 +130,7 @@ struct DialNavigator {
     /// One row still cannot move: `(0 + n) % 1` is 0, so a single-row list would report a detent
     /// for a turn that changed nothing. That is the one honest limit left.
     private mutating func moveHighlight(by detents: Int) -> [DialEffect] {
-        let rows = rowCount(route)
+        let rows = currentRowCount
         guard rows > 1 else { return [.feedback(.limit)] }
 
         // `%` keeps the sign of its left operand in Swift, so a backward turn off row 0 lands
@@ -304,14 +304,19 @@ struct DialNavigator {
             guard let destination = section.destination else { return [.feedback(.limit)] }
             return open(destination)
 
-        case .recordings:
-            switch RecordingsRow.at(level.highlighted, recordings: content.recordings.count) {
+        case .recordings, .folder:
+            switch RecordingsRow.at(
+                level.highlighted, recordings: currentItems.count, hasImport: hasImportRow
+            ) {
             case .importFiles:
                 // Stays put. The picker belongs to the host and the files land in this very list,
                 // so navigating away would be a round trip back to where you already are.
                 return [.importFiles, .feedback(.commit)]
             case .recording(let index):
-                guard let item = content.recordings[safe: index] else { return [.feedback(.limit)] }
+                guard let item = currentItems[safe: index] else { return [.feedback(.limit)] }
+                // **A folder opens; a file plays.** One press, two outcomes, decided by the row
+                // rather than by a mode — which is what keeps the hub saying OPEN on both.
+                guard !item.isFolder else { return open(.folder(itemID: item.id)) }
                 return playItem(item, at: index)
             case nil:
                 return [.feedback(.limit)]
@@ -382,9 +387,22 @@ struct DialNavigator {
     /// Row 0 is Import, so this is `nil` there — and the stick's four nudges all act on a recording,
     /// which is why every one of them guards on it.
     private var highlightedRecording: DialContent.Item? {
-        guard case .recording(let index)? = RecordingsRow.at(level.highlighted, recordings: content.recordings.count)
-        else { return nil }
-        return content.recordings[safe: index]
+        guard case .recording(let index)? = RecordingsRow.at(
+            level.highlighted, recordings: currentItems.count, hasImport: hasImportRow
+        ) else { return nil }
+        return currentItems[safe: index]
+    }
+
+    /// The highlighted row when it is a file — which is what all four nudges and the editor need.
+    ///
+    /// **Folders refuse rather than act.** Every one of the four does something a folder cannot
+    /// answer: there is nothing to trim, the share sheet takes a file URL, adding a folder to a
+    /// folder is a move this slice does not do, and deleting one would take everything inside it
+    /// with no way to say so on a two-row guard. Refusing is a limit pulse, which is the honest
+    /// answer for a control that exists but does not apply here.
+    private var highlightedFile: DialContent.Item? {
+        guard let item = highlightedRecording, !item.isFolder else { return nil }
+        return item
     }
 
     /// Only the recordings list has a second meaning for a second press.
@@ -393,9 +411,13 @@ struct DialNavigator {
     /// exists and would not move, and a double-press on the library is not pushing against
     /// anything at all. Buzzing there would teach the gesture is available everywhere.
     private mutating func doublePress() -> [DialEffect] {
-        guard case .recordings = route,
-              case .recording(let index)? = RecordingsRow.at(level.highlighted, recordings: content.recordings.count),
-              content.recordings.indices.contains(index) else {
+        switch route {
+        case .recordings, .folder: break
+        default: return []
+        }
+        guard case .recording(let index)? = RecordingsRow.at(
+            level.highlighted, recordings: currentItems.count, hasImport: hasImportRow
+        ), let item = currentItems[safe: index], !item.isFolder else {
             return []
         }
         return openEditor()
@@ -439,18 +461,18 @@ struct DialNavigator {
         case (.library, "nowPlaying"):
             return hold()
 
-        case (.recordings, "edit"):
+        case (.recordings, "edit"), (.folder, "edit"):
             return doublePress()
         // **The stick's four nudges, each acting on the highlighted recording.** They were rows on
         // a pushed menu, which cost a nudge, a turn and a press to do one thing.
-        case (.recordings, "share"):
-            guard let item = highlightedRecording else { return [.feedback(.limit)] }
+        case (.recordings, "share"), (.folder, "share"):
+            guard let item = highlightedFile else { return [.feedback(.limit)] }
             return [.item(.share, itemID: item.id), .feedback(.commit)]
-        case (.recordings, "add"):
-            guard let item = highlightedRecording else { return [.feedback(.limit)] }
+        case (.recordings, "add"), (.folder, "add"):
+            guard let item = highlightedFile else { return [.feedback(.limit)] }
             return [.item(.addToPlaylist, itemID: item.id), .feedback(.commit)]
-        case (.recordings, "delete"):
-            guard let item = highlightedRecording else { return [.feedback(.limit)] }
+        case (.recordings, "delete"), (.folder, "delete"):
+            guard let item = highlightedFile else { return [.feedback(.limit)] }
             return open(.confirmDelete(itemID: item.id))
 
         // **Renaming is the editor's, not the stick's.** Four directions cannot hold five verbs, and
@@ -515,8 +537,9 @@ struct DialNavigator {
     }
 
     private mutating func openEditor() -> [DialEffect] {
-        guard case .recording(let index)? = RecordingsRow.at(level.highlighted, recordings: content.recordings.count),
-              let item = content.recordings[safe: index] else { return [.feedback(.limit)] }
+        guard case .recording(let index)? = RecordingsRow.at(
+            level.highlighted, recordings: currentItems.count, hasImport: hasImportRow
+        ), let item = currentItems[safe: index], !item.isFolder else { return [.feedback(.limit)] }
         return openEditor(itemID: item.id)
     }
 
@@ -561,7 +584,9 @@ struct DialNavigator {
             isPlaying: true,
             volume: content.playback?.volume ?? 1,
             queueIndex: index,
-            queueCount: content.recordings.count
+            // Files only: folders sit in the same list but never in the queue, so counting them
+            // would give the browse wheel ends that do not exist.
+            queueCount: currentItems.count(where: { !$0.isFolder })
         )
         push(.nowPlaying)
         return [.play(itemID: item.id), .feedback(.commit)]
@@ -582,15 +607,45 @@ struct DialNavigator {
 
     // MARK: - Rows
 
-    func rowCount(_ route: DialRoute) -> Int {
-        switch route {
-        case .chooseMode: 2
-        case .library: content.sections.count
-        case .recordings: RecordingsRow.rowCount(recordings: content.recordings.count)
-        case .confirmDelete: DialRoute.DeleteChoice.allCases.count
-        case .nowPlaying, .recording, .edit: 0
+    /// The items visible at a given depth: the root list, descended once per `.folder` level.
+    ///
+    /// **Depth rather than "current", because `update(_:)` re-clamps every level**, including the
+    /// ones underneath the screen you are looking at. A list shrinking two levels down still has to
+    /// leave a highlight that points at something.
+    ///
+    /// A folder whose id is no longer in the tree yields an empty list rather than falling back to
+    /// its parent's. The folder has been deleted or moved under you; showing its neighbours instead
+    /// would be showing a different place under the same heading.
+    func items(atDepth depth: Int) -> [DialContent.Item] {
+        var items = content.recordings
+        for level in stack.prefix(depth + 1) {
+            guard case .folder(let itemID) = level.route else { continue }
+            guard let children = items.first(where: { $0.id == itemID })?.children else { return [] }
+            items = children
+        }
+        return items
+    }
+
+    /// What is on screen now.
+    var currentItems: [DialContent.Item] { items(atDepth: stack.count - 1) }
+
+    /// Import is a row on the library root and nowhere else.
+    var hasImportRow: Bool { route == .recordings }
+
+    func rowCount(atDepth depth: Int) -> Int {
+        let items = items(atDepth: depth)
+        switch stack[depth].route {
+        case .chooseMode: return 2
+        case .library: return content.sections.count
+        case .recordings: return RecordingsRow.rowCount(recordings: items.count)
+        case .folder: return RecordingsRow.rowCount(recordings: items.count, hasImport: false)
+        case .confirmDelete: return DialRoute.DeleteChoice.allCases.count
+        case .nowPlaying, .recording, .edit: return 0
         }
     }
+
+    /// The row count of the screen on top.
+    var currentRowCount: Int { rowCount(atDepth: stack.count - 1) }
 }
 
 /// Bounds-checked subscript. The navigator clamps every index it owns, but the data behind one can

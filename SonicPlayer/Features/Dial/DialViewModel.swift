@@ -110,6 +110,7 @@ final class DialViewModel {
     /// leave a highlight pointing past the end.
     func refresh(
         allFiles: [AudioFile],
+        libraryTree: [DialContent.Item],
         player: PlayerViewModel,
         recorder: RecordingViewModel,
         markers: MarkerRegistry
@@ -152,14 +153,22 @@ final class DialViewModel {
         // this screen only. The label in `DialChrome` follows you down, and following you down is
         // the whole job. See `DialNavigatorScreen.status`.
 
-        content.recordings = allFiles.map { file in
-            DialContent.Item(
-                id: file.url.absoluteString,
-                title: file.title,
-                duration: file.duration,
-                subtitle: nil
-            )
-        }
+        // **Nested, not flat.** This used to map `allFiles`, which is a recursive sweep — so every
+        // recording appeared at the top level and the folder it lived in appeared nowhere. The flat
+        // list is still what the queue and the editor want; only the browsing shape changed.
+        //
+        // The fallback is not a convenience. The two are loaded by the same call but built by
+        // different walks, and the nested one can fail on its own — a folder that becomes
+        // unreadable mid-walk throws, and `LibraryTree.load` is caught into an empty array. Without
+        // this, that would empty the library on screen while the flat sweep still held every file.
+        // A flat list is a worse shape than a nested one; it is a far better answer than nothing.
+        content.recordings = libraryTree.isEmpty
+            ? allFiles.map {
+                DialContent.Item(
+                    id: $0.url.absoluteString, title: $0.title, duration: $0.duration
+                )
+            }
+            : libraryTree
 
         if let track = player.currentTrack {
             content.playback = DialContent.Playback(

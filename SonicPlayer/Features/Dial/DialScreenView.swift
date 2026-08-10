@@ -19,12 +19,12 @@ import SwiftUI
 /// what a command *means* is decided here.
 struct DialScreenView: View {
 
-    /// The level the pill is showing, and whether it is showing.
+    /// The level the readout is showing, and whether it is showing at all.
     ///
     /// Held here rather than in the contract because it is *presentation timing*, not state — the
     /// navigator knows the volume, and knows nothing about how long a transient should linger.
-    @State private var pillVolume: Double?
-    @State private var pillTask: Task<Void, Never>?
+    @State private var shownVolume: Double?
+    @State private var hideTask: Task<Void, Never>?
 
     let screen: DialScreen
     let onCommand: (DialCommand) -> Void
@@ -44,6 +44,11 @@ struct DialScreenView: View {
                 Spacer(minLength: 0)
 
                 DialActionRow(actions: screen.actions, onCommand: onCommand)
+                    .layoutPriority(1)
+
+                // Between the card and the dial, where there is already a gap — so appearing costs
+                // no layout anywhere else and the list underneath does not jump when it does.
+                volumeReadout
                     .layoutPriority(1)
 
                 dial
@@ -238,6 +243,29 @@ struct DialScreenView: View {
         .accessibilityHint(Text(screen.hint))
     }
 
+    /// The transient volume readout: present for a beat after the level moves, then gone.
+    ///
+    /// A fixed-height slot rather than an insertion, because a control that appears *between* two
+    /// others pushes both apart — and the thing it would push is the dial, which must not move
+    /// under a thumb that is mid-nudge. So the space is always there and only the contents fade.
+    @ViewBuilder
+    private var volumeReadout: some View {
+        VolumeSlider(volume: shownVolume ?? 0)
+            .opacity(shownVolume == nil ? 0 : 1)
+            .animation(Motion.settle, value: shownVolume == nil)
+            .onChange(of: currentVolume) { _, level in
+                guard let level else { return }
+                shownVolume = level
+                hideTask?.cancel()
+                hideTask = Task {
+                    try? await Task.sleep(for: .seconds(Self.readoutLinger))
+                    guard !Task.isCancelled else { return }
+                    shownVolume = nil
+                }
+            }
+            .onDisappear { hideTask?.cancel() }
+    }
+
     /// The volume this screen is currently reporting, or `nil` where volume is not on show.
     ///
     /// `onChange` needs an `Equatable` to watch, and watching the whole screen would fire the pill
@@ -247,9 +275,9 @@ struct DialScreenView: View {
         return playing.volume
     }
 
-    /// How long the pill stays after the last nudge. Long enough to read a second nudge as one
-    /// gesture, short enough not to sit over the artwork.
-    private static let pillLinger: Double = 1.2
+    /// How long the readout stays after the last nudge. Long enough that a run of nudges reads as
+    /// one gesture rather than a flicker, short enough to be gone before you look away.
+    private static let readoutLinger: Double = 1.5
 
     private static let washTint: Double = 0.15
 

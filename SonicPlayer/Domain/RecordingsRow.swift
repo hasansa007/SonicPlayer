@@ -21,19 +21,29 @@ enum RecordingsRow: Equatable {
     case recording(index: Int)
 
     /// How many rows the list has for a given number of recordings.
-    static func rowCount(recordings count: Int) -> Int { count + 1 }
+    ///
+    /// `hasImport` is false inside a folder. Import puts files in the library, not in whichever
+    /// folder you happen to be standing in — offering it at every depth would be offering a choice
+    /// the picker does not actually take.
+    static func rowCount(recordings count: Int, hasImport: Bool = true) -> Int {
+        count + (hasImport ? 1 : 0)
+    }
 
     /// What the highlight is pointing at, or `nil` when it points past the end.
     ///
     /// Out of range is `nil` rather than a clamp on purpose: the navigator clamps its own highlight,
     /// so a value that lands here out of range means the data moved underneath it, and the caller
     /// should feel a limit rather than act on a neighbour.
-    static func at(_ highlighted: Int, recordings count: Int) -> RecordingsRow? {
-        guard highlighted >= 0, highlighted < rowCount(recordings: count) else { return nil }
+    static func at(_ highlighted: Int, recordings count: Int, hasImport: Bool = true) -> RecordingsRow? {
+        guard highlighted >= 0, highlighted < rowCount(recordings: count, hasImport: hasImport)
+        else { return nil }
+        guard hasImport else { return .recording(index: highlighted) }
         return highlighted == 0 ? .importFiles : .recording(index: highlighted - 1)
     }
 
     /// The row a given recording sits on — the inverse, for the places holding an index that need a
     /// highlight back.
-    static func row(forRecording index: Int) -> Int { index + 1 }
+    static func row(forRecording index: Int, hasImport: Bool = true) -> Int {
+        index + (hasImport ? 1 : 0)
+    }
 }

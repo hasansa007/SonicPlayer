@@ -17,6 +17,13 @@ enum DialRoute: Equatable {
     case library
     /// 1b, or 1g when there are none.
     case recordings
+    /// A folder inside the library — which is also what a playlist is.
+    ///
+    /// **The stack is the path.** There is no stored folder URL and no parent pointer: the items
+    /// visible at any depth are found by starting at the root list and descending once per
+    /// `.folder` level below it. Popping is therefore all that going up requires, and a folder
+    /// cannot be reached by a route that did not walk to it.
+    case folder(itemID: String)
     /// 1c.
     case nowPlaying
     /// 1d.
@@ -46,6 +53,9 @@ enum DialRoute: Equatable {
         // it actually has: it is a menu you start from, not a library.
         case .library: "HOME"
         case .recordings: "LIBRARY"
+        // The folder's own name, so the header reads HOME ▸ LIBRARY ▸ LECTURES rather than
+        // repeating LIBRARY at every depth.
+        case .folder(let itemID): content.item(withID: itemID)?.title.uppercased() ?? "FOLDER"
         case .nowPlaying: "NOW PLAYING"
         case .recording: "RECORDING"
         case .edit: "EDIT"

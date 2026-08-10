@@ -292,7 +292,16 @@ final class AppViewModel {
         dial.onPlay = { [player, home] itemID in
             guard let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
             else { return }
-            player.loadTrack(file, queue: home.allFiles, source: nil)
+            // **The queue is the folder you played from, not the whole library.** It used to be
+            // everything, which was the only honest answer while the dial had no folders — there
+            // was one list and it was all of them. Now that pressing a row inside a folder is a
+            // different act from pressing one at the root, the queue that follows has to match the
+            // list you were looking at, or Next walks out of the folder without saying so.
+            let directory = file.url.deletingLastPathComponent()
+            let siblings = home.allFiles.filter {
+                $0.url.deletingLastPathComponent() == directory
+            }
+            player.loadTrack(file, queue: siblings, source: nil)
         }
         dial.onTogglePlayPause = { [player] in player.playPauseTapped() }
         // Opening the recorder or the trim editor silences whatever is playing. `pauseIfPlaying`
@@ -468,7 +477,11 @@ final class AppViewModel {
     /// because the navigator holds a snapshot rather than reaching back into the view models.
     func refreshDial() {
         dial.refresh(
-            allFiles: home.allFiles, player: player, recorder: recording, markers: markers
+            allFiles: home.allFiles,
+            libraryTree: home.libraryTree,
+            player: player,
+            recorder: recording,
+            markers: markers
         )
     }
 }

@@ -42,6 +42,10 @@ final class HomeViewModel {
     /// `MediaFileRowView` used to do from inside its own `body` (#48).
     var documentsURL: URL { fileManager.documentsDirectory() }
 
+    /// The same library, nested. The dial browses this; the flat `allFiles` still feeds the queue,
+    /// the editor and the Library card's count.
+    var libraryTree: [DialContent.Item] = []
+
     init(player: PlayerViewModel, fileManager: FileManagerClient = .live) {
         self.player = player
         self.fileManager = fileManager
@@ -53,7 +57,13 @@ final class HomeViewModel {
 
         Task { [weak self, fileManager] in
             guard let files = try? await Self.allAudioFiles(fileManager: fileManager) else { return }
-            await MainActor.run { self?.allFiles = files }
+            // The dial browses the nested shape; everything else still wants the flat one. Loaded
+            // together so a refresh cannot show a folder that the flat list disagrees about.
+            let tree = (try? await LibraryTree.load(fileManager: fileManager)) ?? []
+            await MainActor.run {
+                self?.allFiles = files
+                self?.libraryTree = tree
+            }
         }
     }
 
@@ -94,32 +104,31 @@ private extension HomeViewModel {
     /// answered a smaller question than it was being asked.
     static func allAudioFiles(fileManager: FileManagerClient) async throws -> [AudioFile] {
         var allFiles: [AudioFile] = []
-        var seenNames: Set<String> = []
-        try await collect(from: nil, into: &allFiles, seenNames: &seenNames, fileManager: fileManager)
+        try await collect(from: nil, into: &allFiles, fileManager: fileManager)
         allFiles.sort { $0.creationDate > $1.creationDate }
         return allFiles
     }
 
-    /// Deduplicates by filename, so the same recording surfaced in two collections appears once.
+    /// **The filename deduplication is gone, and folders are why.**
+    ///
+    /// It folded two recordings with the same name into one, on the reasoning that the same file
+    /// surfaced from two collections should appear once. That was defensible while this list was a
+    /// flat strip with nowhere to say where a file came from. Now the dial browses the folders
+    /// themselves, so two files called `Lecture 1.m4a` in two folders are two files — and dropping
+    /// one made its folder look emptier than it is and made the survivor unresolvable by URL,
+    /// which is how the dial turns a pressed row back into something to play.
     static func collect(
         from directory: URL?,
         into files: inout [AudioFile],
-        seenNames: inout Set<String>,
         fileManager: FileManagerClient
     ) async throws {
         let items = try await fileManager.listItems(directory)
         for item in items {
             switch item {
             case let .file(audioFile):
-                let name = audioFile.url.lastPathComponent
-                if !seenNames.contains(name) {
-                    seenNames.insert(name)
-                    files.append(audioFile)
-                }
+                files.append(audioFile)
             case let .folder(folder):
-                try await collect(
-                    from: folder.url, into: &files, seenNames: &seenNames, fileManager: fileManager
-                )
+                try await collect(from: folder.url, into: &files, fileManager: fileManager)
             }
         }
     }

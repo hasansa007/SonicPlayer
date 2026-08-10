@@ -169,8 +169,10 @@ enum Sizing {
     static let dialChoiceTile: CGFloat = 52
 
     /// The transient volume indicator, sized to sit where iOS puts its own without imitating it.
-    static let volumePillWidth: CGFloat = 44
-    static let volumePillHeight: CGFloat = 132
+    /// The transient volume readout: a track no taller than a hairline pair, and a glyph column
+    /// wide enough that the speaker symbol changing does not shift the track.
+    static let volumeTrackHeight: CGFloat = 4
+    static let volumeGlyphWidth: CGFloat = 18
 }
 
 /// A shadow, as one value rather than four loose arguments at the call site.
