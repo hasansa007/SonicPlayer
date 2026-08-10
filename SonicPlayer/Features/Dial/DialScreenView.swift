@@ -57,6 +57,23 @@ struct DialScreenView: View {
     /// Inside the card rather than loose on the screen, because it acts on the card — it pops the
     /// level the card is showing. A control floating beside the dial would read as belonging to the
     /// dial, which nudges and presses and never navigates.
+    /// The header, ruled off from the content beneath it.
+    ///
+    /// The hairline sits on the *bottom* edge of the bar, mirroring the bottom bar's on its top
+    /// edge — so the card reads as three bands: where you are, what is here, and the way back. The
+    /// `VStack`'s own spacing does the separating either side, which is what keeps the two rules
+    /// the same distance from the content they divide.
+    private var topBar: some View {
+        DialChrome(chrome: screen.chrome, onCommand: onCommand)
+            .dynamicTypeSize(...Self.captionCeiling)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(Color.sonicBorder)
+                    .frame(height: Sizing.hairlineTrackHeight)
+                    .offset(y: Spacing.sm)
+            }
+    }
+
     private var bottomBar: some View {
         HStack(spacing: 0) {
             backControl
@@ -114,10 +131,7 @@ struct DialScreenView: View {
     /// as the device and the content as what is on the device.
     private var stage: some View {
         VStack(spacing: Spacing.md) {
-            if hasChrome {
-                DialChrome(chrome: screen.chrome, onCommand: onCommand)
-                    .dynamicTypeSize(...Self.captionCeiling)
-            }
+            if hasChrome { topBar }
 
             // **Static until it cannot be, then scrollable.**
             //
