@@ -90,7 +90,12 @@ struct DialScreenView: View {
         Button {
             onCommand(.action("back"))
         } label: {
-            Image(systemName: "chevron.left")
+            // **A list glyph rather than a chevron.** A chevron says only "backwards", which on a
+            // stack of eight screens is a direction and not a destination. Every level below the
+            // root pops to a list — the library, or home — so the icon can name where it goes
+            // instead of which way. It also stops reading as the navigation bar's back button on a
+            // screen that deliberately has no navigation bar.
+            Image(systemName: "list.bullet")
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundColor(.sonicPrimary)
