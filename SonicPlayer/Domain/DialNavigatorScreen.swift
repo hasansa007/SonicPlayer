@@ -338,6 +338,16 @@ extension DialNavigator {
                 right: .init(id: "next", icon: .next, label: "Next track")
             )
 
+        // **Trim keeps the selection, delete removes it — the two things you can do to a region.**
+        // The hub stays `DONE`, so the wheel says what the selection is *for* rather than making
+        // you find it on a menu. Absent until the material has loaded: nothing to act on.
+        case .edit:
+            guard content.editing != nil else { return nil }
+            return DialScreen.Directions(
+                up: .init(id: "trim", icon: .edit, label: "Trim to selection"),
+                down: .init(id: "cut", icon: .delete, label: "Delete selection")
+            )
+
         case .recording:
             guard let capture = content.capture else { return nil }
             return DialScreen.Directions(

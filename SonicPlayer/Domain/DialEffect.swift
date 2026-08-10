@@ -59,6 +59,13 @@ enum DialEffect: Equatable {
     case previewTrim(itemID: String, start: TimeInterval, end: TimeInterval)
     case commitTrim(itemID: String, start: TimeInterval, end: TimeInterval)
 
+    /// **The complement of `commitTrim`: throw the selection away and keep the rest.**
+    ///
+    /// Same bounds, opposite meaning — trim keeps what is between the handles, this removes it and
+    /// joins what is left. `AudioTrimmerClient.deleteAudioRange` has existed all along and had one
+    /// caller, in the old sheet editor; the dial could select a region and only ever keep it.
+    case commitCut(itemID: String, start: TimeInterval, end: TimeInterval)
+
     // MARK: - Items
 
     case item(DialItemAction, itemID: String)

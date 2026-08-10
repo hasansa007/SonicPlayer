@@ -475,6 +475,18 @@ struct DialNavigator {
 
         // **Renaming is the editor's, not the stick's.** Four directions cannot hold five verbs, and
         // of the five this is the one that belongs where you are already changing the recording.
+        // Both commit and leave. `Back` still asks Save or Discard, which is the escape for a
+        // handle moved and then thought better of; these two are the deliberate answers.
+        case (.edit(let itemID), "trim"):
+            guard let trim = currentTrim else { return [.feedback(.limit)] }
+            pop()
+            return [.commitTrim(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
+
+        case (.edit(let itemID), "cut"):
+            guard let trim = currentTrim else { return [.feedback(.limit)] }
+            pop()
+            return [.commitCut(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
+
         case (.edit(let itemID), "rename"):
             return [.renameItem(itemID: itemID), .feedback(.commit)]
 

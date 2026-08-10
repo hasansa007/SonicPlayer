@@ -381,6 +381,12 @@ final class AppViewModel {
             else { return }
             commitTrim(on: file.url, start: start, end: end)
         }
+        dial.onCommitCut = { [weak self] itemID, start, end in
+            guard let self,
+                  let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
+            else { return }
+            cutRange(on: file.url, start: start, end: end)
+        }
 
         // **The actions screen's rows, wired to the flows that already exist.**
         //
@@ -418,6 +424,27 @@ final class AppViewModel {
     /// the recording untouched, and `AudioTrimmerClient.trimAudio` on its own does not promise that.
     /// What belongs here is the part that is genuinely cross-feature: the browser and Home both
     /// draw this file, and the dial has a picture of its old shape cached.
+    /// The complement of `commitTrim` — remove the selection and keep the rest.
+    ///
+    /// Deliberately *not* routed through `TrimCommit`: that type stages a keep-the-range export and
+    /// swaps it in, and the promise it makes is about that operation. Sharing it by adding a flag
+    /// would make one type mean two things at the moment it is rewriting a real recording.
+    private func cutRange(on url: URL, start: TimeInterval, end: TimeInterval) {
+        trimPreview.stop()
+        Task { [weak self, audioTrimmer] in
+            guard let self else { return }
+            do {
+                _ = try await audioTrimmer.deleteAudioRange(url, start, end)
+            } catch {
+                print("Failed to cut range: \(error.localizedDescription)")
+            }
+            markers.forget(url)
+            dial.forgetWaveform(for: url)
+            home.loadAllFiles()
+            filesRoot.refreshFiles()
+        }
+    }
+
     private func commitTrim(on url: URL, start: TimeInterval, end: TimeInterval) {
         trimPreview.stop()
         Task { [weak self, audioTrimmer] in
