@@ -33,9 +33,11 @@ struct DialModeTests {
         let navigator = nowPlaying()
 
         #expect(navigator.route.modes.isEmpty)
-        // No chips at all: the wheel seeks, the two segments carry volume and track, and Back is
-        // the top bar's chevron. A screen is allowed to have an empty action row.
-        #expect(navigator.screen.actions.isEmpty)
+        // **No *mode* chips**, which is what this is about. The wheel seeks and the stick carries
+        // volume and track, so nothing here chooses an axis. The row is not empty — Back and the
+        // two queue toggles live in it — so the assertion names the absence it means.
+        #expect(!navigator.screen.actions.contains { navigator.route.modes.map(\.id).contains($0.id) })
+        #expect(navigator.screen.actions.map(\.id) == ["back", "repeat", "shuffle"])
         #expect(navigator.screen.chrome.canGoBack)
         #expect(navigator.axis == .seek)
     }
@@ -43,11 +45,11 @@ struct DialModeTests {
     /// **Modes outlived the chips that used to display them.** The trim editor still has two
     /// things one wheel must do, so `route.modes` still decides the axis — but you choose between
     /// them by tapping the handle rather than a chip, so the editor draws no action row at all.
-    @Test func theEditorKeepsItsModesAndShowsNoChips() {
+    @Test func theEditorKeepsItsModesAndShowsNoModeChips() {
         let navigator = DialSample.whileEditing()
 
         #expect(navigator.route.modes.map(\.id) == ["trimStart", "trimEnd"])
-        #expect(navigator.screen.actions.isEmpty)
+        #expect(navigator.screen.actions.map(\.id) == ["back"], "the way out, and nothing else")
     }
 
     /// The selection has to reach the *screen* now, because the handle drawn filled is the only

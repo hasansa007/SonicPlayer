@@ -17,13 +17,16 @@ final class DialViewModel {
     /// What the view renders. Recomputed from the navigator, which is the single source of truth.
     var screen: DialScreen { navigator.screen }
 
-    var onPlay: ((String) -> Void)?
+    var onPlay: ((String, [String]) -> Void)?
     var onTogglePlayPause: (() -> Void)?
     /// Recording and trimming both want the audio session to themselves.
     var onPausePlayback: (() -> Void)?
     /// `0...1`, already clamped by the navigator.
     var onSetVolume: ((Double) -> Void)?
     var onImportFiles: ((String?) -> Void)?
+    /// The dial has no text entry, so naming a new folder is the host's.
+    var onCreateFolder: ((String?) -> Void)?
+    var onMoveItem: ((String, String?) -> Void)?
     /// Raised only after the user has confirmed. The composition root does the deleting, because a
     /// file leaving disk concerns the player, the markers and the waveform cache as well.
     var onDeleteItem: ((String) -> Void)?
@@ -34,7 +37,7 @@ final class DialViewModel {
     var onSeek: ((TimeInterval) -> Void)?
     var onSelectTrack: ((Int) -> Void)?
     var onStartRecording: (() -> Void)?
-    var onOpenSettings: (() -> Void)?
+    var onSetting: ((DialSetting) -> Void)?
     var onStopRecording: (() -> Void)?
     var onTogglePause: (() -> Void)?
     var onAddMarker: (() -> Void)?
@@ -53,8 +56,7 @@ final class DialViewModel {
     /// asynchronously. Only the waveform needs it — every other input is state the host can already
     /// see change.
     var onNeedsRefresh: (() -> Void)?
-    var onReloadLibrary: (() -> Void)?
-    var onCreateFolder: ((String?) -> Void)?
+    var onReleasePlayer: (() -> Void)?
     var onCycleRepeat: (() -> Void)?
     var onToggleShuffle: (() -> Void)?
 
@@ -115,6 +117,7 @@ final class DialViewModel {
     func refresh(
         allFiles: [AudioFile],
         libraryTree: [DialContent.Item],
+        settings: SettingsViewModel,
         player: PlayerViewModel,
         recorder: RecordingViewModel,
         markers: MarkerRegistry
@@ -126,28 +129,6 @@ final class DialViewModel {
         // It was a card here first, where it outranked the two things this screen exists to offer.
         // The library is where it belongs: that screen is the place you *add to*, and arriving there
         // from a card marked `Library` with no way to put anything in is the gap that settled it.
-        content.sections = [
-            DialContent.Section(
-                id: "recordings",
-                icon: .library,
-                title: String(localized: "Library"),
-                count: allFiles.count,
-                destination: .recordings,
-                // What is inside, not how much — the count is already the row's trailing value, and
-                // a card that says `12` and "12 recordings" is one fact wearing two hats. Short
-                // because the card also carries a count and a chevron: the longer form truncated to
-                // "Recordings · Import…" at the default text size.
-                subtitle: String(localized: "Recordings · Imports")
-            ),
-            DialContent.Section(
-                id: "record",
-                icon: .recording,
-                title: String(localized: "Record"),
-                count: nil,
-                destination: .recording,
-                subtitle: String(localized: "Capture something new")
-            )
-        ]
 
         // **There is no Now Playing row, and the corner label is why.**
         //
@@ -192,6 +173,12 @@ final class DialViewModel {
                 isShuffled: player.isShuffleEnabled
             )
         }
+
+        content.settingValues = [
+            DialSetting.playbackSpeed.rawValue: settings.defaultPlaybackSpeed.displayText,
+            DialSetting.skipDuration.rawValue: settings.defaultSkipDuration.displayText,
+            DialSetting.appearance.rawValue: settings.colorScheme.rawValue
+        ]
 
         content.capture = capture(from: recorder)
         content.editing = editable(from: allFiles, markers: markers)
@@ -291,10 +278,13 @@ final class DialViewModel {
         switch effect {
         case .feedback(let event):
             haptics.fire(DetentFeedback.pulse(for: event))
-        case .play(let itemID):
-            onPlay?(itemID)
+        case .play(let itemID, let queue):
+            onPlay?(itemID, queue)
         case .togglePlayPause:
             onTogglePlayPause?()
+        case .releasePlayer:
+            onReleasePlayer?()
+
         case .pausePlayback:
             onPausePlayback?()
         case .seek(let time):
@@ -307,16 +297,14 @@ final class DialViewModel {
         case .toggleShuffle:
             onToggleShuffle?()
 
-        case .reloadLibrary:
-            onReloadLibrary?()
-
-        case .createFolder(let itemID):
-            onCreateFolder?(itemID)
-
         case .importFiles(let itemID):
             onImportFiles?(itemID)
-        case .openSettings:
-            onOpenSettings?()
+        case .createFolder(let itemID):
+            onCreateFolder?(itemID)
+        case .moveItem(let itemID, let folderID):
+            onMoveItem?(itemID, folderID)
+        case .setting(let setting):
+            onSetting?(setting)
         case .startRecording:
             onStartRecording?()
         case .stopRecording:

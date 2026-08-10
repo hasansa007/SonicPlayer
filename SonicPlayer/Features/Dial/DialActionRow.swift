@@ -47,18 +47,50 @@ struct DialActionRow: View {
         .padding(.horizontal, Spacing.xxs)
     }
 
+    /// **A glyph in a circle where the action has one, a word in a capsule where it does not.**
+    ///
+    /// The words were the original design and they cost a band of the card's height on every
+    /// screen: five chips across a phone wrapped to two lines at ordinary text sizes in Arabic, and
+    /// at AX3 in English. A symbol says `Back` in the space the word `‹ Back` needed for its
+    /// chevron alone.
+    ///
+    /// The label has not gone anywhere — it is the accessibility label, so nothing is lost to
+    /// VoiceOver, and a chip with no icon still draws it. That fallback is not decorative: an
+    /// action whose meaning has no honest symbol should say so in words rather than pick a vague
+    /// one, which is how a glyph row turns into a guessing game.
     private func chip(_ action: DialScreen.Action) -> some View {
         Button {
             onCommand(.action(action.id))
         } label: {
-            Text(action.label)
-                .font(.footnote)
-                .fontWeight(.semibold)
-                .lineLimit(1)
-                .foregroundColor(foreground(action.emphasis))
-                .padding(.horizontal, Sizing.chipInsetH)
-                .padding(.vertical, Spacing.sm)
-                .background(background(action.emphasis), in: Capsule())
+            Group {
+                if let symbol = DialIcon.systemImage(for: action.icon) {
+                    Image(systemName: symbol)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        // A fixed square under the padding, so every glyph chip is the same
+                        // capsule whatever its symbol is wide — `repeat.1` is noticeably wider
+                        // than `shuffle`, and a row of different-sized pills reads as a mistake.
+                        .frame(width: Sizing.compactControl)
+                } else {
+                    Text(action.label)
+                        .font(.footnote)
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
+                }
+            }
+            // **The padding is the chip.** The glyph version first shipped as a bare 28pt square,
+            // which made a control that is pressed constantly smaller than the 44 points Apple
+            // documents as the minimum — and read as an icon someone had forgotten to style rather
+            // than as a button. Shared by both forms so a mixed row lines up.
+            //
+            // Wider than it is tall on purpose: a capsule whose ends are a semicircle needs visible
+            // straight sides or it reads as a circle, which is a different control. `xxl` against
+            // `sm` is what gives it those sides at a 28pt glyph.
+            .frame(minHeight: Sizing.compactControl)
+            .padding(.horizontal, Spacing.xxl)
+            .padding(.vertical, Spacing.sm)
+            .foregroundColor(foreground(action.emphasis))
+            .background(background(action.emphasis), in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(action.emphasis == .disabled)

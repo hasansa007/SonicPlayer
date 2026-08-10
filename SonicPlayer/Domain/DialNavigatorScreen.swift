@@ -27,12 +27,12 @@ extension DialNavigator {
             breadcrumb: stack.compactMap { $0.route.crumb(in: content) },
             status: status,
             isRecording: content.capture.map { !$0.isPaused } ?? false,
-            showsSettings: stack.count == 1,
-            showsSync: isFileList,
-            showsLibraryActions: isFileList,
+            isSettingsHighlighted: isSettingsHighlighted,
+            primaryAction: primaryAction,
             isLive: isLive,
             transport: transport,
-            canGoBack: stack.count > 1
+            canGoBack: stack.count > 1,
+            isBackHighlighted: isBackHighlighted
         )
     }
 
@@ -62,27 +62,30 @@ extension DialNavigator {
 
     private var screenContent: DialScreen.Content {
         switch route {
-        case .chooseMode:
-            return .list(list(rows: chooserRows))
-
         case .library:
             return .list(list(rows: libraryRows))
 
-        // **Always a list.** Import is row 0 and is always there, so there is never nothing to draw
-        // — and the empty-state message could not have held a row anyway. What the message said
-        // lives on that row's second line when the library is bare.
         // **The empty state is a message again.** It was folded into the Import row's second line,
-        // which worked only while Import was a row — with the verbs in the bottom bar an empty
+        // which worked only while Import was a row — with the verb pinned above the list, an empty
         // library would otherwise be a blank card that says nothing about why.
+        //
+        // It names the mode's verb and points **up**, at the row the highlight is already resting
+        // on. It said "using the buttons below" for a while after those buttons had moved, which is
+        // the failure mode of copy that describes a layout rather than an action.
         case .recordings, .folder:
             guard !currentItems.isEmpty else {
                 return .message(.init(
-                    icon: .importFile,
+                    icon: mode == .record ? .recording : .importFile,
                     title: "Nothing here yet",
-                    body: "Import audio or make a folder using the buttons below."
+                    body: mode == .record
+                        ? "Press the wheel to start recording."
+                        : "Press the wheel to import audio from Files."
                 ))
             }
             return .list(list(rows: recordingRows))
+
+        case .settings:
+            return .list(list(rows: settingRows))
 
         case .nowPlaying:
             guard let playback = content.playback else {
@@ -147,6 +150,11 @@ extension DialNavigator {
 
         // The subject is not decoration here — it is the whole guard. Two verbs with nothing
         // naming what they act on is exactly the screen `Delete` must not be.
+        // The subject is the whole point again: a list of folders with nothing saying what is
+        // being filed is a list of folders.
+        case .move(let itemID):
+            return .list(list(rows: moveRows(for: itemID), subject: subject(for: itemID)))
+
         case .confirmDelete(let itemID):
             return .list(list(rows: deleteChoiceRows, subject: subject(for: itemID)))
         }
@@ -158,15 +166,53 @@ extension DialNavigator {
     ) -> DialScreen.List {
         DialScreen.List(
             rows: rows,
-            highlighted: min(level.highlighted, max(0, rows.count - 1)),
+            // **Out of range on purpose when the wheel is on a chrome stop.**
+            //
+            // This clamped into the rows, which is exactly wrong at the ends: with the highlight on
+            // Back, `min(rowCount, rows.count - 1)` handed the cursor back to the *last row* — so
+            // the card drew two things selected at once, the row and the control, and neither
+            // looked like the one the hub would act on. Seen on the phone, and it is the same
+            // reading either stop: no row is highlighted, because the highlight is not on a row.
+            highlighted: rows.indices.contains(level.highlighted) ? level.highlighted : -1,
             subject: subject,
             isProminent: route.showsProminentRows
         )
     }
 
+    private func moveRows(for itemID: String) -> [DialScreen.List.Row] {
+        MoveDestinations.all(in: content.recordings, excluding: itemID).map { destination in
+            .init(
+                id: destination.id ?? "root",
+                icon: destination.id == nil ? .library : .playlist,
+                title: destination.path,
+                // **The folder it is already in says so rather than being hidden.** Removing it
+                // would make the list depend on where the file happens to live, so the same folder
+                // would be at a different index depending on what you are filing.
+                subtitle: destination.id == currentFolderID ? "Where it is now" : nil
+            )
+        }
+    }
+
     /// The recording the action rows act on. Without it the screen is five verbs and no object.
     private func subject(for itemID: String) -> DialScreen.List.Subject? {
         guard let item = content.item(itemID) else { return nil }
+
+        // **A folder has to say what it takes with it.** Deleting one is not deleting one thing,
+        // and a guard that names only the folder is a guard that hides the cost of confirming it.
+        if let children = item.children {
+            let files = children.count { !$0.isFolder }
+            let folders = children.count(where: \.isFolder)
+            let parts = [
+                files == 1 ? "1 recording" : "\(files) recordings",
+                folders == 0 ? nil : (folders == 1 ? "1 folder" : "\(folders) folders")
+            ].compactMap { $0 }
+            return DialScreen.List.Subject(
+                icon: .playlist,
+                title: item.title,
+                detail: children.isEmpty ? "Empty" : parts.joined(separator: " · ")
+            )
+        }
+
         return DialScreen.List.Subject(
             icon: .recording,
             title: item.title,
@@ -176,27 +222,24 @@ extension DialNavigator {
         )
     }
 
-    private var chooserRows: [DialScreen.List.Row] {
-        [
-            .init(id: "listen", icon: .playlist, title: "Listen", subtitle: "Play from your library"),
-            .init(id: "record", icon: .recording, title: "Record", subtitle: "Capture something new")
-        ]
-    }
 
-    /// The count when there is one, and separately whether the row goes anywhere.
+    /// Home's two cards: the fork between listening and editing.
     ///
-    /// The chevron used to be `▸` appended to the count string. It is a flag now, for the reason
-    /// `DialScreen.List.Row.opensSomewhere` gives — one field cannot be both a number and an
-    /// affordance without the view being unable to draw either properly.
+    /// **They were places and are now jobs.** `Library` and `Record` put browsing and capturing on
+    /// the same footing and left editing with nowhere to live — so it ended up as a double press on
+    /// the library, which made every single press wait to find out it was not coming. As jobs, each
+    /// card opens the same library with a different set of verbs, and the press means one thing.
+    ///
+    /// The counts still come from the host, because only the host knows how many files there are.
     private var libraryRows: [DialScreen.List.Row] {
-        content.sections.map { section in
+        DialActivity.all.map { activity in
             .init(
-                id: section.id,
-                icon: section.icon,
-                title: section.title,
-                trailing: section.count.map { "\($0)" },
-                subtitle: section.subtitle,
-                opensSomewhere: section.destination != nil
+                id: activity.id,
+                icon: activity.icon,
+                title: activity.title,
+                trailing: activity == .listen ? content.recordings.count.description : nil,
+                subtitle: activity.subtitle,
+                opensSomewhere: true
             )
         }
     }
@@ -205,6 +248,30 @@ extension DialNavigator {
     ///
     /// **Import belongs to a library, which is what this screen turned out to be.** It was tried as
     /// a card on home, a chip here, a row here, and then removed altogether — the removal on the
+    /// The preference under the highlight, or `nil` anywhere but Settings.
+    private var highlightedSetting: DialSetting? {
+        guard case .settings = route,
+              DialSetting.allCases.indices.contains(level.highlighted) else { return nil }
+        return DialSetting.allCases[level.highlighted]
+    }
+
+    /// Preferences as rows, each carrying its current value in the trailing column.
+    ///
+    /// The values come from the host — `Domain/` is Foundation-only and knows nothing about what a
+    /// playback speed is, only that it has a printable current value and a next one.
+    private var settingRows: [DialScreen.List.Row] {
+        DialSetting.allCases.map { setting in
+            .init(
+                id: setting.rawValue,
+                icon: setting.icon,
+                title: setting.title,
+                trailing: content.settingValues[setting.rawValue],
+                subtitle: setting.subtitle,
+                opensSomewhere: !setting.cycles
+            )
+        }
+    }
+
     /// Every row is a file or a folder.
     ///
     /// **Import and New folder used to be here and are buttons now.** They were a row, then a
@@ -237,52 +304,74 @@ extension DialNavigator {
 
     // MARK: - Actions
 
+    /// **Navigation is a chip again, and the card has no bottom bar.**
+    ///
+    /// Back spent a while as a control in the card's bottom-left and Settings as a gear in its
+    /// top-right corner. Both are back in this row, which is where every other touch target on the
+    /// dial lives — the bar was a second control surface inside the card, competing with the row
+    /// twenty points below it for the same thumb.
+    ///
+    /// They are still ring stops: `.selected` is how a chip says the wheel is resting on it, the
+    /// same signal a chosen mode uses on Now Playing.
     private var actions: [DialScreen.Action] {
-        switch route {
-        case .chooseMode:
-            return []
-
-        case .library:
-            // The "Now playing" chip is gone: the dial's border says it now, by moving while
-            // audio moves. `Now Playing` is also a row in this very list, so the chip was a second
-            // door to a room already on screen.
-            return []
-
-        // **No chip on the empty library either.** A red `Record` used to sit here, on the argument
-        // that an empty library most wants filling. But that band is dead space on every other
-        // screen in the app, and one lone control appearing in it — only when the library is empty,
-        // only in red — reads as an alert rather than an offer. `Record` is a card on home, one Back
-        // away, which is where every other destination lives.
-        case .recordings, .folder:
-            // `Edit` is the visible partner for `.doublePress`; the contract requires one.
-            // Both moved onto the stick — right nudges to Edit, left to the actions menu.
-            return []
-
-        // Nothing at all: the wheel seeks, the segments do volume and track, and Back is in the
-        // top bar. A screen can legitimately have no chips.
-        case .nowPlaying:
-            return []
-
-        case .recording:
-            let paused = content.capture?.isPaused ?? false
-            // Both moved onto the stick — up adds a marker, left pauses.
-            _ = paused
-            return []
-
-        // **No chips.** `Start handle` and `End handle` were how you chose which one the wheel
-        // nudged; you tap the handle itself now, which is where your eye already is. `Preview` went
-        // with them — a third control to hear the result was one more thing between you and the
-        // trim, and the waveform plus `Keeping` already say what you are about to keep.
-        case .edit:
-            return []
-
-        case .confirmDelete:
-            return []
-        }
+        chipIDs.compactMap(chip)
     }
 
-    /// `back` is no longer a chip — it is the top bar's chevron — but the *command* is unchanged
-    /// and still accepted on every screen, so nothing that used to send it has broken.
+    /// One chip, built from its id.
+    ///
+    /// **The navigator owns the list and this owns the look.** They were one function, which is how
+    /// Sort shipped drawn-but-unreachable: the projection invented a chip the ring had never heard
+    /// of. Now `chipIDs` is the single list, the ring walks it, and anything it names gets a cursor
+    /// here for free — `highlightedChipID` is the whole of that.
+    private func chip(_ id: String) -> DialScreen.Action? {
+        let isUnderTheWheel = highlightedChipID == id
+
+        switch id {
+        case "back":
+            return .init(id: id, label: "Back", icon: .back, emphasis: isUnderTheWheel ? .selected : .plain)
+
+        case "settings":
+            return .init(id: id, label: "Settings", icon: .settings, emphasis: isUnderTheWheel ? .selected : .plain)
+
+        case "newFolder":
+            return .init(id: id, label: "New folder", icon: .newFolder,
+                         emphasis: highlightedChipID == id ? .selected : .plain)
+
+        case "sort":
+            return .init(
+                id: id,
+                label: level.sort.title,
+                icon: .sort,
+                // **Two things share this fill and they do not conflict.** A sort that is not the
+                // default is worth marking, and so is the wheel resting on it — either way the chip
+                // is the one to look at.
+                emphasis: isUnderTheWheel || level.sort != .newest ? .selected : .plain
+            )
+
+        case "repeat":
+            guard let transport else { return nil }
+            return .init(
+                id: id,
+                label: transport.repeatMode == .one ? "Repeat one" : "Repeat",
+                // `repeat.1` is the one repeat state a bare `repeat` glyph cannot say, which is why
+                // the icon follows the mode rather than the emphasis carrying all three.
+                icon: transport.repeatMode == .one ? .repeatOne : .repeatAll,
+                emphasis: transport.repeatMode == .off ? .plain : .selected
+            )
+
+        case "shuffle":
+            guard let transport else { return nil }
+            return .init(
+                id: id,
+                label: "Shuffle",
+                icon: .shuffle,
+                emphasis: transport.isShuffled ? .selected : .plain
+            )
+
+        default:
+            return nil
+        }
+    }
 
     /// Exactly one `.selected`, always — the selected index is clamped into the mode list, so there
     /// is no state in which a screen with modes shows none chosen.
@@ -310,19 +399,44 @@ extension DialNavigator {
 
     /// True only where `doublePress()` has something to do — which today is a highlighted recording.
     /// Everywhere else a press is instant, because there is no second meaning to wait for.
-    private var defersPress: Bool {
-        // Not on Import: there is no second meaning there, so waiting to find out whether a second
-        // press is coming would delay the one press that has nothing to wait for. Nor on a folder,
-        // which has no editor behind it — waiting there would make opening one feel slow for a
-        // second press that can never mean anything.
-        highlightedLibraryItem?.isFolder == false
-    }
+    /// **Nothing defers any more, and the mode is why.**
+    ///
+    /// The deferral existed for exactly one ambiguity: on the library a single press played and a
+    /// double press edited, so every single press had to wait to find out whether a second was
+    /// coming. With Listen and Record the press means one thing on each side of the fork — so the
+    /// wait bought nothing and cost `holdDuration` on every open.
+    private var defersPress: Bool { false }
 
     /// What the highlight is pointing at on a library list, or `nil` anywhere else. Folders count:
     /// they are the same list at a deeper level, drawn and turned through the same way.
     private var highlightedLibraryItem: DialContent.Item? {
         guard isFileList, currentItems.indices.contains(level.highlighted) else { return nil }
         return currentItems[level.highlighted]
+    }
+
+    /// The one verb each mode pins to the top of the card. Nothing else lives there.
+    ///
+    /// **Which verb is the navigator's answer, not this file's.** `pinnedActionID` decides it,
+    /// because `press` has to run the same one the row draws — two switches on `mode` in two files
+    /// is exactly the kind of pair that agrees until one of them is edited.
+    private var primaryAction: DialScreen.Chrome.PrimaryAction? {
+        guard let id = pinnedActionID else { return nil }
+        return id == "record"
+            ? .init(
+                id: id,
+                icon: .recording,
+                title: "Record",
+                subtitle: "Capture something new",
+                isLive: true,
+                isHighlighted: isPinnedActionHighlighted
+              )
+            : .init(
+                id: id,
+                icon: .importFile,
+                title: "Import",
+                subtitle: "Bring audio in from Files",
+                isHighlighted: isPinnedActionHighlighted
+              )
     }
 
     /// Whether this screen is a folder — asked in a couple of places that do not care which one.
@@ -344,8 +458,10 @@ extension DialNavigator {
         case .nowPlaying:
             guard content.playback != nil else { return nil }
             return DialScreen.Directions(
-                up: .init(id: "volumeUp", icon: .volumeUp, label: "Volume up"),
-                down: .init(id: "volumeDown", icon: .volumeDown, label: "Volume down"),
+                // The only two nudges that repeat while held — one shove is 5%, so crossing the
+                // range was twenty of them.
+                up: .init(id: "volumeUp", icon: .volumeUp, label: "Volume up", repeatsWhenHeld: true),
+                down: .init(id: "volumeDown", icon: .volumeDown, label: "Volume down", repeatsWhenHeld: true),
                 left: .init(id: "previous", icon: .previous, label: "Previous track"),
                 right: .init(id: "next", icon: .next, label: "Next track")
             )
@@ -356,7 +472,7 @@ extension DialNavigator {
         case .edit:
             guard content.editing != nil else { return nil }
             return DialScreen.Directions(
-                up: .init(id: "trim", icon: .edit, label: "Trim to selection"),
+                up: .init(id: "trim", icon: .trim, label: "Trim to selection"),
                 down: .init(id: "cut", icon: .delete, label: "Delete selection"),
                 // **Hearing the selection is the point of setting it.** Preview has moved three
                 // times — a chip, then the hub's settle state — and both homes were wrong for the
@@ -384,14 +500,39 @@ extension DialNavigator {
         //
         // Absent on the Import row: they act on the highlighted *recording*, and offering `Delete`
         // while the highlight is on Import is offering to delete nothing.
+        case .settings:
+            return nil
+
         case .recordings, .folder:
-            // Not on a folder either: all four act on a file, and a stick that lights up over a
-            // row none of them can answer is four controls promising something they refuse.
-            guard highlightedLibraryItem?.isFolder == false else { return nil }
+            guard let item = highlightedLibraryItem else { return nil }
+
+            // **A folder answers two of the four, and that is why it lights up at all now.**
+            //
+            // The stick was blank over a folder — every verb acted on a file, and four controls
+            // promising something they refuse is worse than none. That was true of `Share` and
+            // `Add to playlist`, which a folder genuinely cannot answer; it was never true of
+            // renaming or deleting one. The result was a library where folders could be made and
+            // browsed and then never touched again.
+            guard !item.isFolder else {
+                guard mode == .record else { return nil }
+                return DialScreen.Directions(
+                    up: .init(id: "rename", icon: .rename, label: "Rename folder"),
+                    down: .init(id: "delete", icon: .delete, label: "Delete folder")
+                )
+            }
+
+            // **Listen cannot destroy and Record cannot collect.** The stick is where that split is
+            // most visible — there is no mode indicator anywhere, so the verbs have to say it.
+            guard mode == .record else {
+                return DialScreen.Directions(
+                    left: .init(id: "add", icon: .playlist, label: "Add to playlist"),
+                    right: .init(id: "share", icon: .share, label: "Share")
+                )
+            }
             return DialScreen.Directions(
-                up: .init(id: "edit", icon: .edit, label: "Edit"),
+                up: .init(id: "rename", icon: .rename, label: "Rename"),
                 down: .init(id: "delete", icon: .delete, label: "Delete"),
-                left: .init(id: "add", icon: .playlist, label: "Add to playlist"),
+                left: .init(id: "move", icon: .move, label: "Move to folder"),
                 right: .init(id: "share", icon: .share, label: "Share")
             )
 
@@ -431,25 +572,63 @@ extension DialNavigator {
             return .position(axis == .trimEnd ? trim.outFraction : trim.inFraction)
 
         default:
-            return .browse(thumb: fraction(level.highlighted, of: currentRowCount))
+            // **Measured over the whole ring, both stops included** — the same span
+            // `moveHighlight` turns through. Counting only the rows leaves the thumb still while
+            // the highlight moves onto a control, which reports the wheel as stuck exactly where
+            // it is not.
+            return .browse(
+                thumb: fraction(level.highlighted - firstIndex, of: lastIndex - firstIndex + 1)
+            )
+        }
+    }
+
+    /// What the hub says while the wheel rests on a chip. Upper case like every other hub label,
+    /// and the chip's own words rather than a second vocabulary.
+    private func chipHubLabel(_ id: String) -> String {
+        switch id {
+        case "sort": return level.sort.next.hubLabel
+        default: return (chip(id)?.label ?? id).uppercased()
         }
     }
 
     private var hub: DialScreen.Hub {
+        // **A chip names itself, before the route gets a say.** The hub says what the thing under
+        // the highlight does, everywhere — and on Back it cannot say OPEN. Driven off
+        // `highlightedChipID` rather than a case per chip, so the next one added is named without
+        // anyone remembering to come here.
+        if let chip = highlightedChipID { return .label(chipHubLabel(chip)) }
+
         switch route {
-        case .chooseMode: .label("CHOOSE")
-        case .library: .label("OPEN")
-        // The hub says what *this row* does, which is the whole point of one button meaning
-        // something different everywhere. On Import it cannot say OPEN.
-        // Always OPEN: every row here is something to open, now that the two verbs are buttons.
-        case .recordings, .folder: .label("OPEN")
-        case .nowPlaying: .glyph(content.playback?.isPlaying == false ? "play.fill" : "pause.fill")
-        case .recording: .recordDot
+        case .library:
+            return .label("OPEN")
+
+        // The hub names what the row under it does, which on this screen is two different things.
+        case .settings:
+            return highlightedSetting?.cycles == false ? .label("OPEN") : .label("CHANGE")
+
+        // **The hub names the mode's verb.** A folder opens whichever job you are doing; a file
+        // plays in Listen and opens for editing in Record, and one button saying two things is the
+        // whole reason a mode exists rather than a second screen.
+        case .recordings, .folder:
+            // On the pinned stop the hub is the verb itself — the one row where PLAY and EDIT are
+            // both wrong.
+            if isPinnedActionHighlighted { return .label(mode == .record ? "RECORD" : "IMPORT") }
+            if highlightedLibraryItem?.isFolder == true { return .label("OPEN") }
+            return .label(mode == .record ? "EDIT" : "PLAY")
+
+        case .nowPlaying:
+            return .glyph(content.playback?.isPlaying == false ? "play.fill" : "pause.fill")
+        case .recording:
+            return .recordDot
         // One state, one meaning: `DONE` applies whichever operation the nudges armed. It briefly
         // had two — settle, then play — which stopped making sense once the nudges themselves
         // committed, and stopped existing when they went back to arming.
-        case .edit: .label("DONE")
-        case .confirmDelete: .label("CONFIRM")
+        case .edit:
+            return .label("DONE")
+        case .confirmDelete:
+            return .label("CONFIRM")
+        case .move:
+            return .label("FILE HERE")
         }
     }
 
@@ -458,22 +637,55 @@ extension DialNavigator {
     /// The only thing teaching rotate/press/hold, so it follows the mode rather than describing the
     /// screen in general — a caption that says "rotate to seek" while the wheel is set to Volume is
     /// worse than none.
-    private var hint: String {
-        switch route {
-        case .chooseMode:
-            return "rotate to switch mode · press to choose"
+    private func chipHint(_ id: String) -> String {
+        switch id {
+        case "back": return "go back"
+        case "settings": return "open settings"
+        case "sort": return "sort \(level.sort.next.hint)"
+        case "repeat": return "change repeat"
+        case "shuffle": return "toggle shuffle"
+        default: return (chip(id)?.label ?? id).lowercased()
+        }
+    }
 
+    private var hint: String {
+        if let chip = highlightedChipID {
+            return "press to \(chipHint(chip)) · rotate for the list"
+        }
+
+        switch route {
         case .library:
             return "rotate to browse · press to open · hold for now playing"
 
         case .recordings, .folder:
-            if currentItems.isEmpty {
-                return "nothing here yet · import or make a folder below"
+            // **The empty list is now a case of this one**, because clamping leaves the highlight
+            // on the pinned verb when there is nothing else to hold it. It used to end "press
+            // record below" while the control sat above — a caption pointing at where the button
+            // had been two revisions earlier.
+            if isPinnedActionHighlighted {
+                if currentItems.isEmpty {
+                    return mode == .record
+                        ? "nothing recorded yet · press to start one"
+                        : "nothing here yet · press to import"
+                }
+                return mode == .record
+                    ? "press to start recording · rotate for what you have"
+                    : "press to import from Files · rotate for your library"
             }
             if highlightedLibraryItem?.isFolder == true {
                 return "rotate to scroll · press to open the folder"
             }
-            return "rotate to scroll · press to open · double-press to edit"
+            return mode == .record
+                ? "rotate to scroll · press to trim · nudge to rename, delete or share"
+                : "rotate to scroll · press to play · nudge to add to a playlist or share"
+
+        case .settings:
+            return highlightedSetting?.cycles == false
+                ? "rotate to scroll · press to open"
+                : "rotate to scroll · press to change"
+
+        case .move:
+            return "rotate to choose a folder · press to file it there"
 
         case .nowPlaying:
             // One sentence, because the wheel does one thing. The segments beside and above it

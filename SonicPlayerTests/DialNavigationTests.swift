@@ -20,13 +20,6 @@ enum DialSample {
         }
     }
 
-    static let sections: [DialContent.Section] = [
-        .init(id: "playlists", icon: .playlist, title: "Playlists", count: 6),
-        .init(id: "recordings", icon: .recording, title: "Recordings", count: 12, destination: .recordings),
-        .init(id: "sessions", icon: .session, title: "Focus Sessions", count: 24),
-        .init(id: "podcasts", icon: .podcast, title: "Podcasts", count: 9),
-        .init(id: "stats", icon: .stats, title: "Stats")
-    ]
 
     static let playback = DialContent.Playback(
         title: "Deep Work, Chapter 4",
@@ -64,12 +57,27 @@ enum DialSample {
         editing: DialContent.Editable? = DialSample.editable
     ) -> DialContent {
         DialContent(
-            sections: sections,
             recordings: recordings(recordingCount),
             playback: playback,
             capture: capture,
             editing: editing
         )
+    }
+
+    /// **What a press asked to play, ignoring the queue it came with.**
+    ///
+    /// `.play` carries the whole ordered queue now — which is the fix for Next after a sort, and
+    /// which makes `effects.contains(.play(itemID:))` impossible to write without restating the
+    /// queue in every assertion. Most tests care which *track* opened; the ones that care about the
+    /// queue read it explicitly.
+    static func playedID(_ effects: [DialEffect]) -> String? {
+        for case .play(let itemID, _) in effects { return itemID }
+        return nil
+    }
+
+    static func playedQueue(_ effects: [DialEffect]) -> [String]? {
+        for case .play(_, let queue) in effects { return queue }
+        return nil
     }
 
     static func navigator(
@@ -84,16 +92,27 @@ enum DialSample {
         )
     }
 
-    /// Drills home → library, landing on the first file.
+    /// Drills home → library in **Listen** mode, landing on the first file.
     ///
-    /// **The tick that used to be here is gone.** Import was row 0, so the highlight arrived on it
-    /// and every test meaning "I am on a file" needed one detent first. The action rows are at the
-    /// bottom of the list now, so row 0 *is* the first recording and the tick would have landed on
-    /// the second — which is the kind of change that turns twenty passing tests into twenty tests
-    /// asserting the wrong file.
+    /// **Both ticks that used to be here are gone, for two different reasons.** The first stepped
+    /// across home's old five-section fixture to reach `Recordings`; home is now exactly two rows —
+    /// Listen and Record — so a detent there chooses the *other mode*, and every test built on this
+    /// would have been editing where it meant to play. The second stepped off the Import row, which
+    /// is a bar button now.
+    ///
+    /// Row 0 of home is Listen and row 0 of the library is the first file, so the helper is two
+    /// presses and no turning.
     static func inRecordings(recordingCount: Int = 12) -> DialNavigator {
         var navigator = navigator(recordingCount: recordingCount)
-        _ = navigator.receive(.tick(1))     // Playlists → Recordings
+        _ = navigator.receive(.press)       // home → Listen
+        return navigator
+    }
+
+    /// The same library with Record's verbs over it: press opens the editor, and the stick renames,
+    /// deletes and shares.
+    static func inRecordMode(recordingCount: Int = 12) -> DialNavigator {
+        var navigator = navigator(recordingCount: recordingCount)
+        _ = navigator.receive(.tick(1))     // home → Record
         _ = navigator.receive(.press)
         return navigator
     }
@@ -106,19 +125,21 @@ enum DialSample {
     /// home, like every other destination — and because the shared `sections` fixture has no such
     /// card, this builds its own.
     static func whileRecording() -> DialNavigator {
-        var content = content(recordingCount: 0, capture: capture)
-        content.sections = [
-            .init(id: "record", icon: .recording, title: "Record", destination: .recording)
-        ]
+        let content = content(recordingCount: 0, capture: capture)
         var navigator = DialNavigator(content: content, root: .library)
-        _ = navigator.receive(.press)
+        _ = navigator.receive(.tick(1))             // home → Record
+        _ = navigator.receive(.press)               // → the library, Record's verbs
+        _ = navigator.receive(.action("record"))    // the bar's Record button → the recorder
         return navigator
     }
 
-    /// Library → recordings → the trim editor (1e).
+    /// Home → Record → the trim editor.
+    ///
+    /// **A press, not a double press.** Editing was a second press on the library; it is what the
+    /// hub does in Record mode now, which is why the deferral could go.
     static func whileEditing() -> DialNavigator {
-        var navigator = inRecordings()
-        _ = navigator.receive(.doublePress)
+        var navigator = inRecordMode()
+        _ = navigator.receive(.press)
         return navigator
     }
 }
@@ -144,7 +165,7 @@ struct DialNavigationTests {
 
     /// The point of deriving it: three levels deep, nothing had to store its own header.
     @Test func theBreadcrumbGrowsWithTheStack() {
-        var navigator = DialSample.inRecordings()
+        var navigator = DialSample.inRecordMode()
 
         _ = navigator.receive(.action("delete"))
 
@@ -185,14 +206,18 @@ struct DialNavigationTests {
         #expect(list.highlighted == 4, "opened from row 4 — the helper starts on 0")
     }
 
-    @Test func aSectionWithNowhereToGoIsALimit() {
-        var navigator = DialSample.navigator()
-        _ = navigator.receive(.tick(4))        // Stats, which drills nowhere
+    /// **There is no section with nowhere to go any more.** Home was a menu of five destinations,
+    /// three of which led nowhere and answered with a limit. It is two jobs now, and both lead to
+    /// the same place — so the state this guarded cannot be constructed.
+    @Test func bothCardsLeadSomewhere() {
+        for row in 0..<2 {
+            var navigator = DialSample.navigator()
+            if row > 0 { _ = navigator.receive(.tick(row)) }
 
-        let effects = navigator.receive(.press)
+            _ = navigator.receive(.press)
 
-        #expect(effects == [.feedback(.limit)])
-        #expect(navigator.screen.chrome.breadcrumb == ["HOME"])
+            #expect(navigator.screen.chrome.breadcrumb == ["HOME", "LIBRARY"])
+        }
     }
 
     // MARK: - Hold
@@ -227,16 +252,20 @@ struct DialNavigationTests {
 
     /// The contract's rule: every double-press must also be reachable as a chip, and both must
     /// arrive at the same code.
-    @Test func theEditChipAndTheDoublePressAgree() {
-        var byChip = DialSample.inRecordings()
-        var byWheel = DialSample.inRecordings()
+    /// **Editing has one route now.** It was a chip and a double press, kept in agreement by this
+    /// test; both are gone, and the hub in Record mode is the only way in.
+    @Test func theEditorIsReachedByPressingInRecordMode() {
+        var navigator = DialSample.inRecordMode()
 
-        let chipEffects = byChip.receive(.action("edit"))
-        let wheelEffects = byWheel.receive(.doublePress)
+        _ = navigator.receive(.press)
 
-        #expect(chipEffects == wheelEffects)
-        #expect(byChip.screen == byWheel.screen)
-        #expect(byChip.screen.chrome.breadcrumb == ["HOME", "LIBRARY", "EDIT"])
+        #expect(navigator.screen.chrome.breadcrumb == ["HOME", "LIBRARY", "EDIT"])
+
+        // `#expect` captures its expression in a closure, so a `mutating` call inside one fails to
+        // compile against an immutable copy — the note at the top of this suite, in practice.
+        var listening = DialSample.inRecordings()
+        let doublePress = listening.receive(.doublePress)
+        #expect(doublePress.isEmpty, "and nothing else reaches the editor")
     }
 
     /// **The invariant that keeps `.doublePress` reachable at all.**
@@ -251,17 +280,13 @@ struct DialNavigationTests {
     /// it got, and every other press fires instantly. This test is what stops that flag drifting
     /// away from the screens `doublePress()` actually handles — if they ever disagree again, the
     /// gesture dies silently a second time.
-    @Test func onlyAScreenWithASecondMeaningDefersItsPress() {
-        let library = DialSample.navigator()
-        #expect(!library.screen.ring.defersPress, "the library has no double-press meaning")
-
-        var recordings = DialSample.inRecordings()
-        #expect(recordings.screen.ring.defersPress, "a highlighted recording can be edited")
-
-        // Opening that recording lands somewhere with no second meaning, so presses go back to
-        // being instant — the 300ms is paid on exactly one screen, not carried around.
-        _ = recordings.receive(.press)
-        #expect(!recordings.screen.ring.defersPress)
+    /// **Nothing defers any more.** The wait existed for one ambiguity — a press played and a
+    /// double press edited — and the mode took it: the press means one thing on each side of the
+    /// fork. Every press is instant now, including the one that used to pay for the ambiguity.
+    @Test func nothingDefersItsPress() {
+        #expect(!DialSample.navigator().screen.ring.defersPress, "home")
+        #expect(!DialSample.inRecordings().screen.ring.defersPress, "Listen")
+        #expect(!DialSample.inRecordMode().screen.ring.defersPress, "Record — the press *is* edit")
     }
 
     /// A gesture with no meaning here is silent rather than a limit: nothing was pushed against.

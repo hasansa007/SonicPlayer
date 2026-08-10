@@ -25,7 +25,10 @@ enum DialIcon {
         case .next: "forward.end.fill"
         case .pause: "pause.fill"
         case .play: "play.fill"
-        case .edit: "slider.horizontal.below.rectangle"
+        // **Scissors, not a slider.** `slider.horizontal.below.rectangle` is what an editor
+        // *is*, and this nudge is one specific thing an editor does — keep the selection and cut
+        // everything outside it. On a four-way stick beside a bin, the glyph has to say which cut.
+        case .trim: "scissors"
         case .more: "ellipsis"
         case .share: "square.and.arrow.up"
         case .export: "arrow.down.doc"
@@ -35,6 +38,18 @@ enum DialIcon {
         case .repeatOff, .repeatAll: "repeat"
         case .repeatOne: "repeat.1"
         case .shuffle: "shuffle"
+        // **A list, not a chevron.** A chevron says only "backwards", which on a stack of eight
+        // screens is a direction and not a destination. Every level below the root pops to a list —
+        // the library, or home — so the glyph can name where it goes instead of which way.
+        case .back: "list.bullet"
+        case .settings: "gearshape.fill"
+        // **The same glyph in all three orders.** Three arrow variants would be three things to
+        // learn for a control whose result is the list directly underneath it — the order is read
+        // off the rows, not off the button. Which order is current is in the accessibility label,
+        // and the fill says it is not the default.
+        case .sort: "arrow.up.arrow.down"
+        case .newFolder: "folder.badge.plus"
+        case .move: "folder"
         case .none: nil
         }
     }

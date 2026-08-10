@@ -43,6 +43,14 @@ struct DialRing: View {
     /// How far the gear stick has been pushed, and in which direction.
     @State private var nudge: CGSize = .zero
     @State private var didNudge = false
+    /// Fires the held direction over and over. Nil whenever the stick is not resting on a
+    /// repeatable one — which is most of the time, and every direction on every other screen.
+    @State private var repeatTask: Task<Void, Never>?
+    /// Which direction the repeat is running for, so moving the thumb from up to down restarts it
+    /// rather than carrying on raising the volume.
+    @State private var repeatingID: String?
+    /// Whether the repeat has fired at least once, which is what makes the release silent.
+    @State private var didRepeat = false
     /// A single press held back while we find out whether a second one is coming. Only ever
     /// non-nil on a screen whose `defersPress` is true.
     @State private var pendingPress: Task<Void, Never>?
@@ -444,6 +452,8 @@ struct DialRing: View {
                     onCommand(.nudgeEngaged)
                 }
 
+                startRepeatIfNeeded(for: value.translation)
+
                 // Follow the thumb, bounded, so the stick reads as a stick rather than as a button
                 // that happens to react.
                 nudge = CGSize(
@@ -456,6 +466,13 @@ struct DialRing: View {
                 holdTask = nil
                 isHubPressed = false
                 nudge = .zero
+
+                let repeated = didRepeat
+                stopRepeating()
+                // **A held nudge has already done its work.** Firing again on release would make
+                // every hold one step longer than the thumb asked for, which on volume is the one
+                // place you notice — you let go *at* the level you wanted.
+                if repeated { return }
 
                 // **The direction is read before `didHold` is consulted, and the order is the
                 // fix.** Cancelling the hold on threshold only helps a push that crosses 16pt
@@ -470,6 +487,43 @@ struct DialRing: View {
                 guard !didHold else { return }
                 registerPress()
             }
+    }
+
+    /// **Holding a repeatable direction keeps it firing**, after a pause long enough that an
+    /// ordinary nudge is still one step.
+    ///
+    /// Restarting when the thumb crosses to a different direction is what stops a slide from up to
+    /// down carrying on raising the volume — the gesture is continuous, and the direction under it
+    /// is not.
+    private func startRepeatIfNeeded(for translation: CGSize) {
+        guard didNudge, let id = directionID(for: translation) else { return }
+        guard id != repeatingID else { return }
+
+        stopRepeating()
+        guard direction(id)?.repeatsWhenHeld == true else { return }
+
+        repeatingID = id
+        repeatTask = Task {
+            try? await Task.sleep(for: .seconds(Self.repeatDelay))
+            while !Task.isCancelled {
+                didRepeat = true
+                onCommand(.action(id))
+                try? await Task.sleep(for: .seconds(Self.repeatInterval))
+            }
+        }
+    }
+
+    private func stopRepeating() {
+        repeatTask?.cancel()
+        repeatTask = nil
+        repeatingID = nil
+        didRepeat = false
+    }
+
+    private func direction(_ id: String) -> DialScreen.Direction? {
+        [directions?.up, directions?.down, directions?.left, directions?.right]
+            .compactMap { $0 }
+            .first { $0.id == id }
     }
 
     /// Which of *this screen's* directions the stick reached, or `nil` for a tap.
@@ -501,6 +555,13 @@ struct DialRing: View {
 
     /// How far the stick has to move before it counts. Above a thumb's resting wobble, below the
     /// distance that would feel like a drag.
+    /// How long the stick must be held before it starts repeating. Long enough that a deliberate
+    /// single nudge — which is a shove and a release — never trips it.
+    private static let repeatDelay: TimeInterval = 0.45
+    /// And how fast it goes once it has. At 5% a step this crosses the range in about 1.6 seconds,
+    /// which is the pace of a hardware volume rocker rather than of a scrub.
+    private static let repeatInterval: TimeInterval = 0.08
+
     private static let nudgeThreshold: CGFloat = 16
     /// How far it is allowed to travel while you hold it.
     private static let nudgeTravel: CGFloat = 22

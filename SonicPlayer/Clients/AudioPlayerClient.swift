@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
 import MediaPlayer
+import UIKit
 
 struct AudioPlayerClient: Sendable {
     var prepare: @Sendable (URL) async throws -> Void
@@ -20,6 +21,25 @@ struct AudioPlayerClient: Sendable {
     ///
     /// Defaulted, so every `.test` client and every existing initialiser keeps compiling.
     var setVolume: @Sendable (Float) async -> Void = { _ in }
+
+    /// **Writes the device's level.** Paired with `systemVolumeUpdates`, this is what makes the
+    /// dial's volume the phone's volume rather than a second one beside it.
+    ///
+    /// See `SystemVolumeControl` for the cost, which is real and was accepted deliberately.
+    var setSystemVolume: @Sendable (Float) async -> Void = { _ in }
+
+    /// The device's level as it changes — seeded immediately, then every hardware button press,
+    /// Control Centre drag and route change.
+    var systemVolumeUpdates: @Sendable () async -> AsyncStream<Float> = { AsyncStream { $0.finish() } }
+
+    /// **The device's level, read-only.** `AVAudioSession.outputVolume` is the one half of system
+    /// volume an app may have without cost: reading it and observing it are free, and only
+    /// *writing* it needs the `MPVolumeView` that suppresses the hardware HUD.
+    ///
+    /// Used to seed this app's gain at launch, so the dial opens at the level the phone is actually
+    /// at rather than at full — see `PlayerViewModel.setVolume`. Defaulted to 1 so `.test` clients
+    /// and every existing initialiser keep compiling, and so a stub is the old behaviour exactly.
+    var systemVolume: @Sendable () async -> Float = { 1 }
     var skipForward: @Sendable (TimeInterval) async -> Void
     var skipBackward: @Sendable (TimeInterval) async -> Void
     var updateNowPlaying: @Sendable () async -> Void
@@ -58,6 +78,31 @@ extension AudioPlayerClient {
             },
             setVolume: { volume in
                 await player.setVolume(volume)
+            },
+            setSystemVolume: { level in
+                await SystemVolumeControl.shared.set(level)
+            },
+            systemVolumeUpdates: {
+                AsyncStream { continuation in
+                    let session = AVAudioSession.sharedInstance()
+                    try? session.setActive(true)
+                    continuation.yield(session.outputVolume)
+
+                    // KVO rather than a notification: `outputVolume` is the documented observable,
+                    // and it fires for the hardware buttons, Control Centre and a route change to
+                    // headphones alike — all three are "the device's level moved under us".
+                    let observation = session.observe(\.outputVolume, options: [.new]) { _, change in
+                        guard let level = change.newValue else { return }
+                        continuation.yield(level)
+                    }
+                    continuation.onTermination = { _ in observation.invalidate() }
+                }
+            },
+            systemVolume: {
+                // Activating first: before the session is active the value is documented as
+                // unreliable, and at cold launch this is read early enough to matter.
+                try? AVAudioSession.sharedInstance().setActive(true)
+                return AVAudioSession.sharedInstance().outputVolume
             },
             skipForward: { interval in
                 await player.skip(by: interval)
@@ -354,4 +399,61 @@ private final class AudioPlayerManager: NSObject, ObservableObject {
             return .success
         }
     }
+}
+
+
+/// **The one way an app can set the system volume, and what it costs.**
+///
+/// There is no public setter for `AVAudioSession.outputVolume`. The only route is the `UISlider`
+/// that `MPVolumeView` embeds: put the view in the window, move its slider, and the device level
+/// moves with it.
+///
+/// **The cost is the hardware HUD.** An `MPVolumeView` in the window is precisely how an app
+/// *suppresses* the system volume overlay — so pressing the buttons stops drawing anything. That is
+/// not a bug to be worked around and there is no API to summon the overlay back; an app may only
+/// suppress it.
+///
+/// **It is accepted here on purpose**, and the dial's own volume arc is what was built to replace
+/// it: the ring reports the level while it changes and fades out after `volumeLinger`. This was
+/// tried, reverted for exactly this reason while the app had no indicator of its own, and taken
+/// back up once it did. If the arc is ever removed, this has to go with it.
+///
+/// Off-screen at 1×1 rather than hidden: `isHidden` stops the embedded slider responding at all on
+/// some iOS versions, and a zero-size frame has the same problem. One point, parked outside the
+/// bounds, is the shape that works.
+@MainActor
+final class SystemVolumeControl {
+
+    static let shared = SystemVolumeControl()
+
+    private let host = MPVolumeView(frame: CGRect(x: -offscreen, y: -offscreen, width: 1, height: 1))
+    private var isAttached = false
+
+    private var slider: UISlider? {
+        host.subviews.compactMap { $0 as? UISlider }.first
+    }
+
+    func set(_ level: Float) {
+        attachIfNeeded()
+        guard let slider else { return }
+        slider.setValue(min(max(0, level), 1), animated: false)
+        // **The value alone does nothing.** `MPVolumeView`'s slider only pushes the level through
+        // when it thinks a finger let go of it, so the action has to be sent by hand.
+        slider.sendActions(for: .touchUpInside)
+    }
+
+    /// Attached lazily, so a launch that never touches volume never adds the view — and therefore
+    /// never suppresses the HUD before the user has asked for anything.
+    private func attachIfNeeded() {
+        guard !isAttached else { return }
+        let window = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }
+        guard let window else { return }
+        window.addSubview(host)
+        isAttached = true
+    }
+
+    private static let offscreen: CGFloat = 1000
 }

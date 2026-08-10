@@ -46,7 +46,7 @@ private extension DialScreen.Icon {
     /// the design. Listed here instead, where forgetting to add a case costs only this test.
     static let allDialCases: [DialScreen.Icon] = [
         .playlist, .recording, .session, .podcast, .stats, .marker, .importFile, .library,
-        .volumeUp, .volumeDown, .previous, .next, .pause, .play, .edit, .more,
+        .volumeUp, .volumeDown, .previous, .next, .pause, .play, .trim, .more,
         .share, .export, .rename, .delete, .add, .none
     ]
 }

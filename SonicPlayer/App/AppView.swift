@@ -22,29 +22,10 @@ struct AppView: View {
                 // player is the root, and everything else — recordings, now playing, recording —
                 // is a level of the dial's own stack rather than a separate destination.
                 //
-                // The `NavigationStack` stays only because Settings is still a push. When Settings
-                // becomes a dial route it goes too.
+                // **The toolbar gear is gone with the push.** Settings is a dial route now, reached
+                // from the gear in the card's own header — there were briefly two of them, one in a
+                // navigation bar the rest of the app hides.
                 dialRoot
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button {
-                                app.isSettingsPresented = true
-                            } label: {
-                                Image(systemName: "gearshape.fill")
-                                    .foregroundColor(.sonicTextSecondary)
-                            }
-                        }
-                    }
-                    .navigationDestination(isPresented: isSettingsPresented) {
-                        SettingsView(viewModel: app.settings)
-                            // **Explicit, not inherited.** The dial root hides the navigation bar,
-                            // and a pushed screen that inherits that has no back button — which is
-                            // a trap rather than a style choice. Stating it here means Settings
-                            // cannot be reached and then not left.
-                            .toolbar(.visible, for: .navigationBar)
-                            .navigationTitle("Settings")
-                            .navigationBarTitleDisplayMode(.inline)
-                    }
                     .alert("Delete \(filesRoot.pendingDeleteCount) \(filesRoot.pendingDeleteCount == 1 ? "item" : "items")?",
                            isPresented: $filesRoot.isConfirmingDelete) {
                         Button("Delete", role: .destructive) { filesRoot.confirmDelete() }
@@ -57,6 +38,13 @@ struct AppView: View {
                         TextField("Name", text: $filesRoot.inputText)
                         Button("Create") { filesRoot.confirmNameInput() }
                         Button("Cancel", role: .cancel) { filesRoot.cancelNameInput() }
+                    }
+                    // Naming a folder the dial asked for. The dial has no text entry, so this is
+                    // where a `createFolder` effect turns into a folder.
+                    .alert("New Folder", isPresented: $app.isNamingNewFolder) {
+                        TextField("Name", text: $app.newFolderName)
+                        Button("Create") { app.confirmNewFolder(named: app.newFolderName) }
+                        Button("Cancel", role: .cancel) { app.isNamingNewFolder = false }
                     }
                     .alert("Rename", isPresented: isRenaming) {
                         TextField("Name", text: $filesRoot.inputText)
@@ -121,18 +109,20 @@ struct AppView: View {
                 app.importPickedFiles(urls)
             }
         }
-        .alert("New Folder", isPresented: Binding(
-            get: { app.isNamingNewFolder },
-            set: { app.isNamingNewFolder = $0 }
+        // **About and Help outlived the screen that presented them.** They were pushed from inside
+        // `SettingsView`; Settings is a dial screen now, so they are presented from here — over the
+        // dial rather than inside a navigation stack that no longer exists.
+        .sheet(isPresented: Binding(
+            get: { app.settings.showAbout },
+            set: { if !$0 { app.settings.dismissAbout() } }
         )) {
-            TextField("Name", text: Binding(
-                get: { app.newFolderName },
-                set: { app.newFolderName = $0 }
-            ))
-            Button("Cancel", role: .cancel) { app.isNamingNewFolder = false }
-            Button("Create") { app.confirmNewFolder() }
-        } message: {
-            Text("Group recordings together.")
+            NavigationStack { AboutView(viewModel: app.settings) }
+        }
+        .sheet(isPresented: Binding(
+            get: { app.settings.showHelp },
+            set: { if !$0 { app.settings.dismissHelp() } }
+        )) {
+            NavigationStack { HelpView(viewModel: app.settings) }
         }
         .onChange(of: scenePhase) { _, newPhase in
             app.scenePhaseChanged(newPhase)
@@ -198,12 +188,6 @@ private extension AppView {
         )
     }
 
-    var isSettingsPresented: Binding<Bool> {
-        Binding(
-            get: { app.isSettingsPresented },
-            set: { if !$0 { app.isSettingsPresented = false } }
-        )
-    }
 
     var isImportSheetPresented: Binding<Bool> {
         Binding(
@@ -226,6 +210,12 @@ private extension AppView {
     var dialRoot: some View {
         DialScreenView(screen: app.dial.screen) { app.dial.receive($0) }
             .onAppear { app.refreshDial() }
+            // **The dial's volume is the phone's volume.** This stream seeds it on the first
+            // value — so the ring opens at the device's level rather than at a default of full —
+            // and then keeps it there through every hardware press and Control Centre drag. It runs
+            // for the lifetime of the view, which is the lifetime of the app.
+            .task { await app.player.observeSystemVolume() }
+            .onChange(of: app.player.volume) { _, _ in app.refreshDial() }
             .onChange(of: app.player.currentTime) { _, _ in app.refreshDial() }
             .onChange(of: app.player.isPlaying) { _, _ in app.refreshDial() }
             .onChange(of: app.player.currentTrack) { _, track in
@@ -236,8 +226,17 @@ private extension AppView {
             }
             .onChange(of: app.home.allFiles) { _, _ in app.refreshDial() }
             .onChange(of: app.recording.isRecording) { _, _ in app.refreshDial() }
-            .onChange(of: app.recording.peakLevel) { _, _ in app.refreshDial() }
-            // Pausing stops the meter, so `peakLevel` stops changing — without this the screen
+            // **The clock, not the microphone.** This watched `peakLevel`, and the meter loop sets
+            // the time, the peak and the waveform sample in one 100ms tick — so any of them looks
+            // like it would do. It does not: in a quiet room consecutive peak readings are
+            // *identical*, `onChange` does not fire on an equal value, and the running timer
+            // stopped for as long as the room stayed the same. It advanced when you made a noise,
+            // which is a clock that appears to stall and then catch up.
+            //
+            // `recordingTime` changes on every tick by construction, and it is the value on screen.
+            // Watching it covers the meter and the waveform too, since they arrive together.
+            .onChange(of: app.recording.recordingTime) { _, _ in app.refreshDial() }
+            // Pausing stops the meter, so `recordingTime` stops changing — without this the screen
             // would keep the running state it had at the moment the take was paused (#75).
             .onChange(of: app.recording.isPaused) { _, _ in app.refreshDial() }
             // A marker must appear under the thumb, not up to a meter interval later.

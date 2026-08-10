@@ -56,35 +56,80 @@ struct DialHighlightTests {
 
     // MARK: - The ends, which are no longer ends
 
-    /// **The list wraps in both directions.** It clamped until `Delete` got a confirmation dialog —
-    /// the whole argument for a wall was that overshooting the top of the actions menu would land a
-    /// thumb on the destructive row. Guarded, that objection goes, and a wheel with no ends stops
-    /// having to explain which end you are against through a pulse that means four other things.
-    @Test func turningBackPastTheFirstRowLandsOnTheLast() {
+    /// **The ring is the card, top to bottom — not just the list.**
+    ///
+    /// Three files inside the library is **seven** positions, in the order they are drawn:
+    ///
+    ///     -1  the pinned verb, above the list
+    ///      0  1  2   the files
+    ///      3  4  5   the chips: Back, New folder, Sort
+    ///
+    /// Every count in this section is that count, which is why they all move together every time a
+    /// chip is added — the arithmetic is deliberately in one place so that is the only cost. A stop
+    /// that is not a row reports `list.highlighted == -1`, because on it no *row* is highlighted;
+    /// the clamp that used to hand the cursor back to the nearest row drew two selections at once.
+    @Test func turningBackPastTheFirstRowLandsOnTheVerb() {
         var navigator = DialSample.inRecordings(recordingCount: 3)
 
         let effects = navigator.receive(.tick(-1))
 
-        #expect(highlight(navigator) == 2, "three files — back off the first is the last")
+        #expect(navigator.isPinnedActionHighlighted, "back off the first row is Import")
+        #expect(highlight(navigator) == -1, "and no row wears the cursor")
         #expect(effects == [.feedback(.detent)], "a move is a detent, not a wall")
     }
 
-    @Test func turningPastTheLastRowLandsOnTheFirst() {
+    /// **The ring still wraps in both directions.** It clamped until `Delete` got a confirmation
+    /// dialog — the whole argument for a wall was that overshooting the top of the actions menu
+    /// would land a thumb on the destructive row. Guarded, that objection goes, and a wheel with no
+    /// ends stops having to explain which end you are against through a pulse that means four other
+    /// things. The stops are two more positions on that ring, not walls at the ends of it.
+    @Test func turningBackPastTheVerbLandsOnTheLastChip() {
+        var navigator = DialSample.inRecordings(recordingCount: 3)
+
+        _ = navigator.receive(.tick(-2))
+
+        #expect(navigator.highlightedChipID == "sort", "past the top is round to the last chip")
+    }
+
+    @Test func turningPastTheLastRowLandsOnBack() {
         var navigator = DialSample.inRecordings(recordingCount: 3)
         _ = navigator.receive(.tick(2))             // the last file, row 2
 
         let effects = navigator.receive(.tick(1))
 
-        #expect(highlight(navigator) == 0)
+        #expect(navigator.isBackHighlighted)
+        #expect(highlight(navigator) == -1)
         #expect(effects == [.feedback(.detent)])
     }
 
-    /// A flick far larger than the list still lands somewhere sensible rather than running out of
-    /// bounds — `detents` is reduced modulo the row count before it is applied.
-    @Test func aFlickLongerThanTheListStillLands() {
-        var navigator = DialSample.inRecordings(recordingCount: 3)   // 3 rows, highlight on 0
+    @Test func theChipsAreTheNextThreeStopsInDrawOrder() {
+        var navigator = DialSample.inRecordings(recordingCount: 3)
+        _ = navigator.receive(.tick(2))            // the last file
 
-        let effects = navigator.receive(.tick(40))                   // 40 % 3 == 1
+        _ = navigator.receive(.tick(1))
+        #expect(navigator.highlightedChipID == "back")
+        _ = navigator.receive(.tick(1))
+        #expect(navigator.highlightedChipID == "newFolder")
+        _ = navigator.receive(.tick(1))
+        #expect(navigator.highlightedChipID == "sort")
+        _ = navigator.receive(.tick(1))
+        #expect(navigator.isPinnedActionHighlighted, "and round to the verb above the list")
+    }
+
+    @Test func aFullRevolutionComesBackToTheFirstRow() {
+        var navigator = DialSample.inRecordings(recordingCount: 3)
+
+        _ = navigator.receive(.tick(7))            // seven positions
+
+        #expect(highlight(navigator) == 0)
+    }
+
+    /// A flick far larger than the list still lands somewhere sensible rather than running out of
+    /// bounds — `detents` is reduced modulo the ring before it is applied.
+    @Test func aFlickLongerThanTheListStillLands() {
+        var navigator = DialSample.inRecordings(recordingCount: 3)   // 7 positions, highlight on 0
+
+        let effects = navigator.receive(.tick(43))                   // 43 % 7 == 1
 
         #expect(highlight(navigator) == 1)
         #expect(effects == [.feedback(.detent)])
@@ -94,9 +139,9 @@ struct DialHighlightTests {
     /// started, and a tick that changes nothing reports `.limit` — the law this suite opens with,
     /// which wrapping does not repeal.
     @Test func awholeNumberOfRevolutionsChangesNothing() {
-        var navigator = DialSample.inRecordings(recordingCount: 3)   // 3 rows
+        var navigator = DialSample.inRecordings(recordingCount: 3)   // 7 positions
 
-        let effects = navigator.receive(.tick(39))                   // 39 % 3 == 0
+        let effects = navigator.receive(.tick(42))                   // 42 % 7 == 0
 
         #expect(highlight(navigator) == 0)
         #expect(effects == [.feedback(.limit)])
@@ -104,29 +149,39 @@ struct DialHighlightTests {
 
     // MARK: - Nothing to scroll
 
-    /// One row cannot wrap onto itself, and neither can none. An empty library is now genuinely
-    /// empty — Import and New folder left the list for the bottom bar — so there is nothing to turn
-    /// through at all, and the wheel says so rather than pretending.
-    @Test func aListWithNothingInItHasNothingToMoveAndSaysSo() {
-        var navigator = DialSample.navigator(recordingCount: 0)
-        _ = navigator.receive(.tick(1))
-        _ = navigator.receive(.press)
+    /// **Nothing is immovable any more, and that is the point of the stops.**
+    ///
+    /// This asserted that an empty library has nothing to turn through — true while the list was
+    /// the whole ring. An empty library still has its verb and its Back, so there are two positions
+    /// and the wheel moves between them. A screen you can turn on is a screen you can operate
+    /// without touching it, which is the whole of what these two changes were for.
+    @Test func evenAnEmptyListHasItsTwoControlsToTurnBetween() {
+        var navigator = DialSample.inRecordings(recordingCount: 0)
+        #expect(navigator.isPinnedActionHighlighted, "and it opens on the verb, not on the way out")
 
         let effects = navigator.receive(.tick(1))
 
-        #expect(effects == [.feedback(.limit)])
+        #expect(effects == [.feedback(.detent)])
+        #expect(navigator.isBackHighlighted)
     }
 
-    /// A single file is the same fact one row up.
-    @Test func aSingleRowListCannotWrapOntoItself() {
+    /// One file is five positions: Import, the file, then the three chips.
+    @Test func aSingleFileSitsAmongItsControls() {
         var navigator = DialSample.inRecordings(recordingCount: 1)
 
-        #expect(navigator.receive(.tick(1)) == [.feedback(.limit)])
+        #expect(navigator.receive(.tick(1)) == [.feedback(.detent)])
+        #expect(navigator.isBackHighlighted)
+
+        _ = navigator.receive(.tick(3))
+        #expect(navigator.isPinnedActionHighlighted, "past the last chip and round")
     }
 
     // MARK: - The ring follows the highlight
 
-    /// `Ticks.browse(thumb:)` exists to light the tick you are on, so it has to track the row.
+    /// `Ticks.browse(thumb:)` exists to light the tick you are on, so it has to track the
+    /// highlight — **measured along the whole ring, both stops included.** Counting only the files
+    /// would leave the thumb still while the highlight moved onto a control, which reports the
+    /// wheel as stuck exactly where it is not.
     @Test func theRingsThumbFollowsTheHighlight() {
         var navigator = DialSample.inRecordings(recordingCount: 5)
 
@@ -136,16 +191,29 @@ struct DialHighlightTests {
             Issue.record("expected browse ticks, got \(navigator.screen.ring.ticks)")
             return
         }
-        #expect(abs((thumb ?? .nan) - 0.5) < 1e-9, "row 2 of five files")
+        // Import, five files, three chips — nine positions, and row 2 is the fourth of them.
+        #expect(abs((thumb ?? .nan) - 0.375) < 1e-9)
     }
 
-    /// A one-row list has no span to place a thumb along. Only an empty library is one row now —
-    /// a single file is two, because Import is always above it.
-    @Test func aSingleRowHasNoThumbToPlace() {
-        var navigator = DialSample.navigator(recordingCount: 0)
-        _ = navigator.receive(.tick(1))
-        _ = navigator.receive(.press)
+    @Test func theThumbSitsAtEachEndOnTheFirstAndLastStop() {
+        var navigator = DialSample.inRecordings(recordingCount: 5)
 
-        #expect(navigator.screen.ring.ticks == .browse(thumb: nil))
+        _ = navigator.receive(.tick(-1))
+        #expect(navigator.screen.ring.ticks == .browse(thumb: 0), "Import is the top of the travel")
+
+        _ = navigator.receive(.tick(-1))
+        #expect(navigator.screen.ring.ticks == .browse(thumb: 1), "and the last chip is the bottom")
+    }
+
+    /// **There is no thumbless browse screen left.**
+    ///
+    /// This asserted that an empty library has no span to place a thumb along, which held while the
+    /// list was the whole ring — no rows, nothing to point at. It has two controls now, so it has a
+    /// span of two and the thumb sits at the top of it, on the verb the screen opens on.
+    @Test func anEmptyListPlacesItsThumbOnTheVerbItOpensOn() {
+        let navigator = DialSample.inRecordings(recordingCount: 0)
+
+        #expect(navigator.isPinnedActionHighlighted)
+        #expect(navigator.screen.ring.ticks == .browse(thumb: 0))
     }
 }

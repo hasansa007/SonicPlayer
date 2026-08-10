@@ -11,12 +11,12 @@ import Foundation
 /// not a place you navigated to — making it a route would mean something had to decide to push it,
 /// and that decision would be wrong for exactly as long as it took to record something.
 enum DialRoute: Equatable {
-    /// 1h — listen or record, the fork before anything else.
-    case chooseMode
     /// 1a — library home.
     case library
     /// 1b, or 1g when there are none.
     case recordings
+    /// Preferences, as rows you turn to and press.
+    case settings
     /// A folder inside the library — which is also what a playlist is.
     ///
     /// **The stack is the path.** There is no stored folder URL and no parent pointer: the items
@@ -38,12 +38,22 @@ enum DialRoute: Equatable {
     /// care mattered most.
     case confirmDelete(itemID: String)
 
+    /// Choosing a folder to move a recording into.
+    ///
+    /// **A pushed screen rather than a modal picker**, because filing something is navigation and
+    /// the dial navigates. The sheet it replaces was reached by a nudge and then operated by a
+    /// finger, which put a second input model in the middle of a dial flow.
+    ///
+    /// **Flattened, not nested.** Descending to file something means walking a tree you are not
+    /// browsing — every level a chance to lose the thing you were moving. One list of paths is one
+    /// turn and one press however deep the destination is.
+    case move(itemID: String)
+
     /// The header segment, uppercased. `nil` contributes nothing — the mode chooser is a fork
     /// rather than a place, and `DialScreen.Chrome` says an empty breadcrumb is valid.
     ///
     func crumb(in content: DialContent) -> String? {
         switch self {
-        case .chooseMode: nil
         // **`HOME` and `LIBRARY`, not `LIBRARY` and `RECORDINGS`.** The card that opens the second
         // screen has always been labelled *Library*, while the screen itself said *Recordings* and
         // listed every audio file the app can see — podcasts and imports included. Two names for
@@ -52,6 +62,7 @@ enum DialRoute: Equatable {
         // Renaming only the second would have read `LIBRARY ▸ LIBRARY`, so the root took the name
         // it actually has: it is a menu you start from, not a library.
         case .library: "HOME"
+        case .settings: "SETTINGS"
         case .recordings: "LIBRARY"
         // The folder's own name, so the header reads HOME ▸ LIBRARY ▸ LECTURES rather than
         // repeating LIBRARY at every depth.
@@ -60,6 +71,7 @@ enum DialRoute: Equatable {
         case .recording: "RECORDING"
         case .edit: "EDIT"
         case .confirmDelete: "DELETE"
+        case .move: "MOVE"
         }
     }
 
@@ -126,12 +138,13 @@ enum DialRoute: Equatable {
     /// It reads off the route for the same reason `countsRows` does: the alternative is inferring
     /// it from the row count in the view, and the library home legitimately has two rows or three
     /// depending on whether anything is loaded (`DialScreen.List.isProminent` has the full story).
-    var showsProminentRows: Bool {
-        switch self {
-        case .chooseMode, .library: true
-        default: false
-        }
-    }
+    /// **Nothing is prominent any more.**
+    ///
+    /// Home's two entries were 1:1 cards, which made the fork the biggest thing in the app and left
+    /// a card whose height did not match any other screen's. As rows they sit in the same container
+    /// as everything else, and the card is the same height wherever you are — which is what makes
+    /// the dial below it stop moving between screens.
+    var showsProminentRows: Bool { false }
 }
 
 /// What a tick of the wheel changes.
@@ -189,7 +202,7 @@ enum DialItemAction: String, Equatable, CaseIterable {
     /// so a symbol that reads wrong is a control that lies.
     var icon: DialScreen.Icon {
         switch self {
-        case .edit: .edit
+        case .edit: .trim
         case .share: .share
         case .addToPlaylist: .playlist
         case .delete: .delete

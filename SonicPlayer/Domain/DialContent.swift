@@ -30,17 +30,6 @@ struct DialContent: Equatable {
         return search(recordings)
     }
 
-    /// A row on the library home (1a). `destination` is what pressing it opens — nil for a section
-    /// that counts something but has nowhere to go yet, which is most of them in this slice.
-    struct Section: Equatable, Identifiable {
-        var id: String
-        var icon: DialScreen.Icon
-        var title: String
-        var count: Int?
-        var destination: DialRoute?
-        /// A second line, e.g. what a section contains.
-        var subtitle: String?
-    }
 
     /// A recording, or a folder of them (1b).
     ///
@@ -60,6 +49,13 @@ struct DialContent: Equatable {
 
         var isFolder: Bool { children != nil }
     }
+
+    /// The current value of each cycling setting, preformatted — `1.5×`, `30s`, `System`.
+    ///
+    /// **Strings rather than the types themselves**, because `Domain/` is Foundation-only and
+    /// `PlaybackSpeed`, `SkipDuration` and `AppColorScheme` all know how to describe themselves
+    /// already. The navigator asks for the next one; it never needs to know what a speed *is*.
+    var settingValues: [String: String] = [:]
 
     /// What the transport is doing (1c), and what the status line on every other screen reports.
     struct Playback: Equatable {
@@ -121,7 +117,6 @@ struct DialContent: Equatable {
         var markers: [TimeInterval] = []
     }
 
-    var sections: [Section] = []
     var recordings: [Item] = []
     var playback: Playback?
     var capture: Capture?

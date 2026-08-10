@@ -32,9 +32,8 @@ final class AppViewModel {
 
     // MARK: - Presentation
     //
-    // The three flags that were all `AppFeature.State` had left. `isSettingsPresented` drives a
-    // `.navigationDestination` push, not a sheet — the old name (`isSettingsSheetPresented`) said
-    // otherwise and is corrected here, since nothing outside this type reads it any more.
+    // What is left of the flags `AppFeature.State` carried. Settings is no longer among them: it
+    // is a dial route, so there is nothing to present.
 
     var isRecordingSheetPresented = false
     /// The file the share sheet is presenting.
@@ -44,7 +43,6 @@ final class AppViewModel {
     /// `recentFilesSection`, inside `homeRootContent` — has been unreferenced since the dial
     /// replaced Home. The sheet was there, its trigger was not.
     var shareItem: ShareItem?
-    var isSettingsPresented = false
     var isImportSheetPresented = false
 
     // MARK: - Children
@@ -244,6 +242,19 @@ final class AppViewModel {
         home.onEditFile = { [filesRoot] in filesRoot.audioToEdit = $0 }
         home.onMoveFile = { [filesRoot] in filesRoot.presentPicker(moving: [.file($0)]) }
 
+        // **A take on disk is a library that changed**, whether or not the save flow ever runs.
+        // The dial drives the recorder directly and never presents `RecordingView`, so `onFinished`
+        // — which that view raises — is not reachable from it at all.
+        recording.onTakeLanded = { [weak self] url in
+            guard let self else { return }
+            // Filed under the name it landed as. `onSaved` files again under the final name if the
+            // save flow ever renames it — from the dial it does not, and that flow is where the
+            // markers would otherwise be lost.
+            markers.set(recording.markers, for: url)
+            home.loadAllFiles()
+            filesRoot.refreshFiles()
+        }
+
         recording.onFinished = { [weak self] in
             guard let self else { return }
             isRecordingSheetPresented = false
@@ -289,19 +300,21 @@ final class AppViewModel {
 
         // The dial's out-edges (#6). It navigates on its own; these are the moments it needs
         // something that owns hardware.
-        dial.onPlay = { [player, home] itemID in
+        dial.onPlay = { [player, home] itemID, queueIDs in
             guard let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
             else { return }
-            // **The queue is the folder you played from, not the whole library.** It used to be
-            // everything, which was the only honest answer while the dial had no folders — there
-            // was one list and it was all of them. Now that pressing a row inside a folder is a
-            // different act from pressing one at the root, the queue that follows has to match the
-            // list you were looking at, or Next walks out of the folder without saying so.
-            let directory = file.url.deletingLastPathComponent()
-            let siblings = home.allFiles.filter {
-                $0.url.deletingLastPathComponent() == directory
-            }
-            player.loadTrack(file, queue: siblings, source: nil)
+            // **The queue is the list the dial was showing, in the order it was showing it.**
+            //
+            // It used to be rebuilt here — every known file, filtered to the pressed file's
+            // directory. That is the same *set* and not the same *order*, which was invisible while
+            // the dial had exactly one order, and broke the moment it could sort: the navigator's
+            // index N and this queue's index N stopped being the same track, so Next loaded the
+            // wrong one. The navigator owns what is on screen; it now hands over the queue with it.
+            let byID = Dictionary(
+                home.allFiles.map { ($0.url.absoluteString, $0) }, uniquingKeysWith: { first, _ in first }
+            )
+            let queue = queueIDs.compactMap { byID[$0] }
+            player.loadTrack(file, queue: queue.isEmpty ? [file] : queue, source: nil)
         }
         dial.onTogglePlayPause = { [player] in player.playPauseTapped() }
         dial.onCycleRepeat = { [player] in player.toggleRepeatMode() }
@@ -310,6 +323,10 @@ final class AppViewModel {
         // rather than a stop: the track and its position survive, so Now Playing is still there to
         // come back to.
         dial.onPausePlayback = { [player] in player.pauseIfPlaying() }
+        // **Entering Record lets go, it does not merely pause.** `clearSession` stops the player,
+        // resets the transport and persists an empty session — so a trim cannot rewrite a file that
+        // something is still holding a duration and a position for.
+        dial.onReleasePlayer = { [player] in player.clearSession() }
         dial.onSetVolume = { [player] value in player.setVolume(value) }
         // **The picker lands where you are standing.** Import used to exist only at the library
         // root, so there was one destination and no need to say which. A folder is somewhere you
@@ -319,15 +336,44 @@ final class AppViewModel {
             importDestination = itemID.flatMap(URL.init(string:))
             isImportSheetPresented = true
         }
+        // **Naming is the host's, because the dial has no keyboard.** The folder is created where
+        // you are standing, through the same alert and the same `createCollection` the Files
+        // browser uses — one implementation, so a folder made from the dial and one made from the
+        // browser are the same act.
+        // **Filing a recording.** The destination is a folder id — a URL string — or `nil` for the
+        // library root, which is the one destination that has no item to name it.
+        dial.onMoveItem = { [weak self] itemID, folderID in
+            guard let self,
+                  let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
+            else { return }
+
+            let destination = folderID.flatMap(URL.init(string:)) ?? fileManager.documentsDirectory()
+            // The player may be holding the file at its old path; moving it out from under an
+            // `AVPlayer` is the same hazard a delete is, and takes the same edge.
+            player.clearSessionIfAffected(by: [file.url])
+
+            Task { [weak self, fileManager] in
+                do {
+                    try await fileManager.moveItem(file.url, destination)
+                } catch {
+                    await MainActor.run { [weak self] in
+                        self?.dial.operationError = error.localizedDescription
+                    }
+                    return
+                }
+                await MainActor.run { [weak self] in
+                    self?.markers.forget(file.url)
+                    self?.dial.forgetWaveform(for: file.url)
+                    self?.home.loadAllFiles()
+                    self?.filesRoot.refreshFiles()
+                }
+            }
+        }
+
         dial.onCreateFolder = { [weak self] itemID in
             guard let self else { return }
             newFolderParent = itemID.flatMap(URL.init(string:))
-            newFolderName = ""
             isNamingNewFolder = true
-        }
-        dial.onReloadLibrary = { [weak self] in
-            self?.home.loadAllFiles()
-            self?.filesRoot.refreshFiles()
         }
         // **The edge that was missing.** `loadAllFiles` is asynchronous, and nothing was told when
         // it finished — so the dial kept the library it was handed before the reload started.
@@ -349,16 +395,33 @@ final class AppViewModel {
             filesRoot.renameItemTapped(.file(file))
         }
 
+        // **A folder is deletable too, and this is where that was silently false.**
+        //
+        // The id was resolved by looking it up in `home.allFiles`, which is a flat sweep of *audio
+        // files* — a folder id matches nothing in it, so the guard returned and the delete never
+        // ran. It read as "the list did not update"; nothing had happened to update it for.
+        //
+        // An id **is** a URL string, for files and folders alike, so resolving it needs no lookup
+        // at all. `home.allFiles` is still consulted, but only to build the richer `FileSystemItem`
+        // the browser's edge wants — and a folder that is not in it falls back to a folder item
+        // rather than falling out of the function.
         dial.onDeleteItem = { [weak self] itemID in
-            guard let self,
-                  let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
-            else { return }
+            guard let self, let url = URL(string: itemID) else { return }
 
-            filesRoot.onWillRemoveItems([.file(file)])
+            let item: FileSystemItem = home.allFiles
+                .first { $0.url.absoluteString == itemID }
+                .map(FileSystemItem.file)
+                ?? .folder(CollectionItem(
+                    id: url, url: url, name: url.lastPathComponent, creationDate: Date()
+                ))
+
+            // Stops playback of the file — or of anything *inside* the folder, which
+            // `PathMatching` resolves by containment.
+            filesRoot.onWillRemoveItems([item])
 
             Task { [fileManager] in
                 do {
-                    try await fileManager.deleteItem(file.url)
+                    try await fileManager.deleteItem(url)
                 } catch {
                     self.dial.operationError = error.localizedDescription
                     return
@@ -373,7 +436,33 @@ final class AppViewModel {
         // **Drives the recorder directly rather than presenting the old sheet.** Raising
         // `isRecordingSheetPresented` here put the legacy recording UI *over* the dial's own
         // recording screen, so the level meter was unreachable even once the route was.
-        dial.onOpenSettings = { [weak self] in self?.isSettingsPresented = true }
+        // **Settings is a dial screen now, so this cycles rather than pushes.** The three value
+        // rows advance and wrap; the other two open what they always opened. `SettingsViewModel`
+        // keeps every setter, because it is still the thing that persists them.
+        dial.onSetting = { [weak self] setting in
+            guard let self else { return }
+            switch setting {
+            case .playbackSpeed:
+                settings.setDefaultPlaybackSpeed(
+                    PlaybackSpeed.allCases.next(after: settings.defaultPlaybackSpeed)
+                )
+            case .skipDuration:
+                settings.setDefaultSkipDuration(
+                    SkipDuration.allCases.next(after: settings.defaultSkipDuration)
+                )
+            case .appearance:
+                settings.setColorScheme(
+                    AppColorScheme.allCases.next(after: settings.colorScheme)
+                )
+            case .language:
+                settings.openSystemLanguageSettings()
+            case .about:
+                settings.showAboutTapped()
+            case .help:
+                settings.showHelpTapped()
+            }
+            refreshDial()
+        }
         dial.onStartRecording = { [recording] in recording.startRecordingTapped() }
         dial.onStopRecording = { [recording] in recording.stopRecordingTapped() }
 
@@ -495,15 +584,34 @@ final class AppViewModel {
         }
     }
 
+    /// Where a new folder should land — `nil` for the library root. Paired with
+    /// `isNamingNewFolder`, which raises the alert that gives it a name.
+    var newFolderParent: URL?
+    var isNamingNewFolder = false
+    var newFolderName = ""
+
+    /// Creates the folder the alert just named, in `newFolderParent`.
+    func confirmNewFolder(named name: String) {
+        let parent = newFolderParent
+        newFolderParent = nil
+        isNamingNewFolder = false
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let folderName = trimmed.isEmpty ? "New Folder" : trimmed
+
+        Task { [weak self, fileManager] in
+            let root = fileManager.documentsDirectory()
+            let destination = (parent ?? root).appendingPathComponent(folderName, isDirectory: true)
+            try? FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+            await MainActor.run { [weak self] in
+                self?.home.loadAllFiles()
+                self?.filesRoot.refreshFiles()
+            }
+        }
+    }
+
     /// Where the import picker's files should land — `nil` for the library root.
     var importDestination: URL?
 
-    /// The new-folder prompt. Its own alert rather than the browser's, because the browser's
-    /// navigates into whatever it creates, and the dial has already got you where the folder will
-    /// appear — following it would be leaving the only place that shows what just happened.
-    var isNamingNewFolder = false
-    var newFolderName = ""
-    var newFolderParent: URL?
 
     /// Imports into `importDestination` rather than into the root browser's directory.
     func importPickedFiles(_ urls: [URL]) {
@@ -518,21 +626,6 @@ final class AppViewModel {
         }
     }
 
-    func confirmNewFolder() {
-        let name = newFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let parent = newFolderParent
-        isNamingNewFolder = false
-        newFolderParent = nil
-        guard !name.isEmpty else { return }
-
-        Task { [fileManager] in
-            try? await fileManager.createCollection(name, parent)
-            await MainActor.run { [weak self] in
-                self?.filesRoot.refreshFiles()
-                self?.home.loadAllFiles()
-            }
-        }
-    }
 
     /// Re-feeds the dial from the app's current state. Called wherever the data it renders moves,
     /// because the navigator holds a snapshot rather than reaching back into the view models.
@@ -540,6 +633,7 @@ final class AppViewModel {
         dial.refresh(
             allFiles: home.allFiles,
             libraryTree: home.libraryTree,
+            settings: settings,
             player: player,
             recorder: recording,
             markers: markers

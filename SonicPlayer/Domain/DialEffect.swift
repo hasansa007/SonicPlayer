@@ -16,7 +16,14 @@ enum DialEffect: Equatable {
 
     // MARK: - Playback
 
-    case play(itemID: String)
+    /// Play this, with **the list the dial is showing as the queue, in the order it is showing
+    /// it**.
+    ///
+    /// The queue used to be rebuilt host-side by filtering every known file down to the pressed
+    /// file's directory — which was the same set but not the same *order*, and the moment the dial
+    /// could sort, index N here stopped being index N there. Next then loaded the wrong track, or
+    /// none at all when the counts differed. The list is the navigator's; so is the queue.
+    case play(itemID: String, queue: [String])
     case togglePlayPause
     /// Off → all → one, and round. The host owns the order; this only asks for the next.
     case cycleRepeat
@@ -32,6 +39,14 @@ enum DialEffect: Equatable {
     /// Pause rather than stop: the track, its position and the queue survive, so Now Playing is
     /// still there to go back to when the recording ends.
     case pausePlayback
+
+    /// Let go of the loaded track entirely — not merely pause it.
+    ///
+    /// **Pausing is not enough before an edit.** `commitTrim` rewrites the file on disk; a player
+    /// that still holds it holds the old duration and the old position, and the saved session will
+    /// restore both against bytes that no longer match. Entering Record mode releases it, which is
+    /// what makes editing a loaded file impossible rather than merely discouraged. See `DialActivity`.
+    case releasePlayer
     /// Absolute, already inside `0...duration`.
     case seek(to: TimeInterval)
     /// Absolute, already inside `0...1`.
@@ -84,13 +99,18 @@ enum DialEffect: Equatable {
     /// Bring audio in from Files. `intoItemID` is the folder to land in — `nil` for the library
     /// root. It used to take no argument, because Import only existed at the root.
     case importFiles(intoItemID: String?)
-
-    /// Make a folder inside `inItemID`, or at the library root when `nil`. The host asks for a name.
+    /// Make a folder in the list you are standing in — `nil` for the library root.
+    ///
+    /// **This existed, was deleted with the bottom bar, and is back.** Removing the bar removed the
+    /// only way to create a folder from the dial, so the library could grow folders by import and
+    /// never by intent. The naming is the host's: a folder needs a name before it exists, and the
+    /// dial has no text entry.
     case createFolder(inItemID: String?)
+    /// File a recording into a folder — `nil` for the library root.
+    case moveItem(itemID: String, toFolderID: String?)
 
-    /// Re-read the library from disk. Raised by the bottom bar's sync control.
-    case reloadLibrary
 
     /// Open Settings. Still a push rather than a dial route — when it becomes one, this goes.
-    case openSettings
+    /// Advance a preference to its next value, or open the one that is not a value.
+    case setting(DialSetting)
 }

@@ -21,11 +21,10 @@ struct DialCaptureTests {
             recordingCount: 0,
             capture: DialContent.Capture(elapsed: 12, levels: [0.3], gain: 0.5, markers: [])
         )
-        content.sections = [
-            .init(id: "record", icon: .recording, title: "Record", destination: .recording)
-        ]
         var navigator = DialNavigator(content: content, root: .library)
-        _ = navigator.receive(.press)               // the Record card
+        _ = navigator.receive(.tick(1))             // home → Record
+        _ = navigator.receive(.press)               // → the library, Record's verbs
+        _ = navigator.receive(.action("record"))    // the bar's Record button
 
         let effects = navigator.receive(.tick(2))
 
@@ -138,7 +137,6 @@ struct DialCaptureTests {
 
     private static func content(editing: DialContent.Editable?) -> DialContent {
         DialContent(
-            sections: DialSample.sections,
             recordings: DialSample.recordings(),
             playback: DialSample.playback,
             capture: nil,
@@ -146,23 +144,32 @@ struct DialCaptureTests {
         )
     }
 
-    /// Root at the recordings list, then a double-press into the editor on the first row.
-    // The tick before each `doublePress` steps off Import, which is row 0 — a double-press there
-    // has no second meaning and returns nothing at all.
-
+    /// Home → Record → the first recording's editor.
+    ///
+    /// **It used to root at the recordings list and double-press**, from the days when a second
+    /// press was what opened the editor. Both halves of that are dead: the mode fork took the
+    /// meaning, so `doublePress` returns nothing — and rooting below home leaves `mode` on its
+    /// default of Listen, where the press *plays* instead. The helper looked like it worked and
+    /// was silently building a navigator sitting on a list, which is why every test using it then
+    /// turned a wheel bound to the wrong axis.
     private static func inEditor(markers: [TimeInterval] = []) -> DialNavigator {
-        var navigator = DialNavigator(content: content(editing: editable(markers: markers)), root: .recordings)
-        _ = navigator.receive(.tick(1))
-        _ = navigator.receive(.doublePress)
+        var navigator = DialNavigator(content: content(editing: editable(markers: markers)), root: .library)
+        _ = navigator.receive(.tick(1))     // home → Record
+        _ = navigator.receive(.press)       // → the library, Record's verbs
+        _ = navigator.receive(.press)       // → the editor, on the first recording
         return navigator
     }
 
     /// The real ordering: the editor is pushed, and only then does the host discover which item it
     /// has to load and hand the material over.
     private static func editorOpenedBeforeTheMaterialLoads(thenLoad: Bool = true) -> DialNavigator {
-        // No tick: the list is only its contents now, so row 0 is the first recording.
-        var navigator = DialNavigator(content: content(editing: nil), root: .recordings)
-        _ = navigator.receive(.doublePress)
+        // **Through Record mode, because that is what opens the editor now.** It used to be a
+        // double press on the library; the mode took that meaning, which is what let the deferred
+        // press go. The mode is private, so the only way in is the fork.
+        var navigator = DialNavigator(content: content(editing: nil), root: .library)
+        _ = navigator.receive(.tick(1))     // home → Record
+        _ = navigator.receive(.press)       // → the library
+        _ = navigator.receive(.press)       // → the editor, on the first recording
         if thenLoad {
             navigator.update(content(editing: editable(markers: [])))
         }

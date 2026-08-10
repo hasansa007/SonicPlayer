@@ -16,17 +16,19 @@ import Foundation
 /// Adding a flip would be the third instance of the bug #54 and #63 were both filed on.
 struct RotaryTracker {
 
-    /// 12 detents per revolution.
+    /// 24 detents per revolution.
     ///
-    /// Third value: 12° (30 per revolution) was too fine on a phone, 20° went untested for a day,
-    /// and this is the deliberate step past it. Everything derived from it follows — the ring draws
-    /// one tick per detent, and `RotaryTrackerTests` reads this constant rather than repeating the
-    /// number, so retuning again is this line alone.
+    /// Fourth value, and **the first one chosen on the phone**: 12° (30 per revolution) was too
+    /// fine against a browser prototype, 20° went untested for a day, 30° was the deliberate step
+    /// past it — and 30° in the hand turns a twelve-file library into a full revolution of thumb,
+    /// which is a long way to travel for a list you can see all of. Halving it doubles the
+    /// resolution without going back to the 12° that was rejected for being twitchy.
     ///
-    /// Tuned against the browser prototype committed beside the design spec, and **not yet
-    /// re-tuned on a device** — a mouse is not a thumb, and there is no haptic in a browser, which
-    /// is most of what a detent feels like.
-    static let detentDegrees: Double = 30
+    /// Everything derived from it follows — the ring draws one tick per detent, and
+    /// `RotaryTrackerTests` reads this constant rather than repeating the number, so retuning again
+    /// is this line alone. The earlier values were tuned against a browser, where a mouse is not a
+    /// thumb and there is no haptic, which is most of what a detent feels like.
+    static let detentDegrees: Double = 15
 
     /// How many detents a full turn holds. Derived rather than stated, because `DialRing` draws one
     /// tick per detent and the two must not be able to disagree — 36 ticks over 30 detents looked

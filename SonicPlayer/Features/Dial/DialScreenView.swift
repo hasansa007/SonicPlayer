@@ -55,21 +55,12 @@ struct DialScreenView: View {
         }
     }
 
-    /// **Back sits in the card's bottom-left corner, not its top-left.**
+    /// The header, ruled off from the content beneath it: where you are, and what is playing.
     ///
-    /// It was the first thing in the header — the furthest corner of the card from the hand, and
-    /// the only thing up there pressed often. Moved down it is a short reach from the wheel, and the
-    /// header goes back to being what it says it is: where you are, and what is playing.
-    ///
-    /// Inside the card rather than loose on the screen, because it acts on the card — it pops the
-    /// level the card is showing. A control floating beside the dial would read as belonging to the
-    /// dial, which nudges and presses and never navigates.
-    /// The header, ruled off from the content beneath it.
-    ///
-    /// The hairline sits on the *bottom* edge of the bar, mirroring the bottom bar's on its top
-    /// edge — so the card reads as three bands: where you are, what is here, and the way back. The
-    /// `VStack`'s own spacing does the separating either side, which is what keeps the two rules
-    /// the same distance from the content they divide.
+    /// **Back is not in here and is not in the card at all.** It was the first thing in this row,
+    /// then a control in a bar along the card's foot, and it is a chip again — the card carried two
+    /// control surfaces for a while, a bar inside it and the chip row twenty points below, both
+    /// reaching for the same thumb.
     private var topBar: some View {
         DialChrome(chrome: screen.chrome, onCommand: onCommand)
             .dynamicTypeSize(...Self.captionCeiling)
@@ -79,69 +70,6 @@ struct DialScreenView: View {
                     .frame(height: Sizing.hairlineTrackHeight)
                     .offset(y: Spacing.sm)
             }
-    }
-
-    private var bottomBar: some View {
-        HStack(spacing: 0) {
-            backControl
-            Spacer(minLength: 0)
-
-            transportControls
-            libraryActions
-
-            // Opposite corner from Back, because they are opposite kinds of thing: one leaves, one
-            // stays and re-reads. Sharing a corner would make the wrong one the easy tap.
-            if screen.chrome.showsSync {
-                syncControl
-            }
-        }
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(Color.sonicBorder)
-                .frame(height: Sizing.hairlineTrackHeight)
-        }
-    }
-
-    /// Re-reads the library from disk.
-    ///
-    /// **A backstop, not the way it works.** The library reports its own reloads now. This is here
-    /// for the staleness nothing announces — a file changed by another app, a folder rearranged in
-    /// Files while this was backgrounded — where the alternative is force quitting.
-    private var syncControl: some View {
-        Button {
-            onCommand(.action("sync"))
-        } label: {
-            Image(systemName: "arrow.clockwise")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundColor(.sonicTextSecondary)
-                .frame(width: Sizing.tapTarget, height: Sizing.tapTarget)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text("Refresh library"))
-    }
-
-    private var backControl: some View {
-        Button {
-            onCommand(.action("back"))
-        } label: {
-            // **A list glyph rather than a chevron.** A chevron says only "backwards", which on a
-            // stack of eight screens is a direction and not a destination. Every level below the
-            // root pops to a list — the library, or home — so the icon can name where it goes
-            // instead of which way. It also stops reading as the navigation bar's back button on a
-            // screen that deliberately has no navigation bar.
-            Image(systemName: "list.bullet")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundColor(.sonicPrimary)
-                // A real target, not a glyph-sized one. In the header this was caption-sized with a
-                // padded hit area to compensate; it stopped being chrome when it became the control
-                // you press most.
-                .frame(width: Sizing.tapTarget, height: Sizing.tapTarget)
-                .contentShape(Rectangle())
-        }
-        .accessibilityLabel(Text("Back"))
     }
 
     /// The same gradient `ShellView` established for the wheel canvas: teal falling into the
@@ -173,6 +101,7 @@ struct DialScreenView: View {
     private var stage: some View {
         VStack(spacing: Spacing.md) {
             if hasChrome { topBar }
+            primaryAction
 
             // **Static until it cannot be, then scrollable.**
             //
@@ -189,11 +118,6 @@ struct DialScreenView: View {
                 content
                 ScrollView { content }
             }
-
-            // **A bar, not an overlay.** Sitting on top of the content it covered the last row of a
-            // full list; as the stack's final element it holds its own height, so the list ends
-            // above it and nothing is hidden however long the list gets.
-            if screen.chrome.canGoBack { bottomBar }
         }
         .padding(Spacing.lg)
         // **Wide, but only as tall as it needs to be.** `maxHeight: .infinity` made the card fill
@@ -290,79 +214,60 @@ struct DialScreenView: View {
         return playing.volume
     }
 
-    /// Import and New folder, on the screens that list files.
-    ///
-    /// **They were rows, and being rows was the problem.** A verb sitting among the nouns competed
-    /// for the highlight with the files and pushed every reader of that highlight through an
-    /// offset. Here they are beside Back and Refresh, which is where this app's other verbs live.
-    @ViewBuilder
-    private var libraryActions: some View {
-        if screen.chrome.showsLibraryActions {
-            barButton(icon: .importFile, label: "Import", command: "import")
-            barButton(icon: .add, label: "New folder", command: "newFolder")
-        }
-    }
-
-    private func barButton(
-        icon: DialScreen.Icon, label: String, command: String
-    ) -> some View {
-        Button {
-            onCommand(.action(command))
-        } label: {
-            Image(systemName: DialIcon.systemImage(for: icon) ?? "questionmark")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundColor(.sonicTextSecondary)
-                .frame(width: Sizing.tapTarget, height: Sizing.tapTarget)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(label))
-    }
-
     /// How long the volume arc stays after the last nudge. Long enough that a run of nudges reads
     /// as one gesture rather than a flicker, short enough to be gone before you look away.
     private static let volumeLinger: Double = 1.5
 
-    /// The transport toggles, on the screen that owns the queue.
+    /// The mode's one verb, pinned under the header and never scrolling away.
+    ///
+    /// **New folder and Refresh are gone rather than moved.** Refresh existed as a backstop for
+    /// staleness the automatic reload already handles, and a control that should never be needed is
+    /// a control that reads as an admission. New folder went with it — there is no way to make one
+    /// from the dial now, which is a real loss and a deliberate one.
     @ViewBuilder
-    private var transportControls: some View {
-        if let transport = screen.chrome.transport {
-            HStack(spacing: Spacing.xs) {
-                transportButton(
-                    icon: transport.repeatMode == .one ? .repeatOne : .repeatAll,
-                    isOn: transport.repeatMode != .off,
-                    label: "Repeat",
-                    command: "repeat"
-                )
-                transportButton(
-                    icon: .shuffle,
-                    isOn: transport.isShuffled,
-                    label: "Shuffle",
-                    command: "shuffle"
-                )
-            }
-        }
-    }
+    private var primaryAction: some View {
+        if let action = screen.chrome.primaryAction {
+            Button {
+                onCommand(.action(action.id))
+            } label: {
+                HStack(spacing: Spacing.md) {
+                    Image(systemName: DialIcon.systemImage(for: action.icon) ?? "questionmark")
+                        .font(.subheadline)
+                        .foregroundColor(action.isLive ? .red : .sonicPrimary)
+                        // The list's icon column, so the verb and the files it acts on share one
+                        // left margin instead of sitting a few points out from each other.
+                        .frame(width: Spacing.xxl)
 
-    /// Lit when on, muted when off — the only thing distinguishing three repeat states and two
-    /// shuffle ones, since neither has room for a word.
-    private func transportButton(
-        icon: DialScreen.Icon, isOn: Bool, label: String, command: String
-    ) -> some View {
-        Button {
-            onCommand(.action(command))
-        } label: {
-            Image(systemName: DialIcon.systemImage(for: icon) ?? "questionmark")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(isOn ? .sonicPrimary : .sonicTextMuted)
-                .frame(width: Sizing.tapTarget, height: Sizing.tapTarget)
+                    VStack(alignment: .leading, spacing: Spacing.xxs) {
+                        Text(action.title)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.sonicTextPrimary)
+                        if let subtitle = action.subtitle {
+                            Text(subtitle)
+                                .font(.caption)
+                                .foregroundColor(.sonicTextSecondary)
+                        }
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, Spacing.md)
+                .padding(.vertical, Spacing.md)
+                // **The same cursor a row wears, drawn the same way**, because it is selected the
+                // same way: turning back off the first file lands here. A stop that does not light
+                // up is a stop nobody has reason to believe the hub will act on — which is how this
+                // one spent its first day reachable by tap alone.
+                .background(
+                    RoundedRectangle(cornerRadius: Radius.md)
+                        .fill(Color.sonicPrimary.opacity(action.isHighlighted ? ControlTint.on : 0))
+                )
                 .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(action.title))
+            .accessibilityAddTraits(action.isHighlighted ? [.isSelected] : [])
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(label))
-        .accessibilityAddTraits(isOn ? [.isSelected] : [])
     }
 
     private static let washTint: Double = 0.15

@@ -287,10 +287,33 @@ final class PlayerViewModel {
     ///
     /// Not persisted: a level chosen for one listening session is not a preference, and coming back
     /// to an app that is quiet with no memory of why is worse than starting at full.
+    ///
+    /// **It is seeded from the device, though** — see `adoptSystemVolume`. That is the half of
+    /// "sync with the system" that costs nothing.
     func setVolume(_ value: Double) {
         volume = min(max(0, value), 1)
         let level = Float(volume)
-        Task { [audioPlayer] in await audioPlayer.setVolume(level) }
+        Task { [audioPlayer] in
+            // **Both, and in this order.** The system level is what the user means by "volume" and
+            // what the hardware buttons and Control Centre show. The per-player gain is set to full
+            // alongside it, because a track loaded while gain was at 40% would otherwise play at
+            // 40% *of* the system level — two multipliers where the user set one number.
+            await audioPlayer.setSystemVolume(level)
+            await audioPlayer.setVolume(1)
+        }
+    }
+
+    /// **Follows the device, so the arc is never stale.**
+    ///
+    /// Seeded on the first value and updated on every hardware press, Control Centre drag and route
+    /// change. Assigns `volume` directly rather than calling `setVolume` — that would write the
+    /// level straight back to the system, which is a loop.
+    func observeSystemVolume() async {
+        for await level in await audioPlayer.systemVolumeUpdates() {
+            let value = Double(level)
+            guard value != volume else { continue }
+            volume = value
+        }
     }
 
     func setSkipDuration(_ duration: SkipDuration) {

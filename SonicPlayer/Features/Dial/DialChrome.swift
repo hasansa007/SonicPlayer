@@ -33,19 +33,6 @@ struct DialChrome: View {
                 Spacer(minLength: Spacing.sm)
             }
 
-            if chrome.showsSettings {
-                Button {
-                    onCommand(.action("settings"))
-                } label: {
-                    Image(systemName: "gearshape.fill")
-                        .font(.caption)
-                        .foregroundColor(.sonicTextSecondary)
-                        .frame(width: Sizing.tapTarget, height: Sizing.compactControl, alignment: .trailing)
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel(Text("Settings"))
-            }
-
             if chrome.isRecording || chrome.status != nil {
                 // Tappable, and that is the point: `hold` jumps to Now Playing from anywhere and
                 // has no affordance at all. This line is already on screen saying something is

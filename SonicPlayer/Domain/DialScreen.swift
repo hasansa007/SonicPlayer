@@ -38,29 +38,41 @@ struct DialScreen: Equatable {
         /// Drives the pulsing dot. Separate from `status` because it animates.
         var isRecording: Bool = false
 
-        /// Whether the top-right corner offers Settings.
+        /// Whether the wheel is resting on the Settings chip — home's leading ring stop.
         ///
-        /// It replaced the `20:34 ▸ playing` label that used to sit there. That label was doing two
-        /// jobs badly: saying what was playing, in a space too small to name it, and being the only
-        /// way to reach Now Playing. Both moved to a row in the library, which has room for a title
-        /// — and the corner went to the one thing that had nowhere to live at all.
-        var showsSettings: Bool = false
+        /// **There is no gear in the corner any more.** It lived there for a while, having nowhere
+        /// else to go once the `20:34 ▸ playing` label took the corner back; it is a chip again,
+        /// and the chip's own `.selected` emphasis is what the view draws. This stays because it is
+        /// the fact the emphasis is derived *from*.
+        var isSettingsHighlighted: Bool = false
 
-        /// Whether the bottom bar offers a manual reload.
+        /// The one thing this screen exists to let you add, pinned to the top of the card.
         ///
-        /// **An escape hatch, not the mechanism.** The library refreshes itself now — a finished
-        /// load reports back and reaches the navigator. This exists because a snapshot can still go
-        /// stale in ways nothing thought to announce (a file changed by another app, a folder edited
-        /// in Files while this was backgrounded), and the alternative to a button there is force
-        /// quitting. Only on the screens that show files, because it is the only thing it reloads.
-        var showsSync: Bool = false
+        /// **It has been a home card, a chip, a row, a pinned bottom row and a bar button.** Every
+        /// version put it somewhere it competed with something: with the files for the highlight,
+        /// or with Back and Refresh for the corner your thumb rests in. At the top of the card it
+        /// competes with nothing and never scrolls away — which is what "always available" meant
+        /// each of the times it was asked for.
+        ///
+        /// One per mode, because each mode has exactly one way to bring material in: Listen imports,
+        /// Record records.
+        var primaryAction: PrimaryAction?
 
-        /// Whether the bottom bar offers Import and New folder.
-        ///
-        /// Both were rows in the list they act on. A thing you *do* sitting among the things you
-        /// *have* competed with the files for the highlight and forced an offset on everything that
-        /// read it; in the bar they sit with Back and Refresh, which are the app's other verbs.
-        var showsLibraryActions: Bool = false
+        struct PrimaryAction: Equatable {
+            var id: String
+            var icon: Icon
+            var title: String
+            var subtitle: String?
+            /// Drawn in red — the only one that starts something rather than opening a picker.
+            var isLive: Bool = false
+            /// Whether the wheel is resting on it.
+            ///
+            /// **It is a stop on the ring, not only a button.** Pinned above the list it was
+            /// reachable by tap alone, which made the one verb each mode exists for the one thing
+            /// the dial could not do. It draws its highlight the way a row does, because it is
+            /// selected the way a row is.
+            var isHighlighted: Bool = false
+        }
 
         /// Whether the **card's** border cycles while audio moves.
         ///
@@ -80,10 +92,17 @@ struct DialScreen: Equatable {
 
         /// Whether there is a level to pop to.
         ///
-        /// Back lives in the top bar rather than the action row because it is *navigation*, not one
-        /// of the things this screen does. Mixing "go up a level" in with "delete this file" made
-        /// them look like peers, and it cost the action row a slot on every screen below the root.
+        /// **Back is a chip again.** It was moved out of the action row on the argument that it is
+        /// *navigation*, not one of the things this screen does — mixing "go up a level" in with
+        /// "delete this file" makes them look like peers. It went to the header, then to a bar
+        /// along the card's foot, and each home cost the card a band of height for one control.
+        /// It is one glyph among three or four in a row that already exists.
         var canGoBack: Bool = false
+
+        /// Whether the wheel is resting on Back — the stop **after** the last row, matching where
+        /// the control is drawn. Only on screens the wheel scrolls: Now Playing, the recorder and
+        /// the editor bind it to seek, gain and trim, so there is no highlight to park there.
+        var isBackHighlighted: Bool = false
     }
 
     // MARK: - Content
@@ -250,7 +269,8 @@ struct DialScreen: Equatable {
         case next
         case pause
         case play
-        case edit
+        /// Cutting a recording down to the selected region.
+        case trim
         case more
         case share
         /// Writing a copy out of the app. Distinct from `share`, which hands the existing file to
@@ -264,6 +284,13 @@ struct DialScreen: Equatable {
         case repeatOne
         case repeatAll
         case shuffle
+        /// Leaving the level you are on. Named for the act, not the glyph — the view has drawn it
+        /// as both a chevron and a list, for reasons recorded where it is drawn.
+        case back
+        case settings
+        case sort
+        case newFolder
+        case move
         case none
     }
 
@@ -289,7 +316,14 @@ struct DialScreen: Equatable {
         }
 
         var id: String
+        /// **Not drawn when there is an `icon` — it becomes the accessibility label.**
+        ///
+        /// The chips were words for most of their life and are glyphs now: five of them across a
+        /// phone in Arabic or at AX3 wrapped to two lines and took a band of the card's height, on
+        /// every screen, to say things a symbol says in 28 points. The word is still the truth of
+        /// what the chip does, so it stays here and VoiceOver reads it.
         var label: String
+        var icon: Icon = .none
         var emphasis: Emphasis = .plain
     }
 
@@ -349,6 +383,17 @@ struct DialScreen: Equatable {
         var icon: Icon
         /// What VoiceOver says. The glyph is a legend; this is the name.
         var label: String
+
+        /// Whether holding the stick here keeps firing.
+        ///
+        /// **Opt-in, and only volume takes it.** Volume is a *quantity* — one nudge is 5%, so
+        /// crossing the range is twenty shoves of the same thumb, which is a control that works and
+        /// nobody uses. Track, marker, pause and the trim arming are all *discrete*: a held Next
+        /// that skipped twenty tracks would be a way to lose your place, not a convenience.
+        ///
+        /// This is the same distinction the wheel already makes between `.volume` and `.queue` —
+        /// one accelerates and wraps, the other steps once per detent.
+        var repeatsWhenHeld: Bool = false
     }
 
     /// What the ring's tick marks are showing. The design uses a different set per screen —

@@ -54,32 +54,53 @@ struct DialRecordingView: View {
     /// Opacity ramps from oldest to newest rather than every bar being the same teal, which is what
     /// makes it read as scrolling in from the right instead of as a static barcode. The bars carry
     /// no interaction and duplicate nothing the timer says, so they are hidden from VoiceOver.
+    /// **Drawn, not laid out — which is the whole fix.**
+    ///
+    /// This was fifty `Capsule`s in an `HStack`, and fifty bars at four points plus four of spacing
+    /// is 400pt of *minimum* width against roughly 345 of usable screen. A `frame(maxWidth:
+    /// .infinity)` and a `.clipped()` were added against exactly that and did not hold: they bound
+    /// what is **painted**, and a stack of fixed-width children has a minimum it will overflow
+    /// rather than compress. So at five seconds — the moment the window fills — the card grew past
+    /// its own padding and went edge to edge, corners and border running off the screen. Four
+    /// seconds looked right and six did not, which is what makes it a layout bug rather than a
+    /// styling one.
+    ///
+    /// A `Canvas` has no intrinsic width. It takes the width it is offered and this decides how
+    /// many bars fit in it, so the card cannot be widened by its own contents no matter how long
+    /// the take runs. It also stops rebuilding fifty views ten times a second.
     private var waveform: some View {
-        HStack(alignment: .center, spacing: Spacing.xs) {
-            ForEach(Array(recording.levels.enumerated()), id: \.offset) { index, level in
-                Capsule()
-                    .fill(Color.sonicPrimary.opacity(age(of: index)))
-                    .frame(
-                        width: Sizing.dialWaveBar,
-                        height: max(Sizing.dialWaveBar, level.clampedFraction * Sizing.dialWave)
-                    )
+        Canvas { context, size in
+            let step = Sizing.dialWaveBar + Spacing.xs
+            // How many bars the given width holds — the newest are kept, so it scrolls in from the
+            // right exactly as the stack did.
+            let fits = max(1, Int((size.width + Spacing.xs) / step))
+            let shown = Array(recording.levels.suffix(fits))
+            guard !shown.isEmpty else { return }
+
+            let width = CGFloat(shown.count) * step - Spacing.xs
+            let originX = size.width - width
+
+            for (index, level) in shown.enumerated() {
+                let height = max(Sizing.dialWaveBar, level.clampedFraction * Sizing.dialWave)
+                let bar = CGRect(
+                    x: originX + CGFloat(index) * step,
+                    y: (size.height - height) / 2,
+                    width: Sizing.dialWaveBar,
+                    height: height
+                )
+                context.fill(
+                    Path(roundedRect: bar, cornerRadius: Sizing.dialWaveBar / 2),
+                    with: .color(.sonicPrimary.opacity(age(of: index, of: shown.count)))
+                )
             }
         }
-        // **Bounded and clipped, newest kept.** Fifty bars at four points plus four of spacing is
-        // 400pt of intrinsic width against roughly 345 of usable screen — so once the window filled,
-        // at five seconds of recording, the stack demanded more room than it had and widened
-        // everything around it, the dial included. `maxWidth: .infinity` makes it accept the width
-        // it is given instead of asking for its ideal, and trailing alignment keeps the newest bars
-        // on screen when there are more than fit.
-        .frame(maxWidth: .infinity, alignment: .trailing)
         .frame(height: Sizing.dialWave)
-        .clipped()
         .accessibilityHidden(true)
     }
 
-    private func age(of index: Int) -> Double {
-        guard recording.levels.count > 1 else { return 1 }
-        let position = Double(index) / Double(recording.levels.count - 1)
+    private func age(of index: Int, of count: Int) -> Double {
+        guard count > 1 else { return 1 }
+        let position = Double(index) / Double(count - 1)
         return Self.oldestBar + position * (1 - Self.oldestBar)
     }
 

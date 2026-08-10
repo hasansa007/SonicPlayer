@@ -33,9 +33,10 @@ struct DialFolderTests {
             DialContent.Item(id: "rec-1", title: "Recording 2", duration: 30),
         ]
 
+        // Home is the fork: row 0 is Listen, row 1 is Record. A tick here would choose the other
+        // mode, and these tests are about browsing.
         var navigator = DialNavigator(content: content, root: .library)
-        _ = navigator.receive(.tick(1))     // home → the Library card
-        _ = navigator.receive(.press)
+        _ = navigator.receive(.press)       // home → Listen
         return navigator
     }
 
@@ -99,7 +100,7 @@ struct DialFolderTests {
 
         let effects = navigator.receive(.press)
 
-        #expect(effects.contains(.play(itemID: "rec-a")))
+        #expect(DialSample.playedID(effects) == "rec-a")
     }
 
     @Test func theSecondRowInsideAFolderIsTheSecondFile() {
@@ -109,7 +110,7 @@ struct DialFolderTests {
 
         let effects = navigator.receive(.press)
 
-        #expect(effects.contains(.play(itemID: "rec-b")))
+        #expect(DialSample.playedID(effects) == "rec-b")
     }
 
     /// The four nudges all act on a file. A folder answers none of them, so the stick draws nothing
@@ -162,14 +163,30 @@ struct DialFolderTests {
     }
 
     /// The wheel wraps inside a folder the same way it does everywhere, and against its own count
-    /// rather than the root's.
+    /// rather than the root's — **plus the folder's own controls**, Import above and the chip row
+    /// below, which are stops here exactly as they are at the root. Two files is six positions.
     @Test func theWheelWrapsWithinTheFolder() {
         var navigator = Self.atFolderRow()
         _ = navigator.receive(.press)
 
-        _ = navigator.receive(.tick(2))               // two rows: past the end is the start
+        _ = navigator.receive(.tick(6))
 
         let effects = navigator.receive(.press)
-        #expect(effects.contains(.play(itemID: "rec-a")))
+        #expect(DialSample.playedID(effects) == "rec-a")
+    }
+
+    /// And the stop it gains is that folder's, not the library's — the reason Import carries a
+    /// destination id at all.
+    @Test func theFoldersVerbImportsIntoTheFolder() {
+        var navigator = Self.atFolderRow()
+        _ = navigator.receive(.press)
+
+        _ = navigator.receive(.tick(-1))
+
+        #expect(navigator.isPinnedActionHighlighted)
+        #expect(
+            navigator.receive(.press)
+                == [.importFiles(intoItemID: "folder-lectures"), .feedback(.commit)]
+        )
     }
 }

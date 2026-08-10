@@ -61,10 +61,10 @@ struct DialDeleteConfirmationTests {
         app.home.allFiles = [file()]
         app.refreshDial()
 
-        // Home is Library then Record, and the highlight opens on row 0 — so Library is already
-        // under it and a tick here would land on Record instead.
-        app.dial.receive(.press)            // into the library, highlight on Import
-        app.dial.receive(.tick(1))          // onto the file
+        // **Delete lives in Record mode only.** Listen is the mode where nothing can be lost, so
+        // reaching the guard means taking the other side of the fork first.
+        app.dial.receive(.tick(1))          // home → Record
+        app.dial.receive(.press)            // → the library, highlight on the only file
         app.dial.receive(.action("delete"))     // the stick's down nudge
     }
 
@@ -126,18 +126,37 @@ struct DialDeleteConfirmationTests {
         #expect(app.dial.screen.chrome.breadcrumb.last == "LIBRARY")
     }
 
-    /// The dial's delete travels through `onWillRemoveItems`, the same edge the browser's delete
-    /// uses — which is what stops playback of a file about to vanish. Re-implementing it here would
-    /// be a second copy free to drift.
+    /// **The dial can no longer delete something the player is holding, and the guard is upstream
+    /// of the guard.**
+    ///
+    /// This used to press Delete with a track loaded and check the player let go — the dial's delete
+    /// travels through `onWillRemoveItems`, the same edge the browser uses. That edge still exists
+    /// and still does that job; what changed is that this route can no longer reach it with anything
+    /// loaded, because deleting means Record mode and entering Record releases the player first.
+    ///
+    /// Asserting the old way would now pass for the wrong reason — `currentTrack` is nil before the
+    /// delete is even offered. So this asserts the fact that actually holds.
     @MainActor
-    @Test func deletingWhatIsPlayingStopsPlayback() async {
+    @Test func enteringRecordModeReleasesWhateverWasLoaded() {
+        let app = makeApp()
+        app.home.allFiles = [file()]
+        app.player.currentTrack = file()
+        app.refreshDial()
+
+        app.dial.receive(.tick(1))          // home → Record
+        app.dial.receive(.press)
+
+        #expect(app.player.currentTrack == nil, "before any edit or delete is even offered")
+    }
+
+    /// The browser's edge is where "stop playing what is about to vanish" lives, and it is still
+    /// reachable — from the Files sheet, which has no modes.
+    @MainActor
+    @Test func removingAPlayingFileThroughTheBrowserStopsPlayback() {
         let app = makeApp()
         app.player.currentTrack = file()
-        pressDelete(app)
 
-        app.dial.receive(.tick(1))          // onto Delete
-        app.dial.receive(.press)
-        await Task.yield()
+        app.filesRoot.onWillRemoveItems([.file(file())])
 
         #expect(app.player.currentTrack == nil)
     }

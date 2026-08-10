@@ -43,6 +43,17 @@ final class RecordingViewModel {
     /// history.
     private(set) var levels: [Double] = []
 
+    /// **Raised the moment a take is written to disk**, before any naming or trimming.
+    ///
+    /// Distinct from `onFinished`, which means *the save flow completed* — and the save flow is
+    /// rendered only by `RecordingView`, which the dial never presents. So from the dial nothing
+    /// reloaded the library after a take: the file was on disk and the screen said the folder was
+    /// empty, until an unrelated import happened to force a refresh.
+    ///
+    /// A separate edge rather than reusing `onFinished`, because these are different facts and one
+    /// of them will be true in flows where the other never is.
+    var onTakeLanded: ((URL) -> Void)?
+
     /// Timestamps dropped during this take (#75). Cleared when a take starts, and handed to the
     /// registry under the name the file lands as.
     private(set) var markers = RecordingMarkers()
@@ -126,11 +137,35 @@ final class RecordingViewModel {
 
     // MARK: - Recording
 
+    /// **The first press asks and then records; it used to only ask.**
+    ///
+    /// This was `guard hasPermission else { requestPermissions(); return }` — so on a fresh install
+    /// the first press raised the system prompt, returned, and did nothing after you granted.
+    /// Pressing again worked, which is why it read as "recording does not work the first time"
+    /// rather than as a permission problem.
+    ///
+    /// The dial made it certain rather than likely. `hasPermission` was seeded by
+    /// `checkPermissions()`, called from `RecordingView.onAppear` — and the dial drives this type
+    /// directly without ever presenting that view, so the flag was *always* false on the first
+    /// press however many times the app had recorded before.
+    ///
+    /// Requesting is cheap when the answer is already yes: the system returns the stored grant
+    /// without prompting, so this path costs one await rather than a dialog.
     func startRecordingTapped() {
         guard hasPermission else {
-            requestPermissions()
+            workTask = Task { [weak self, audioRecorder] in
+                let granted = await audioRecorder.requestPermissions()
+                self?.hasPermission = granted
+                self?.showPermissionAlert = !granted
+                guard granted else { return }
+                self?.beginTake()
+            }
             return
         }
+        beginTake()
+    }
+
+    private func beginTake() {
         guard let recordingsCollection else { return }
 
         try? FileManager.default.createDirectory(at: recordingsCollection, withIntermediateDirectories: true)
@@ -187,6 +222,8 @@ final class RecordingViewModel {
         currentRecordingURL = url
         saveFileName = url.deletingPathExtension().lastPathComponent
         isSaveFlowPresented = true
+        // The file exists from here on, whatever happens to the save flow above it.
+        onTakeLanded?(url)
 
         // Copy to a temp file so the inline editor is non-destructive from the first frame.
         let tempEditURL = EditRecordingViewModel.tempEditURL(pathExtension: "m4a")
