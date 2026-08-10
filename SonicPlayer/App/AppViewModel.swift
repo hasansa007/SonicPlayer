@@ -310,6 +310,13 @@ final class AppViewModel {
         dial.onPausePlayback = { [player] in player.pauseIfPlaying() }
         dial.onSetVolume = { [player] value in player.setVolume(value) }
         dial.onImportFiles = { [weak self] in self?.isImportSheetPresented = true }
+        dial.onReloadLibrary = { [weak self] in
+            self?.home.loadAllFiles()
+            self?.filesRoot.refreshFiles()
+        }
+        // **The edge that was missing.** `loadAllFiles` is asynchronous, and nothing was told when
+        // it finished — so the dial kept the library it was handed before the reload started.
+        home.onFilesLoaded = { [weak self] in self?.refreshDial() }
 
         // **Deleting from the dial goes through the browser's own edge, not around it.**
         //

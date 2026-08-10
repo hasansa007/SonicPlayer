@@ -461,6 +461,11 @@ struct DialNavigator {
         case (.library, "nowPlaying"):
             return hold()
 
+        // Available wherever files are listed, and it stays put — you are reloading the list you
+        // are looking at, so leaving it would be the one thing you did not ask for.
+        case (.recordings, "sync"), (.folder, "sync"):
+            return [.reloadLibrary, .feedback(.commit)]
+
         case (.recordings, "edit"), (.folder, "edit"):
             return doublePress()
         // **The stick's four nudges, each acting on the highlighted recording.** They were rows on

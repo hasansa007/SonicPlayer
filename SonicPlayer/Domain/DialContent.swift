@@ -13,9 +13,13 @@ import Foundation
 /// round trip. The host's later `update(_:)` is the correction, and the source of truth.
 struct DialContent: Equatable {
 
-    /// The item with this id, at any depth. Used where only the id is to hand — a route carries
-    /// one, and the breadcrumb has to turn it back into a name.
-    func item(withID id: String) -> Item? {
+    /// The item with this id, **at any depth**. Used where only the id is to hand — a route
+    /// carries one, and the breadcrumb has to turn it back into a name.
+    ///
+    /// This replaced a one-line `recordings.first { $0.id == id }`, which stopped being right the
+    /// moment folders existed: every id reaching it from inside a folder found nothing, and the
+    /// delete guard named the file it was about to destroy as `nil`.
+    func item(_ id: String) -> Item? {
         func search(_ items: [Item]) -> Item? {
             for item in items {
                 if item.id == id { return item }
@@ -119,5 +123,4 @@ struct DialContent: Equatable {
     var capture: Capture?
     var editing: Editable?
 
-    func item(_ id: String) -> Item? { recordings.first { $0.id == id } }
 }

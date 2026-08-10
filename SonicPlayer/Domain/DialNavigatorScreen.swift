@@ -28,6 +28,7 @@ extension DialNavigator {
             status: status,
             isRecording: content.capture.map { !$0.isPaused } ?? false,
             showsSettings: stack.count == 1,
+            showsSync: route == .recordings || isFolder,
             canGoBack: stack.count > 1
         )
     }
@@ -146,7 +147,8 @@ extension DialNavigator {
             rows: rows,
             highlighted: min(level.highlighted, max(0, rows.count - 1)),
             subject: subject,
-            isProminent: route.showsProminentRows
+            isProminent: route.showsProminentRows,
+            pinnedRows: pinnedRowCount
         )
     }
 
@@ -225,6 +227,15 @@ extension DialNavigator {
         }
 
         return hasImportRow ? [importRow] + rows : rows
+    }
+
+    /// Import does not scroll away.
+    ///
+    /// It is row 0 of a list that can be hundreds long, so on any real library it left the screen
+    /// on the second turn — an "always available" row that was available until you looked for it.
+    /// Pinned it keeps that promise, and the wheel still reaches it by turning back up.
+    private var pinnedRowCount: Int {
+        hasImportRow ? 1 : 0
     }
 
     private var deleteChoiceRows: [DialScreen.List.Row] {
@@ -328,6 +339,12 @@ extension DialNavigator {
         return RecordingsRow.at(
             level.highlighted, recordings: currentItems.count, hasImport: hasImportRow
         )
+    }
+
+    /// Whether this screen is a folder — asked in a couple of places that do not care which one.
+    private var isFolder: Bool {
+        if case .folder = route { return true }
+        return false
     }
 
     /// The item under the highlight on a library list, folder or file.

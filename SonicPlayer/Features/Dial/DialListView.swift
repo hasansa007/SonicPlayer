@@ -112,6 +112,23 @@ struct DialListView: View {
     }
 
     private var rows: some View {
+        VStack(spacing: Spacing.xxs) {
+            // **Pinned rows sit outside the scroller entirely.** Import is row 0 of a list that can
+            // be hundreds long, so on any real library it left the screen on the second turn — an
+            // "always available" row that was available right up until you went looking for it.
+            //
+            // Same absolute indices either side of the split, which is what `pinnedRows` being a
+            // count rather than a separate row buys: the highlight can rest here and nothing has to
+            // renumber.
+            ForEach(Array(list.rows.prefix(list.pinnedRows).enumerated()), id: \.element.id) { index, row in
+                rowButton(row, at: index)
+            }
+
+            scrollingRows
+        }
+    }
+
+    private var scrollingRows: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical) {
                 VStack(spacing: Spacing.xxs) {
@@ -119,19 +136,9 @@ struct DialListView: View {
                         subjectHeader(subject)
                     }
 
-                    ForEach(Array(list.rows.enumerated()), id: \.element.id) { index, row in
-                        Button {
-                            onSelect(index)
-                        } label: {
-                            DialRowView(
-                                row: row,
-                                isHighlighted: index == list.highlighted,
-                                isProminent: false,
-                                reservesIconColumn: reservesIconColumn
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .id(index)
+                    ForEach(Array(list.rows.enumerated().dropFirst(list.pinnedRows)), id: \.element.id) { index, row in
+                        rowButton(row, at: index)
+                            .id(index)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .top)
@@ -142,9 +149,26 @@ struct DialListView: View {
             .frame(maxHeight: .infinity)
             .scrollBounceBehavior(.basedOnSize)
             .onChange(of: list.highlighted) { _, index in
+                // A pinned row has no id in this scroller, so scrolling to it would do nothing at
+                // best. It is already on screen — that is the point of pinning it.
+                guard index >= list.pinnedRows else { return }
                 withAnimation(Motion.settle) { proxy.scrollTo(index, anchor: .center) }
             }
         }
+    }
+
+    private func rowButton(_ row: DialScreen.List.Row, at index: Int) -> some View {
+        Button {
+            onSelect(index)
+        } label: {
+            DialRowView(
+                row: row,
+                isHighlighted: index == list.highlighted,
+                isProminent: false,
+                reservesIconColumn: reservesIconColumn
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

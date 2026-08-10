@@ -55,7 +55,7 @@ enum DialRoute: Equatable {
         case .recordings: "LIBRARY"
         // The folder's own name, so the header reads HOME ▸ LIBRARY ▸ LECTURES rather than
         // repeating LIBRARY at every depth.
-        case .folder(let itemID): content.item(withID: itemID)?.title.uppercased() ?? "FOLDER"
+        case .folder(let itemID): content.item(itemID)?.title.uppercased() ?? "FOLDER"
         case .nowPlaying: "NOW PLAYING"
         case .recording: "RECORDING"
         case .edit: "EDIT"

@@ -206,6 +206,29 @@ extension FileManagerClient {
                 }
 
                 let fileName = sourceURL.lastPathComponent
+
+                // **Already here? Then stop.** See `ImportDedupe` — the resolver below cannot
+                // answer this, because avoiding a collision is the opposite of noticing one.
+                let sourceSize = (try? FileManager.default.attributesOfItem(atPath: sourceURL.path))
+                    .flatMap { $0[.size] as? NSNumber }?.int64Value
+                if let sourceSize {
+                    let siblings = (try? FileManager.default.contentsOfDirectory(
+                        at: finalDestinationDirectory,
+                        includingPropertiesForKeys: [.fileSizeKey],
+                        options: [.skipsHiddenFiles]
+                    )) ?? []
+                    let existing = siblings.compactMap { url -> ImportDedupe.Existing? in
+                        guard let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
+                        else { return nil }
+                        return ImportDedupe.Existing(name: url.lastPathComponent, size: Int64(size))
+                    }
+                    if ImportDedupe.isAlreadyPresent(
+                        name: fileName, size: sourceSize, in: existing
+                    ) {
+                        return
+                    }
+                }
+
                 let destinationURL = UniqueNameResolver.resolve(
                     baseName: sourceURL.deletingPathExtension().lastPathComponent,
                     ext: sourceURL.pathExtension,

@@ -53,6 +53,7 @@ final class DialViewModel {
     /// asynchronously. Only the waveform needs it — every other input is state the host can already
     /// see change.
     var onNeedsRefresh: (() -> Void)?
+    var onReloadLibrary: (() -> Void)?
 
     private var navigator: DialNavigator
     private let haptics: HapticsClient
@@ -295,6 +296,9 @@ final class DialViewModel {
             onSeek?(time)
         case .selectTrack(let index):
             onSelectTrack?(index)
+        case .reloadLibrary:
+            onReloadLibrary?()
+
         case .importFiles:
             onImportFiles?()
         case .openSettings:

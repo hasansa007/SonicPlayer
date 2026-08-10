@@ -46,6 +46,15 @@ struct DialScreen: Equatable {
         /// — and the corner went to the one thing that had nowhere to live at all.
         var showsSettings: Bool = false
 
+        /// Whether the bottom bar offers a manual reload.
+        ///
+        /// **An escape hatch, not the mechanism.** The library refreshes itself now — a finished
+        /// load reports back and reaches the navigator. This exists because a snapshot can still go
+        /// stale in ways nothing thought to announce (a file changed by another app, a folder edited
+        /// in Files while this was backgrounded), and the alternative to a button there is force
+        /// quitting. Only on the screens that show files, because it is the only thing it reloads.
+        var showsSync: Bool = false
+
         /// Whether there is a level to pop to.
         ///
         /// Back lives in the top bar rather than the action row because it is *navigation*, not one
@@ -113,6 +122,19 @@ struct DialScreen: Equatable {
         /// thing had happened elsewhere. It is a property of *which screen this is*, so the
         /// navigator states it and the view obeys.
         var isProminent: Bool = false
+
+        /// How many leading rows do not scroll.
+        ///
+        /// **A count rather than a separate `pinned` row, and that is the whole reason it works.**
+        /// Lifting Import out into its own field would renumber everything below it: `highlighted`
+        /// would mean something different depending on where it pointed, and `RecordingsRow` — the
+        /// one place that owns the Import offset — would have to be taught a second numbering. Here
+        /// the rows and the highlight keep one absolute index space, and this says only which of
+        /// them the view draws outside the scroller.
+        ///
+        /// The highlight can still land on a pinned row. That is not a special case: the view
+        /// compares the same absolute index either side of the split.
+        var pinnedRows: Int = 0
     }
 
     struct NowPlaying: Equatable {

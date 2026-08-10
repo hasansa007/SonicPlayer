@@ -80,6 +80,9 @@ enum DialEffect: Equatable {
     /// marked `Library` with no way to put anything in is the gap this fills.
     case importFiles
 
+    /// Re-read the library from disk. Raised by the bottom bar's sync control.
+    case reloadLibrary
+
     /// Open Settings. Still a push rather than a dial route — when it becomes one, this goes.
     case openSettings
 }

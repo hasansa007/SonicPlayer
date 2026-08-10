@@ -90,12 +90,38 @@ struct DialScreenView: View {
         HStack(spacing: 0) {
             backControl
             Spacer(minLength: 0)
+
+            // Opposite corner from Back, because they are opposite kinds of thing: one leaves, one
+            // stays and re-reads. Sharing a corner would make the wrong one the easy tap.
+            if screen.chrome.showsSync {
+                syncControl
+            }
         }
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(Color.sonicBorder)
                 .frame(height: Sizing.hairlineTrackHeight)
         }
+    }
+
+    /// Re-reads the library from disk.
+    ///
+    /// **A backstop, not the way it works.** The library reports its own reloads now. This is here
+    /// for the staleness nothing announces — a file changed by another app, a folder rearranged in
+    /// Files while this was backgrounded — where the alternative is force quitting.
+    private var syncControl: some View {
+        Button {
+            onCommand(.action("sync"))
+        } label: {
+            Image(systemName: "arrow.clockwise")
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundColor(.sonicTextSecondary)
+                .frame(width: Sizing.tapTarget, height: Sizing.tapTarget)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Refresh library"))
     }
 
     private var backControl: some View {

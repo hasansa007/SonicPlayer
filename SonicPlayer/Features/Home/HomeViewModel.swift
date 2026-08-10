@@ -46,6 +46,10 @@ final class HomeViewModel {
     /// the editor and the Library card's count.
     var libraryTree: [DialContent.Item] = []
 
+    /// Raised once both lists have landed. Wired at the composition root, like every other
+    /// cross-feature edge — this feature does not know the dial exists.
+    var onFilesLoaded: (() -> Void)?
+
     init(player: PlayerViewModel, fileManager: FileManagerClient = .live) {
         self.player = player
         self.fileManager = fileManager
@@ -63,6 +67,11 @@ final class HomeViewModel {
             await MainActor.run {
                 self?.allFiles = files
                 self?.libraryTree = tree
+                // **The load has to announce itself.** The dial holds a snapshot rather than
+                // reading back, so a reload that nobody reports leaves it showing the library as it
+                // was — which is why a new recording never appeared. It used to appear by accident,
+                // on the next tick of the player's clock, and after a recording nothing is playing.
+                self?.onFilesLoaded?()
             }
         }
     }
