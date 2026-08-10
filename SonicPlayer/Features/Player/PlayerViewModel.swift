@@ -94,20 +94,24 @@ final class PlayerViewModel {
     /// Replaces `CancelID.timeObserver`. Must be cancelled wherever the reducer cancelled it.
     private var timeObserverTask: Task<Void, Never>?
     private var loadTask: Task<Void, Never>?
+    private var volumeObserverTask: Task<Void, Never>?
 
     private let audioPlayer: AudioPlayerClient
+    private let systemVolume: SystemVolumeClient
     private let fileManager: FileManagerClient
     private let artworkClient: ArtworkClient
     private let repository: PlaybackRepository
 
     init(
         audioPlayer: AudioPlayerClient = .live,
+        systemVolume: SystemVolumeClient = .live,
         fileManager: FileManagerClient = .live,
         artworkClient: ArtworkClient = .live,
         sessionStore: SessionStore = SessionStore(),
         repository: PlaybackRepository? = nil
     ) {
         self.audioPlayer = audioPlayer
+        self.systemVolume = systemVolume
         self.fileManager = fileManager
         self.artworkClient = artworkClient
         self.sessionStore = sessionStore
@@ -122,6 +126,17 @@ final class PlayerViewModel {
         skipDuration = UserDefaults.standard.savedSkipDuration
         repeatMode = UserDefaults.standard.savedRepeatMode
         isShuffleEnabled = UserDefaults.standard.savedShuffleEnabled
+
+        // Seeded, then followed. Without the seed the dial's arc would read full until the first
+        // change; without the stream the hardware buttons would move the volume behind its back,
+        // which is half of what "not synced with the device" meant.
+        volume = systemVolume.level()
+        volumeObserverTask = Task { [weak self, changes = systemVolume.changes] in
+            for await level in changes() {
+                guard let self else { return }
+                self.volume = level
+            }
+        }
     }
 
     /// TCA cancelled in-flight effects when the store scope died. Nothing does that here.
@@ -132,6 +147,7 @@ final class PlayerViewModel {
     isolated deinit {
         timeObserverTask?.cancel()
         loadTask?.cancel()
+        volumeObserverTask?.cancel()
     }
 
     // MARK: - Transport
@@ -270,17 +286,17 @@ final class PlayerViewModel {
         Task { [audioPlayer] in await audioPlayer.setRate(rate) }
     }
 
-    /// This app's output level, `0...1`. **Not the device volume** — that belongs to the hardware
-    /// buttons and `MPVolumeView`, and fighting them was the reason the dial's volume axis went
-    /// unwired for so long. `AVPlayer.volume` is per-player gain, so the wheel can turn this
-    /// without the system slider moving under anyone.
+    /// **The device's media volume, not this app's gain.** It used to be the latter, on the
+    /// reasoning that per-player gain cannot fight the hardware buttons. True, and the wrong trade:
+    /// what it bought was two levels that disagreed, so pressing the buttons left the dial's arc
+    /// where it was and turning the dial left the system slider where it was. A volume control on a
+    /// media player is expected to mean the volume. See `SystemVolumeClient` for what writing it
+    /// costs.
     ///
-    /// Not persisted: a level chosen for one listening session is not a preference, and coming back
-    /// to an app that is quiet with no memory of why is worse than starting at full.
+    /// Not persisted, and now it cannot be: the level belongs to the device and outlives the app.
     func setVolume(_ value: Double) {
         volume = min(max(0, value), 1)
-        let level = Float(volume)
-        Task { [audioPlayer] in await audioPlayer.setVolume(level) }
+        systemVolume.setLevel(volume)
     }
 
     func setSkipDuration(_ duration: SkipDuration) {

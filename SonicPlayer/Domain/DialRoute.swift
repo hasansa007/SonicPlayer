@@ -30,13 +30,6 @@ enum DialRoute: Equatable {
     /// only irreversible one — so the gesture you had just been using stopped working exactly where
     /// care mattered most.
     case confirmDelete(itemID: String)
-    /// The gate on the way out of the editor.
-    ///
-    /// **Leaving is the only thing that commits now.** The hub used to commit and pop, which made
-    /// the trim final at the moment you stopped adjusting it — and popping is what discards the
-    /// selection, so `Back` threw the work away with no warning. Both are answered here: the hub
-    /// settles and then previews, and the decision is taken on the way out, where it belongs.
-    case confirmTrim(itemID: String)
 
     /// The header segment, uppercased. `nil` contributes nothing — the mode chooser is a fork
     /// rather than a place, and `DialScreen.Chrome` says an empty breadcrumb is valid.
@@ -57,7 +50,6 @@ enum DialRoute: Equatable {
         case .recording: "RECORDING"
         case .edit: "EDIT"
         case .confirmDelete: "DELETE"
-        case .confirmTrim: "SAVE?"
         }
     }
 
@@ -90,28 +82,6 @@ enum DialRoute: Equatable {
         case .recording: .gain
         case .nowPlaying: .seek
         default: .highlight
-        }
-    }
-
-    /// The rows of the trim gate, in order. `Save` leads: you arrived here by finishing an edit,
-    /// so keeping it is the answer you meant — the opposite of `DeleteChoice`, where the safe
-    /// answer is to do nothing.
-    enum TrimChoice: String, CaseIterable {
-        case save
-        case discard
-
-        var label: String {
-            switch self {
-            case .save: "Save"
-            case .discard: "Discard"
-            }
-        }
-
-        var icon: DialScreen.Icon {
-            switch self {
-            case .save: .none
-            case .discard: .delete
-            }
         }
     }
 

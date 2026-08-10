@@ -122,6 +122,7 @@ extension DialNavigator {
                 outFraction: trim.outFraction,
                 playheadFraction: nil,
                 activeHandle: axis == .trimEnd ? .end : .start,
+                operation: level.trimOperation,
                 scale: [
                     DialTimeFormat.clock(0),
                     DialTimeFormat.clock(trim.start),
@@ -134,9 +135,6 @@ extension DialNavigator {
         // naming what they act on is exactly the screen `Delete` must not be.
         case .confirmDelete(let itemID):
             return .list(list(rows: deleteChoiceRows, subject: subject(for: itemID)))
-
-        case .confirmTrim(let itemID):
-            return .list(list(rows: trimChoiceRows, subject: subject(for: itemID)))
         }
     }
 
@@ -222,12 +220,6 @@ extension DialNavigator {
         }
     }
 
-    private var trimChoiceRows: [DialScreen.List.Row] {
-        DialRoute.TrimChoice.allCases.map {
-            .init(id: $0.rawValue, icon: $0.icon, title: $0.label)
-        }
-    }
-
     private var deleteChoiceRows: [DialScreen.List.Row] {
         DialRoute.DeleteChoice.allCases.map {
             .init(id: $0.rawValue, icon: $0.icon, title: $0.label)
@@ -275,7 +267,7 @@ extension DialNavigator {
         case .edit:
             return []
 
-        case .confirmDelete, .confirmTrim:
+        case .confirmDelete:
             return []
         }
     }
@@ -346,7 +338,12 @@ extension DialNavigator {
             guard content.editing != nil else { return nil }
             return DialScreen.Directions(
                 up: .init(id: "trim", icon: .edit, label: "Trim to selection"),
-                down: .init(id: "cut", icon: .delete, label: "Delete selection")
+                down: .init(id: "cut", icon: .delete, label: "Delete selection"),
+                // **Hearing the selection is the point of setting it.** Preview has moved three
+                // times — a chip, then the hub's settle state — and both homes were wrong for the
+                // same reason: it competed with the press that rewrites the file. On its own
+                // direction it competes with nothing.
+                right: .init(id: "preview", icon: .play, label: "Preview selection")
             )
 
         case .recording:
@@ -420,13 +417,11 @@ extension DialNavigator {
         case .recordings: highlightedLibraryRow == .importFiles ? .label("IMPORT") : .label("OPEN")
         case .nowPlaying: .glyph(content.playback?.isPlaying == false ? "play.fill" : "pause.fill")
         case .recording: .recordDot
-        // **Two states, one button.** `DONE` settles the handles; after that the hub plays the
-        // region you are about to keep. Committing is not here at all — it is the question `Back`
-        // asks, which is what stops `Done` and `Back` being one keystroke apart with opposite
-        // consequences.
-        case .edit: level.isTrimSettled ? .glyph("play.fill") : .label("DONE")
+        // One state, one meaning: `DONE` applies whichever operation the nudges armed. It briefly
+        // had two — settle, then play — which stopped making sense once the nudges themselves
+        // committed, and stopped existing when they went back to arming.
+        case .edit: .label("DONE")
         case .confirmDelete: .label("CONFIRM")
-        case .confirmTrim: .label("CONFIRM")
         }
     }
 
@@ -461,17 +456,16 @@ extension DialNavigator {
             return "ring shows input level · rotate to set gain · press to stop"
 
         case .edit:
-            return level.isTrimSettled
-                ? "press to hear what you are keeping · back to save or discard"
-                : "drag or rotate to move the handle · tap the other to switch"
+            // Names the press, the way to change your mind, and the way to check first — in that
+            // order, because that is the order they are wanted in.
+            return level.trimOperation == .remove
+                ? "press to delete the selection · up to keep it instead · right to hear it"
+                : "press to trim to the selection · down to delete it instead · right to hear it"
 
         // Says what the press will do rather than how to press. This is the one screen where the
         // wrong answer cannot be taken back, so the caption names the outcome.
         case .confirmDelete:
             return "deleting cannot be undone · rotate to choose · press to confirm"
-
-        case .confirmTrim:
-            return "saving rewrites the recording · rotate to choose · press to confirm"
         }
     }
 

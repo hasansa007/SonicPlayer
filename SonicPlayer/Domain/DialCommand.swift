@@ -43,6 +43,18 @@ enum DialCommand: Equatable {
     /// directly, and both arrive as commands the navigator handles identically.
     case action(String)
 
+    /// The stick has just travelled far enough to count as a nudge.
+    ///
+    /// **Sent while the thumb is still down, and it is the whole point.** The nudge's action fires
+    /// on release, so until now nothing was felt at the moment the stick engaged — you pushed, felt
+    /// nothing, and learned whether it had taken only after letting go, by which time the choice was
+    /// already made. Every physical detented control answers at the moment you cross into the
+    /// detent, not when you stop pressing.
+    ///
+    /// A command rather than a haptic call inside `DialRing`, because the ring emits commands and
+    /// knows nothing else — the navigator answers this the way it answers every other feedback.
+    case nudgeEngaged
+
     /// A trim handle dragged straight to a position, `0...1` of the recording.
     ///
     /// **It names the handle, because dragging one selects it.** The finger is coarse and the wheel

@@ -40,12 +40,12 @@ struct DialNavigator {
         var mode: Int = 0
         /// The trim editor's selection. Only `.edit` has one, and popping is what discards it.
         var trim: DialTrimRange?
-        /// Whether the editor's handles have been settled with the hub.
+        /// What the editor will do to the selection when `DONE` is pressed.
         ///
-        /// Before: the hub says `DONE` and a press settles. After: it offers to play the kept
-        /// region, so you can hear the trim before deciding to keep it. Nothing about the selection
-        /// changes either way — this only moves what the one button means.
-        var isTrimSettled = false
+        /// **Armed, not applied.** The nudges used to commit and pop on the spot, which left the
+        /// `Back` gate asking whether to save something already written — two mechanisms from two
+        /// rounds, both live, contradicting each other. Up and down choose; the hub does it.
+        var trimOperation: DialScreen.TrimOperation = .keep
     }
 
     /// One detent of input gain. Fifty detents end to end, matching `WheelRouter.volumePerDetent` —
@@ -86,6 +86,8 @@ struct DialNavigator {
         case .hold: hold()
         case .action(let id): perform(id)
         case .dragTrim(let handle, let fraction): dragTrim(handle, to: fraction)
+        // The stick engaging is felt, not decided: nothing about where you are changes.
+        case .nudgeEngaged: [.feedback(.detent)]
         }
     }
 
@@ -267,15 +269,6 @@ struct DialNavigator {
         }
     }
 
-    /// Whether the editor's handles have been moved off the whole recording.
-    ///
-    /// The selection starts as the entire file, so "unchanged" and "keep everything" are the same
-    /// range — and neither is worth stopping to ask about on the way out.
-    private var hasUnsavedTrim: Bool {
-        guard let editing = content.editing, let trim = level.trim else { return false }
-        return trim.start > 0 || trim.end < editing.duration
-    }
-
     /// The editor's selection — the one this level holds, or a whole-file range derived from the
     /// material when it has none yet.
     ///
@@ -341,43 +334,35 @@ struct DialNavigator {
             push(.recordings)
             return [.stopRecording, .feedback(.commit)]
 
-        // **The hub settles, then plays. It no longer commits.**
-        //
-        // Committing on the hub made the trim final the moment you stopped adjusting it, with no
-        // way to hear the result first — and it popped, which is also what *discards* a selection,
-        // so `Back` and `Done` were one keystroke apart with opposite meanings. Saving moved to the
-        // way out, where `.confirmTrim` asks.
+        // **`DONE` is the only thing that writes.** The nudges choose what will happen; this makes
+        // it happen and leaves. One button, one moment where a real recording changes.
         case .edit(let itemID):
             // **Refusing beats acting on an empty range.** The old fallback was
             // `DialTrimRange(start: 0, end: 0, duration: 0)`, so pressing the hub before the
             // material had loaded asked the host to keep nothing at all — and the host is about to
             // rewrite a real file.
             guard let trim = currentTrim else { return [.feedback(.limit)] }
+            let operation = level.trimOperation
 
-            guard level.isTrimSettled else {
-                stack[stack.count - 1].isTrimSettled = true
-                return [.feedback(.commit)]
-            }
-            return [
-                .previewTrim(itemID: itemID, start: trim.start, end: trim.end),
-                .feedback(.commit)
-            ]
+            // **Applying does not leave.** DONE used to pop, which meant the one screen that can
+            // show you the result was gone at the instant there was a result to show — you pressed,
+            // the editor vanished, and whether the cut landed where you wanted was something you
+            // found out by opening the file again. Leaving is the back control's job.
+            //
+            // Clearing `trim` rather than keeping it is what makes a second press safe: the
+            // recording underneath has just been rewritten, so the old start and end describe a
+            // file that no longer exists. `currentTrim` falls back to the whole of
+            // `content.editing`, so the next refresh — carrying the new duration — seeds the
+            // handles across the new file. Disarming to `.keep` for the same reason: the delete
+            // has happened, and leaving it armed points a second one at the wrong region.
+            stack[stack.count - 1].trim = nil
+            stack[stack.count - 1].trimOperation = .keep
 
-        case .confirmTrim(let itemID):
-            let choices = DialRoute.TrimChoice.allCases
-            let choice = choices[min(level.highlighted, choices.count - 1)]
-            let trim = stack.dropLast().last?.trim
-            pop()                                   // the gate
-            pop()                                   // the editor
-            switch choice {
-            case .discard:
-                return [.feedback(.commit)]
-            case .save:
-                guard let trim else { return [.feedback(.limit)] }
-                return [
-                    .commitTrim(itemID: itemID, start: trim.start, end: trim.end),
-                    .feedback(.commit)
-                ]
+            switch operation {
+            case .keep:
+                return [.commitTrim(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
+            case .remove:
+                return [.commitCut(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
             }
 
         case .confirmDelete(let itemID):
@@ -435,15 +420,10 @@ struct DialNavigator {
     private mutating func perform(_ id: String) -> [DialEffect] {
         if id == "back" {
             guard stack.count > 1 else { return [.feedback(.limit)] }
-            // **Leaving the editor is where the trim is decided.** Popping is what discards a
-            // selection, so an unguarded `Back` threw the work away silently — the same hazard
-            // `Delete` has, on a screen that rewrites a real file.
-            //
-            // Only when there is something to lose: an untouched selection is the whole recording,
-            // and asking whether to save what you have not changed is a dialogue for nothing.
-            if case .edit(let itemID) = route, hasUnsavedTrim {
-                return open(.confirmTrim(itemID: itemID))
-            }
+            // **Back leaves, and asks nothing.** It used to open a Save-or-Discard gate, which made
+            // sense while the hub did not write — but the nudges then started committing on the
+            // spot, so the gate offered to save something already on disk. `DONE` writes and
+            // nothing else does, which leaves `Back` with nothing to guard.
             pop()
             return [.feedback(.commit)]
         }
@@ -475,17 +455,15 @@ struct DialNavigator {
 
         // **Renaming is the editor's, not the stick's.** Four directions cannot hold five verbs, and
         // of the five this is the one that belongs where you are already changing the recording.
-        // Both commit and leave. `Back` still asks Save or Discard, which is the escape for a
-        // handle moved and then thought better of; these two are the deliberate answers.
-        case (.edit(let itemID), "trim"):
-            guard let trim = currentTrim else { return [.feedback(.limit)] }
-            pop()
-            return [.commitTrim(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
+        // **These arm; they do not act.** Nothing reaches disk until the hub is pressed, so a nudge
+        // is free to change your mind about.
+        case (.edit, "trim"):
+            stack[stack.count - 1].trimOperation = .keep
+            return [.feedback(.commit)]
 
-        case (.edit(let itemID), "cut"):
-            guard let trim = currentTrim else { return [.feedback(.limit)] }
-            pop()
-            return [.commitCut(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
+        case (.edit, "cut"):
+            stack[stack.count - 1].trimOperation = .remove
+            return [.feedback(.commit)]
 
         case (.edit(let itemID), "rename"):
             return [.renameItem(itemID: itemID), .feedback(.commit)]
@@ -504,6 +482,10 @@ struct DialNavigator {
         // The stick's vertical axis. These had no handler at all — the nudge fired, the navigator
         // shrugged, and nothing moved. A command with no case is silent, which is why the
         // command/handler pair wants to be added in one breath.
+        case (.edit(let itemID), "preview"):
+            guard let trim = currentTrim else { return [.feedback(.limit)] }
+            return [.previewTrim(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
+
         case (.nowPlaying, "volumeUp"):
             return setVolume(by: WheelRouter.volumePerNudge)
         case (.nowPlaying, "volumeDown"):
@@ -606,7 +588,6 @@ struct DialNavigator {
         case .library: content.sections.count
         case .recordings: RecordingsRow.rowCount(recordings: content.recordings.count)
         case .confirmDelete: DialRoute.DeleteChoice.allCases.count
-        case .confirmTrim: DialRoute.TrimChoice.allCases.count
         case .nowPlaying, .recording, .edit: 0
         }
     }

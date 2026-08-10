@@ -101,28 +101,75 @@ struct DialPressTests {
         #expect(starting == [.startRecording, .feedback(.commit)])
     }
 
-    /// **The hub settles, then plays; it no longer commits.** Saving is the question `Back` asks.
-    @Test func pressingOnTheEditorSettlesThenPreviews() {
+    /// **`DONE` is the only thing that writes**, and it applies whichever operation the nudges
+    /// armed. Trim is armed by default, so a press with no nudge keeps the selection.
+    @Test func pressingOnTheEditorAppliesTheArmedOperation() {
         var navigator = DialSample.whileEditing()
         _ = navigator.receive(.tick(10))       // nudge the start handle a second in
 
-        #expect(navigator.receive(.press) == [.feedback(.commit)], "the first press settles")
-        #expect(navigator.receive(.press) == [
-            .previewTrim(itemID: "rec-0", start: 1, end: 600), .feedback(.commit)
-        ])
-        #expect(navigator.route == .edit(itemID: "rec-0"), "and stays put")
+        let effects = navigator.receive(.press)
+
+        #expect(effects == [.commitTrim(itemID: "rec-0", start: 1, end: 600), .feedback(.commit)])
+        // **Still here.** Applying used to pop, which hid the result at the moment there was one.
+        #expect(navigator.route == .edit(itemID: "rec-0"))
     }
 
-    @Test func leavingTheEditorAsksThenSaves() {
+    /// **A second press cannot re-cut the old region.** The file underneath has been rewritten, so
+    /// the handles are cleared and re-seeded from whatever the next refresh reports.
+    @Test func applyingClearsTheSelectionSoItCannotBeAppliedTwice() {
+        var navigator = DialSample.whileEditing()
+        _ = navigator.receive(.tick(10))
+        _ = navigator.receive(.press)
+
+        let again = navigator.receive(.press)
+
+        #expect(again == [.commitTrim(itemID: "rec-0", start: 0, end: 600), .feedback(.commit)])
+    }
+
+    /// Applying a delete disarms it, for the same reason: a second press would aim the same cut at
+    /// a region that is no longer there.
+    @Test func applyingADeleteDisarmsIt() {
+        var navigator = DialSample.whileEditing()
+        _ = navigator.receive(.action("cut"))
+        _ = navigator.receive(.press)
+
+        let again = navigator.receive(.press)
+
+        #expect(again == [.commitTrim(itemID: "rec-0", start: 0, end: 600), .feedback(.commit)])
+    }
+
+    /// The right nudge is the only way to hear the selection before committing to it.
+    @Test func theRightNudgePreviewsTheSelection() {
         var navigator = DialSample.whileEditing()
         _ = navigator.receive(.tick(10))
 
-        _ = navigator.receive(.action("back"))
-        #expect(navigator.route == .confirmTrim(itemID: "rec-0"))
+        let effects = navigator.receive(.action("preview"))
 
-        let effects = navigator.receive(.press)   // Save leads
+        #expect(effects == [.previewTrim(itemID: "rec-0", start: 1, end: 600), .feedback(.commit)])
+        #expect(navigator.route == .edit(itemID: "rec-0"), "previewing goes nowhere")
+    }
 
-        #expect(effects == [.commitTrim(itemID: "rec-0", start: 1, end: 600), .feedback(.commit)])
+    @Test func armingDeleteMakesDoneRemoveTheSelectionInstead() {
+        var navigator = DialSample.whileEditing()
+        _ = navigator.receive(.tick(10))
+
+        #expect(navigator.receive(.action("cut")) == [.feedback(.commit)], "arming writes nothing")
+        #expect(navigator.route == .edit(itemID: "rec-0"), "and goes nowhere")
+
+        let effects = navigator.receive(.press)
+
+        #expect(effects == [.commitCut(itemID: "rec-0", start: 1, end: 600), .feedback(.commit)])
+        #expect(navigator.route == .edit(itemID: "rec-0"))
+    }
+
+    /// **Back leaves and asks nothing**, because nothing has been written to save or discard.
+    @Test func leavingTheEditorAppliesNothing() {
+        var navigator = DialSample.whileEditing()
+        _ = navigator.receive(.tick(10))
+
+        let effects = navigator.receive(.action("back"))
+
+        #expect(effects == [.feedback(.commit)])
         #expect(navigator.route == .recordings)
     }
 

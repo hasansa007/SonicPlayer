@@ -167,6 +167,10 @@ enum Sizing {
     /// 52 — the icon tile on a prominent choice row, where a screen offers two options rather than
     /// a list of many.
     static let dialChoiceTile: CGFloat = 52
+
+    /// The transient volume indicator, sized to sit where iOS puts its own without imitating it.
+    static let volumePillWidth: CGFloat = 44
+    static let volumePillHeight: CGFloat = 132
 }
 
 /// A shadow, as one value rather than four loose arguments at the call site.

@@ -19,6 +19,13 @@ import SwiftUI
 /// what a command *means* is decided here.
 struct DialScreenView: View {
 
+    /// The level the pill is showing, and whether it is showing.
+    ///
+    /// Held here rather than in the contract because it is *presentation timing*, not state — the
+    /// navigator knows the volume, and knows nothing about how long a transient should linger.
+    @State private var pillVolume: Double?
+    @State private var pillTask: Task<Void, Never>?
+
     let screen: DialScreen
     let onCommand: (DialCommand) -> Void
 
@@ -230,6 +237,19 @@ struct DialScreenView: View {
         // useful.
         .accessibilityHint(Text(screen.hint))
     }
+
+    /// The volume this screen is currently reporting, or `nil` where volume is not on show.
+    ///
+    /// `onChange` needs an `Equatable` to watch, and watching the whole screen would fire the pill
+    /// on every tick of the clock.
+    private var currentVolume: Double? {
+        guard case .nowPlaying(let playing) = screen.content else { return nil }
+        return playing.volume
+    }
+
+    /// How long the pill stays after the last nudge. Long enough to read a second nudge as one
+    /// gesture, short enough not to sit over the artwork.
+    private static let pillLinger: Double = 1.2
 
     private static let washTint: Double = 0.15
 

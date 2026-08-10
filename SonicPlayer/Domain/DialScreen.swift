@@ -161,6 +161,18 @@ struct DialScreen: Equatable {
         case end
     }
 
+    /// What `DONE` will do to the selection.
+    ///
+    /// The screen has to say this, because the two are opposites acting on the same region — and
+    /// the only thing distinguishing them is which nudge you last pressed, which is not something a
+    /// screen can be expected to remember on the user's behalf.
+    enum TrimOperation: Equatable {
+        /// Keep what is between the handles.
+        case keep
+        /// Remove what is between the handles and join what is left.
+        case remove
+    }
+
     struct Edit: Equatable {
         var title: String
         /// How much survives the trim, e.g. `"08:12"`.
@@ -171,6 +183,7 @@ struct DialScreen: Equatable {
         var outFraction: Double
         var playheadFraction: Double?
         var activeHandle: Handle = .start
+        var operation: TrimOperation = .keep
         /// The four labels under the waveform: start, IN, OUT, end.
         var scale: [String]
     }

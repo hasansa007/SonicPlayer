@@ -433,6 +433,9 @@ struct DialRing: View {
                     didNudge = true
                     holdTask?.cancel()
                     holdTask = nil
+                    // Felt at the moment the stick engages, not on release — see
+                    // `DialCommand.nudgeEngaged`.
+                    onCommand(.nudgeEngaged)
                 }
 
                 // Follow the thumb, bounded, so the stick reads as a stick rather than as a button
@@ -448,11 +451,17 @@ struct DialRing: View {
                 isHubPressed = false
                 nudge = .zero
 
-                guard !didHold else { return }
+                // **The direction is read before `didHold` is consulted, and the order is the
+                // fix.** Cancelling the hold on threshold only helps a push that crosses 16pt
+                // within half a second. A thumb that lands, rests, and *then* shoves — which is how
+                // a deliberate reach for volume actually goes — had already fired `.hold`, and this
+                // guard threw the nudge away. A hold is a press that stays put; once the stick has
+                // travelled to a direction it was never one, whatever the clock says.
                 if let id = directionID(for: value.translation) {
                     onCommand(.action(id))
                     return
                 }
+                guard !didHold else { return }
                 registerPress()
             }
     }

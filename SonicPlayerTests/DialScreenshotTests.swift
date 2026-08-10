@@ -146,11 +146,16 @@ struct DialScreenshotTests {
         #expect(edit.scale == ["00:00", "00:00", "10:00", "10:00"])
 
         #expect(screen.chrome.breadcrumb == ["HOME", "LIBRARY", "EDIT"])
-        // No chips: the handles are chosen by tapping them, and `Preview` was removed outright.
+        // No chips. The handles are chosen by tapping them, and everything the editor can do is a
+        // nudge — so the action row has nothing left to hold.
         #expect(screen.actions.isEmpty)
         #expect(edit.activeHandle == .start)
+        #expect(edit.operation == .keep)
         #expect(screen.ring.hub == .label("DONE"))
-        #expect(screen.hint == "drag or rotate to move the handle · tap the other to switch")
+        #expect(
+            screen.hint
+                == "press to trim to the selection · down to delete it instead · right to hear it"
+        )
     }
 
     // MARK: - 1f The four nudges that replaced the actions menu

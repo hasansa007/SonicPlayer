@@ -61,13 +61,16 @@ struct DialEditView: View {
 
             Spacer(minLength: Spacing.sm)
 
+            // **The word changes with the armed operation.** Trim and delete act on the same
+            // region and differ only in which nudge you last pressed — so the one figure on this
+            // screen has to say which of the two it is describing, or it is describing neither.
             HStack(spacing: Spacing.xs) {
-                Text("Keeping")
+                Text(edit.operation == .remove ? "Removing" : "Keeping")
                     .foregroundColor(.sonicTextMuted)
                 Text(edit.keeping)
                     .fontWeight(.semibold)
                     .monospacedDigit()
-                    .foregroundColor(.sonicPrimary)
+                    .foregroundColor(edit.operation == .remove ? .red : .sonicPrimary)
             }
             .font(.caption)
         }
