@@ -136,7 +136,7 @@ struct DialScreenView: View {
             DialRecordingView(recording: recording)
 
         case .edit(let edit):
-            DialEditView(edit: edit)
+            DialEditView(edit: edit, onCommand: onCommand)
 
         case .message(let message):
             DialMessageView(message: message)

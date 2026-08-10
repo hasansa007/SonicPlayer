@@ -143,6 +143,18 @@ struct DialScreen: Equatable {
         var markers: [Marker]
     }
 
+    /// Which trim handle the wheel is currently nudging.
+    ///
+    /// **The screen could not say this before.** `DialEditView` drew the start handle active
+    /// unconditionally, with a comment admitting it: the selection lived in the action row's
+    /// `.selected` chip and never reached the contract. So selecting `End` moved the end handle
+    /// while the picture went on highlighting the start one. With the chips gone and selection now
+    /// made by tapping a handle, the screen has to be able to answer this.
+    enum Handle: Equatable {
+        case start
+        case end
+    }
+
     struct Edit: Equatable {
         var title: String
         /// How much survives the trim, e.g. `"08:12"`.
@@ -152,6 +164,7 @@ struct DialScreen: Equatable {
         var inFraction: Double
         var outFraction: Double
         var playheadFraction: Double?
+        var activeHandle: Handle = .start
         /// The four labels under the waveform: start, IN, OUT, end.
         var scale: [String]
     }

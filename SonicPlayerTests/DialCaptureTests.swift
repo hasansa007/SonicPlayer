@@ -127,17 +127,6 @@ struct DialCaptureTests {
         #expect(effects == [.setTrim(start: 599.5, end: 600), .feedback(.detent)])
     }
 
-    // MARK: - Preview
-
-    @Test func previewCarriesTheSelectionAsItStands() {
-        var navigator = Self.inEditor()
-        _ = navigator.receive(.tick(20))
-
-        let effects = navigator.receive(.action("preview"))
-
-        #expect(effects == [.previewTrim(itemID: "rec-0", start: 2, end: 600), .feedback(.commit)])
-    }
-
     // MARK: -
 
     private static func editable(markers: [TimeInterval]) -> DialContent.Editable {

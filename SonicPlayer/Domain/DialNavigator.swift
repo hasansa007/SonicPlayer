@@ -79,6 +79,7 @@ struct DialNavigator {
         case .doublePress: doublePress()
         case .hold: hold()
         case .action(let id): perform(id)
+        case .dragTrim(let handle, let fraction): dragTrim(handle, to: fraction)
         }
     }
 
@@ -134,6 +135,33 @@ struct DialNavigator {
 
         stack[stack.count - 1].highlighted = target
         return [.feedback(.detent)]
+    }
+
+    /// A handle dragged straight to a position, which also selects it.
+    ///
+    /// The selection moves first so the wheel picks up the handle the finger just released — coarse
+    /// with the finger, fine with the dial, which is the pairing this screen is for. `DialTrimRange`
+    /// still owns the rule that the handles cannot cross, so a drag past the other one lands
+    /// against it rather than through it.
+    private mutating func dragTrim(_ handle: DialScreen.Handle, to fraction: Double) -> [DialEffect] {
+        guard case .edit = route, let editing = content.editing else { return [.feedback(.limit)] }
+
+        if let index = route.modes.firstIndex(where: { $0.axis == (handle == .start ? .trimStart : .trimEnd) }) {
+            stack[stack.count - 1].mode = index
+        }
+
+        var trim = currentTrim ?? DialTrimRange(start: 0, end: editing.duration, duration: editing.duration)
+        let target = min(max(0, fraction), 1) * editing.duration
+        let before = (trim.start, trim.end)
+
+        switch handle {
+        case .start: trim.setStart(to: target)
+        case .end: trim.setEnd(to: target)
+        }
+        stack[stack.count - 1].trim = trim
+
+        guard (trim.start, trim.end) != before else { return [] }
+        return [.setTrim(start: trim.start, end: trim.end), .feedback(.detent)]
     }
 
     private mutating func seek(by delta: TimeInterval) -> [DialEffect] {
@@ -412,13 +440,6 @@ struct DialNavigator {
         case (.recording, "pause"):
             content.capture?.isPaused.toggle()
             return [.toggleRecordingPause, .feedback(.commit)]
-
-        case (.edit(let itemID), "preview"):
-            guard let trim = currentTrim else { return [.feedback(.limit)] }
-            return [
-                .previewTrim(itemID: itemID, start: trim.start, end: trim.end),
-                .feedback(.commit)
-            ]
 
         default:
             return []

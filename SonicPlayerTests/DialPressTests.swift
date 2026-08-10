@@ -202,16 +202,12 @@ struct DialPressTests {
         #expect(navigator.screen.ring.directions?.left?.icon == .play)
     }
 
-    @Test func thePreviewChipIsAnActionRatherThanAMode() {
-        var navigator = DialSample.whileEditing()
+    /// **The editor has no chips at all now.** `Start handle` and `End handle` were replaced by
+    /// tapping the handle itself, and `Preview` was removed outright.
+    @Test func theEditorOffersNoChips() {
+        let navigator = DialSample.whileEditing()
 
-        let effects = navigator.receive(.action("preview"))
-
-        // Bounded on the way out, like `commitTrim` — the selection is the whole file until a
-        // handle is nudged, and `DialSample.editable` is ten minutes long.
-        #expect(effects == [.previewTrim(itemID: "rec-0", start: 0, end: 600), .feedback(.commit)])
-        // Preview must not steal the selection from the handle the wheel is nudging.
-        #expect(navigator.axis == .trimStart)
+        #expect(navigator.screen.actions.isEmpty)
     }
 
     /// Now Playing used to be three mode chips and no Back, which made the command load-bearing:

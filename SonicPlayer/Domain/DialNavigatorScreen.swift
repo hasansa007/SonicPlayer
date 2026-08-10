@@ -120,6 +120,7 @@ extension DialNavigator {
                 inFraction: trim.inFraction,
                 outFraction: trim.outFraction,
                 playheadFraction: nil,
+                activeHandle: axis == .trimEnd ? .end : .start,
                 scale: [
                     DialTimeFormat.clock(0),
                     DialTimeFormat.clock(trim.start),
@@ -269,8 +270,12 @@ extension DialNavigator {
             _ = paused
             return []
 
+        // **No chips.** `Start handle` and `End handle` were how you chose which one the wheel
+        // nudged; you tap the handle itself now, which is where your eye already is. `Preview` went
+        // with them — a third control to hear the result was one more thing between you and the
+        // trim, and the waveform plus `Keeping` already say what you are about to keep.
         case .edit:
-            return modeChips + [.init(id: "preview", label: "Preview")]
+            return []
 
         case .actions, .confirmDelete:
             return []

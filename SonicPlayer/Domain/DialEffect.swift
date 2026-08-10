@@ -50,10 +50,6 @@ enum DialEffect: Equatable {
     /// Both handles at once, because they are one selection and `DialTrimRange` is what keeps them
     /// from crossing. Sending them separately would let a listener see a crossed intermediate.
     case setTrim(start: TimeInterval, end: TimeInterval)
-    /// Carries its item and its bounds for the same reason `commitTrim` does, and the reason stated
-    /// at the top of this file: the navigator already holds both, so an effect that arrives complete
-    /// cannot be applied against a stale selection — or against the wrong recording.
-    case previewTrim(itemID: String, start: TimeInterval, end: TimeInterval)
     case commitTrim(itemID: String, start: TimeInterval, end: TimeInterval)
 
     // MARK: - Items

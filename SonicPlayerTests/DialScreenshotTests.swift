@@ -160,7 +160,9 @@ struct DialScreenshotTests {
         #expect(edit.scale == ["00:00", "00:00", "10:00", "10:00"])
 
         #expect(screen.chrome.breadcrumb == ["HOME", "LIBRARY", "EDIT"])
-        #expect(screen.actions.map(\.label) == ["Start handle", "End handle", "Preview"])
+        // No chips: the handles are chosen by tapping them, and `Preview` was removed outright.
+        #expect(screen.actions.isEmpty)
+        #expect(edit.activeHandle == .start)
         #expect(screen.ring.hub == .label("DONE"))
         #expect(screen.hint == "rotate to nudge the active handle · press when done")
     }

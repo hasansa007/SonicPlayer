@@ -2,16 +2,23 @@ import SwiftUI
 
 /// Trim (#6).
 ///
-/// **The handles are drawn, not dragged.** The dial nudges whichever one the action row has
-/// selected, which is the whole reason this screen exists in a wheel-driven app — a trim handle is
-/// the case where a finger on the waveform is too coarse and a wheel is exactly right.
+/// **The handles are dragged as well as nudged, and tapping one chooses it.** This used to say "the
+/// handles are drawn, not dragged" — the wheel was the only way to move them, and which one it
+/// moved was chosen by a chip in the action row. Two problems came out of that. The chips were a
+/// control for something you were already looking at, and the view could not read the selection at
+/// all, so it drew the *start* handle active whichever one you had chosen.
 ///
-/// Note what is *not* here: the design puts `Delete selection` and `Split at playhead` inside this
-/// card. `DialScreen.Edit` has no field for them and `actions` explicitly may hold five, so they
-/// live in the action row with the handle selector. See `DialPreviewData`.
+/// Now the finger does the coarse move and the wheel does the fine one, which is the pairing this
+/// screen wanted all along: drag a handle roughly into place, then turn for the last tenth of a
+/// second. Dragging selects, so the wheel picks up whichever one you just released.
 struct DialEditView: View {
 
     let edit: DialScreen.Edit
+    var onCommand: (DialCommand) -> Void = { _ in }
+
+    /// Which handle the finger currently owns. `nil` between gestures — the wheel's selection is
+    /// `edit.activeHandle`, which the navigator owns and this only mirrors while dragging.
+    @State private var dragging: DialScreen.Handle?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.lg) {
@@ -66,10 +73,10 @@ struct DialEditView: View {
                     .frame(width: max(0, outX - inX))
                     .offset(x: inX)
 
-                handle(isActive: true, systemImage: "chevron.left")
+                handle(.start, systemImage: "chevron.left", width: width)
                     .position(x: inX, y: geometry.size.height / 2)
 
-                handle(isActive: false, systemImage: "chevron.right")
+                handle(.end, systemImage: "chevron.right", width: width)
                     .position(x: outX, y: geometry.size.height / 2)
 
                 if let playhead = edit.playheadFraction {
@@ -81,7 +88,8 @@ struct DialEditView: View {
             }
         }
         .frame(height: Sizing.dialEditWave)
-        .accessibilityElement(children: .ignore)
+        .coordinateSpace(name: Self.waveSpace)
+        .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Trim region"))
         .accessibilityValue(Text(edit.keeping))
     }
@@ -109,11 +117,17 @@ struct DialEditView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    /// `isActive` is the handle the dial is currently nudging. The contract says which through the
-    /// action row's `.selected` emphasis rather than through `Edit`, so this view cannot read it —
-    /// the start handle is drawn active because that is what the selector defaults to.
-    private func handle(isActive: Bool, systemImage: String) -> some View {
-        RoundedRectangle(cornerRadius: Radius.sm)
+    /// One handle: filled when it is the one the wheel will nudge, and both tappable and draggable.
+    ///
+    /// **The touch target is wider than the bar.** `Sizing.dialTrimHandle` is a few points across so
+    /// the waveform stays readable through it, and a few points is not something a thumb can find.
+    /// The `contentShape` widens what responds without widening what is drawn.
+    private func handle(
+        _ which: DialScreen.Handle, systemImage: String, width: CGFloat
+    ) -> some View {
+        let isActive = (dragging ?? edit.activeHandle) == which
+
+        return RoundedRectangle(cornerRadius: Radius.sm)
             .fill(isActive ? Color.sonicPrimary : Color.sonicTextSecondary)
             .frame(width: Sizing.dialTrimHandle, height: Sizing.dialEditWave)
             .overlay(
@@ -122,6 +136,22 @@ struct DialEditView: View {
                     .fontWeight(.bold)
                     .foregroundColor(.white)
             )
+            .contentShape(Rectangle().size(width: Sizing.tapTarget, height: Sizing.dialEditWave))
+            .gesture(
+                // **Named space, not the default.** The handle is `.position`-ed, so a gesture in
+                // its own coordinates reports where the finger is *within the handle* — a few
+                // points wide, and identical wherever on the waveform it sits. Every drag would
+                // read as "near zero" and the handle would jump to the start.
+                DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.waveSpace))
+                    .onChanged { value in
+                        dragging = which
+                        onCommand(.dragTrim(handle: which, fraction: value.location.x / max(1, width)))
+                    }
+                    .onEnded { _ in dragging = nil }
+            )
+            .accessibilityElement()
+            .accessibilityLabel(Text(which == .start ? "Start handle" : "End handle"))
+            .accessibilityAddTraits(isActive ? [.isSelected] : [])
     }
 
     private var scale: some View {
@@ -136,6 +166,10 @@ struct DialEditView: View {
         .foregroundColor(.sonicTextMuted)
         .accessibilityElement(children: .combine)
     }
+
+    /// The waveform's own coordinate space, so a drag on a positioned handle reports where the
+    /// finger is along the *waveform* rather than within the handle.
+    private static let waveSpace = "dialTrimWave"
 
     /// How faint the trimmed-away part of the waveform is. Present, not deleted — the point of the
     /// screen is that you can move the handles back.

@@ -39,7 +39,6 @@ final class DialViewModel {
     var onTogglePause: (() -> Void)?
     var onAddMarker: (() -> Void)?
     var onSetGain: ((Double) -> Void)?
-    var onPreviewTrim: ((String, TimeInterval, TimeInterval) -> Void)?
     var onCommitTrim: ((String, TimeInterval, TimeInterval) -> Void)?
 
     /// The five rows of the actions screen. Declared and **not wired** — see `apply(_:)`.
@@ -296,8 +295,6 @@ final class DialViewModel {
             onAddMarker?()
         case .setGain(let value):
             onSetGain?(value)
-        case .previewTrim(let itemID, let start, let end):
-            onPreviewTrim?(itemID, start, end)
         case .commitTrim(let itemID, let start, let end):
             onCommitTrim?(itemID, start, end)
 

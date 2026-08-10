@@ -40,23 +40,35 @@ struct DialModeTests {
         #expect(navigator.axis == .seek)
     }
 
-    /// Modes survive where a screen genuinely has two things one wheel must do. The trim editor is
-    /// the last of them: one wheel, two handles, and no room for a second control.
-    @Test func theChipsAreGeneratedFromTheModes() {
+    /// **Modes outlived the chips that used to display them.** The trim editor still has two
+    /// things one wheel must do, so `route.modes` still decides the axis — but you choose between
+    /// them by tapping the handle rather than a chip, so the editor draws no action row at all.
+    @Test func theEditorKeepsItsModesAndShowsNoChips() {
         let navigator = DialSample.whileEditing()
 
-        #expect(navigator.screen.actions.map(\.id).prefix(2) == navigator.route.modes.map(\.id).prefix(2))
-        #expect(navigator.screen.actions.map(\.label).prefix(2) == ["Start handle", "End handle"])
+        #expect(navigator.route.modes.map(\.id) == ["trimStart", "trimEnd"])
+        #expect(navigator.screen.actions.isEmpty)
     }
 
-    @Test func exactlyOneChipIsSelected() {
+    /// The selection has to reach the *screen* now, because the handle drawn filled is the only
+    /// thing saying which one the wheel will move. It never did before: the view highlighted the
+    /// start handle unconditionally while the chip row carried the truth.
+    @Test func theScreenSaysWhichHandleIsLive() {
         var navigator = DialSample.whileEditing()
+
+        guard case .edit(let before) = navigator.screen.content else {
+            Issue.record("expected the editor")
+            return
+        }
+        #expect(before.activeHandle == .start)
+
         _ = navigator.receive(.action("trimEnd"))
 
-        let selected = navigator.screen.actions.filter { $0.emphasis == .selected }
-
-        #expect(selected.count == 1)
-        #expect(selected.first?.id == "trimEnd")
+        guard case .edit(let after) = navigator.screen.content else {
+            Issue.record("expected the editor")
+            return
+        }
+        #expect(after.activeHandle == .end)
     }
 
     @Test func theSelectedModeDecidesWhatATickDoes() {

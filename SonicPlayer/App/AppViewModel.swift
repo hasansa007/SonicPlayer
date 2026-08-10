@@ -348,16 +348,9 @@ final class AppViewModel {
             markers.set(recording.markers, for: url)
         }
 
-        // Trimming (#74).
-        dial.onPreviewTrim = { [weak self] itemID, start, end in
-            guard let self,
-                  let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
-            else { return }
-            // The preview takes the shared engine, so the transport must stop claiming it is
-            // playing something it no longer owns.
-            if player.isPlaying { player.playPauseTapped() }
-            trimPreview.play(url: file.url, from: start, to: end)
-        }
+        // Trimming (#74). **Preview is gone from the editor** — the screen is a waveform you drag
+        // and a wheel you nudge, and a third control to hear the result was one more thing between
+        // you and the trim. `trimPreview` survives because `commitTrim` still stops it.
         dial.onCommitTrim = { [weak self] itemID, start, end in
             guard let self,
                   let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })

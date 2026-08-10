@@ -43,6 +43,17 @@ enum DialCommand: Equatable {
     /// directly, and both arrive as commands the navigator handles identically.
     case action(String)
 
+    /// A trim handle dragged straight to a position, `0...1` of the recording.
+    ///
+    /// **It names the handle, because dragging one selects it.** The finger is coarse and the wheel
+    /// is fine, so the pairing this screen wants is drag-then-nudge — and that only works if the
+    /// wheel picks up the handle the finger just let go of.
+    ///
+    /// Absolute rather than a delta, for the reason `DialEffect` gives at the top of its own file:
+    /// the sender already knows where in the waveform the finger is, so a value that arrives
+    /// complete cannot be applied against a stale position.
+    case dragTrim(handle: DialScreen.Handle, fraction: Double)
+
     /// How long two presses may be apart and still count as one double-press.
     ///
     /// Tuned to Apple's own double-tap window rather than guessed. Longer than this and a
