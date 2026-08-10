@@ -65,11 +65,12 @@ struct DialPressTests {
         let effects = navigator.receive(.press)
 
         #expect(effects == [.stopRecording, .feedback(.commit)])
-        #expect(navigator.route == .recordings)
+        // Back to where recording was started from, which is home.
+        #expect(navigator.route == .library)
     }
 
     /// **The empty library's hub imports.** It is the Import row alone, and pressing a row does what
-    /// the row says. `Record` is the chip beside it.
+    /// the row says — which is the whole of this screen now that the `Record` chip has gone.
     @Test func pressingOnTheEmptyLibraryImports() {
         var navigator = DialSample.navigator(recordingCount: 0)
         _ = navigator.receive(.tick(1))
@@ -81,12 +82,16 @@ struct DialPressTests {
         #expect(navigator.route == .recordings)
     }
 
-    @Test func theRecordChipOnTheEmptyLibraryStartsRecording() {
-        var navigator = DialSample.navigator(recordingCount: 0, playback: nil)
-        _ = navigator.receive(.tick(1))
-        _ = navigator.receive(.press)
+    /// **Recording is reached from home, and nowhere else.** The empty library used to carry a
+    /// `Record` chip; the band it sat in is dead space on every other screen.
+    @Test func theRecordCardStartsRecording() {
+        var content = DialSample.content(recordingCount: 0, playback: nil)
+        content.sections = [
+            .init(id: "record", icon: .recording, title: "Record", destination: .recording)
+        ]
+        var navigator = DialNavigator(content: content, root: .library)
 
-        let effects = navigator.receive(.action("record"))
+        let effects = navigator.receive(.press)
 
         #expect(effects == [.startRecording, .feedback(.commit)])
         #expect(navigator.route == .recording)

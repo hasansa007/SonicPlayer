@@ -98,14 +98,20 @@ enum DialSample {
         return navigator
     }
 
-    /// Library → an empty recordings list → a capture in progress (1d).
+    /// Home → a capture in progress (1d), **through the Record card**, which is the only way in.
+    ///
+    /// It used to go home → library → the `Record` chip on the empty state. That chip is gone: the
+    /// band it sat in is dead space on every other screen, so one red control appearing there only
+    /// when the library was empty read as an alert rather than an offer. Recording is a card on
+    /// home, like every other destination — and because the shared `sections` fixture has no such
+    /// card, this builds its own.
     static func whileRecording() -> DialNavigator {
-        var navigator = navigator(recordingCount: 0, capture: capture)
-        _ = navigator.receive(.tick(1))
-        _ = navigator.receive(.press)             // opens the list, highlight on Import
-        // **The chip, not a second press.** An empty library is the Import row alone, so its hub
-        // imports. `Record` is on screen for exactly this reason.
-        _ = navigator.receive(.action("record"))
+        var content = content(recordingCount: 0, capture: capture)
+        content.sections = [
+            .init(id: "record", icon: .recording, title: "Record", destination: .recording)
+        ]
+        var navigator = DialNavigator(content: content, root: .library)
+        _ = navigator.receive(.press)
         return navigator
     }
 

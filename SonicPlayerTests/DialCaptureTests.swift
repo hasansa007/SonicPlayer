@@ -17,14 +17,15 @@ struct DialCaptureTests {
     /// `DialSample.capture` sets `isGainSettable` so the axis can be exercised. This is the other
     /// hardware, which is to say almost all of it.
     @Test func turningAgainstHardwareWithNoInputGainIsALimit() {
-        var navigator = DialSample.navigator(
+        var content = DialSample.content(
             recordingCount: 0,
             capture: DialContent.Capture(elapsed: 12, levels: [0.3], gain: 0.5, markers: [])
         )
-        _ = navigator.receive(.tick(1))
-        _ = navigator.receive(.press)
-        // The empty library's hub imports; `Record` is the chip beside it.
-        _ = navigator.receive(.action("record"))
+        content.sections = [
+            .init(id: "record", icon: .recording, title: "Record", destination: .recording)
+        ]
+        var navigator = DialNavigator(content: content, root: .library)
+        _ = navigator.receive(.press)               // the Record card
 
         let effects = navigator.receive(.tick(2))
 

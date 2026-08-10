@@ -211,13 +211,11 @@ struct DialScreenshotTests {
         #expect(list.rows.first?.subtitle == "Nothing here yet · bring audio in")
 
         #expect(screen.chrome.breadcrumb == ["HOME", "LIBRARY"])
-        // `Record` stays, and is the only way to start one from here — the hub belongs to Import.
-        #expect(screen.actions.map(\.id) == ["record"])
+        // **No chips at all.** A red `Record` used to sit in that band; it is dead space on every
+        // other screen, and one lone control appearing there only when the library was empty read
+        // as an alert. Recording is a card on home.
+        #expect(screen.actions.isEmpty)
         #expect(screen.chrome.canGoBack)
-        // Destructive, not primary. It is the obvious action on this screen *and* the one you
-        // cannot casually undo, and the design draws it red for that reason — `.primary` renders
-        // in the accent, which would make starting a recording look like opening a playlist.
-        #expect(screen.actions.last?.emphasis == .destructive)
         #expect(screen.ring.hub == .label("IMPORT"))
         #expect(screen.hint == "press to import · nothing else here yet")
     }

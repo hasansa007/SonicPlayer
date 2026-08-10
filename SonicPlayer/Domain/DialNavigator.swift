@@ -266,6 +266,12 @@ struct DialNavigator {
             // With Import gone from the dial the mechanism had no setter left, so it went with it
             // rather than sitting here waiting for a second first user.
             guard let destination = section.destination else { return [.feedback(.limit)] }
+            // **Opening the recorder *is* starting a take.** This used to `open(.recording)` like
+            // any other destination, which pushed the screen and asked the host for nothing — so
+            // the card landed you on "Not recording · press the hub to start", and pressing the hub
+            // there stops and pops. A dead end, and it survived because the only tested way in was
+            // the `Record` chip on the empty library, which called this properly and has since gone.
+            if destination == .recording { return startRecording() }
             return open(destination)
 
         case .recordings:
@@ -376,8 +382,6 @@ struct DialNavigator {
             guard case .recording(let index)? = RecordingsRow.at(level.highlighted, recordings: content.recordings.count),
                   let item = content.recordings[safe: index] else { return [.feedback(.limit)] }
             return open(.actions(itemID: item.id))
-        case (.recordings, "record"):
-            return startRecording()
 
         // The tri-state's two ends. Reusing `.action` rather than inventing commands: previous and
         // next were already sayable, and a spring-return switch is a new *affordance* for them, not

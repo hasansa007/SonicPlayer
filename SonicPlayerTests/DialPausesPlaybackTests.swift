@@ -16,29 +16,19 @@ import Testing
 struct DialPausesPlaybackTests {
 
     @Test func startingARecordingPausesPlayback() {
-        var navigator = DialSample.navigator(recordingCount: 0)
-        _ = navigator.receive(.tick(1))
-        _ = navigator.receive(.press)           // the empty library
+        var content = DialSample.content(recordingCount: 0, playback: DialSample.playback)
+        content.sections = [
+            .init(id: "record", icon: .recording, title: "Record", destination: .recording)
+        ]
+        var navigator = DialNavigator(content: content, root: .library)
 
-        let effects = navigator.receive(.action("record"))
+        let effects = navigator.receive(.press)     // the Record card
 
         #expect(effects.contains(.pausePlayback))
         #expect(
             effects.firstIndex(of: .pausePlayback)! < effects.firstIndex(of: .startRecording)!,
             "silence first — the microphone opens on the next effect"
         )
-    }
-
-    /// The chip on the empty library takes the same path as the hub.
-    @Test func theRecordChipPausesPlaybackToo() {
-        var navigator = DialSample.navigator(recordingCount: 0)
-        _ = navigator.receive(.tick(1))
-        _ = navigator.receive(.press)
-
-        let effects = navigator.receive(.action("record"))
-
-        #expect(effects.contains(.pausePlayback))
-        #expect(effects.contains(.startRecording))
     }
 
     @Test func openingTheEditorPausesPlayback() {
@@ -62,11 +52,13 @@ struct DialPausesPlaybackTests {
     /// Nothing playing means nothing to silence — an effect asking the host to pause silence would
     /// be a lie about what happened, and `DialPressTests` reads these arrays exactly.
     @Test func nothingPlayingAsksForNoPause() {
-        var navigator = DialSample.navigator(recordingCount: 0, playback: nil)
-        _ = navigator.receive(.tick(1))
-        _ = navigator.receive(.press)
+        var content = DialSample.content(recordingCount: 0, playback: nil)
+        content.sections = [
+            .init(id: "record", icon: .recording, title: "Record", destination: .recording)
+        ]
+        var navigator = DialNavigator(content: content, root: .library)
 
-        let effects = navigator.receive(.action("record"))
+        let effects = navigator.receive(.press)
 
         #expect(!effects.contains(.pausePlayback))
         #expect(effects == [.startRecording, .feedback(.commit)])

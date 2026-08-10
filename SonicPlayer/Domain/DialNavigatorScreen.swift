@@ -248,13 +248,12 @@ extension DialNavigator {
             // door to a room already on screen.
             return []
 
+        // **No chip on the empty library either.** A red `Record` used to sit here, on the argument
+        // that an empty library most wants filling. But that band is dead space on every other
+        // screen in the app, and one lone control appearing in it — only when the library is empty,
+        // only in red — reads as an alert rather than an offer. `Record` is a card on home, one Back
+        // away, which is where every other destination lives.
         case .recordings:
-            guard !content.recordings.isEmpty else {
-                // Destructive rather than primary: starting a recording is the obvious action on an
-                // empty library and also the one you cannot casually undo, and those must not look
-                // alike. It is a chip because the hub belongs to the Import row.
-                return [.init(id: "record", label: "Record", emphasis: .destructive)]
-            }
             // `Edit` is the visible partner for `.doublePress`; the contract requires one.
             // Both moved onto the stick — right nudges to Edit, left to the actions menu.
             return []
