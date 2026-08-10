@@ -34,11 +34,30 @@ struct DialEditView: View {
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
-            Text(edit.title)
-                .font(.headline)
-                .foregroundColor(.sonicTextPrimary)
-                .lineLimit(1)
-                .truncationMode(.middle)
+            // **The title is the rename control.** Renaming came off the actions menu when that
+            // became four stick nudges, and this is where it belongs anyway: the editor is the
+            // screen for changing the recording, and its name is the other thing you change.
+            // Middle truncation is right here for the reason it is wrong in a list — the tail of a
+            // recording's name is its timestamp, which is what distinguishes one from the next.
+            Button {
+                onCommand(.action("rename"))
+            } label: {
+                HStack(spacing: Spacing.xs) {
+                    Text(edit.title)
+                        .font(.headline)
+                        .foregroundColor(.sonicTextPrimary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    Image(systemName: "pencil")
+                        .font(.caption2)
+                        .foregroundColor(.sonicTextSecondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(edit.title))
+            .accessibilityHint(Text("Rename"))
 
             Spacer(minLength: Spacing.sm)
 

@@ -102,8 +102,6 @@ struct DialScreen: Equatable {
         /// Index into `rows`. **Always valid when `rows` is non-empty** — the navigator clamps it,
         /// so the UI never has to decide what an out-of-range highlight looks like.
         var highlighted: Int
-        /// `"1 of 12"`. Nil when the list is short enough that counting is noise.
-        var position: String?
         var subject: Subject?
         /// Whether the rows are the large cards of a top-level menu rather than the compact rows of
         /// a list you scan.

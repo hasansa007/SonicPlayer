@@ -39,10 +39,14 @@ final class DialViewModel {
     var onTogglePause: (() -> Void)?
     var onAddMarker: (() -> Void)?
     var onSetGain: ((Double) -> Void)?
+    var onPreviewTrim: ((String, TimeInterval, TimeInterval) -> Void)?
     var onCommitTrim: ((String, TimeInterval, TimeInterval) -> Void)?
 
     /// The five rows of the actions screen. Declared and **not wired** — see `apply(_:)`.
     var onItemAction: ((DialItemAction, String) -> Void)?
+
+    /// Rename the recording open in the editor.
+    var onRenameItem: ((String) -> Void)?
 
     /// Asks the host to feed this type again, because something it renders finished loading
     /// asynchronously. Only the waveform needs it — every other input is state the host can already
@@ -295,6 +299,8 @@ final class DialViewModel {
             onAddMarker?()
         case .setGain(let value):
             onSetGain?(value)
+        case .previewTrim(let itemID, let start, let end):
+            onPreviewTrim?(itemID, start, end)
         case .commitTrim(let itemID, let start, let end):
             onCommitTrim?(itemID, start, end)
 
@@ -323,6 +329,9 @@ final class DialViewModel {
         // one place the dial handed over to UIKit chrome mid-flow, at the only irreversible step.
         case .item(.delete, let itemID):
             onDeleteItem?(itemID)
+
+        case .renameItem(let itemID):
+            onRenameItem?(itemID)
 
         case .item(let action, let itemID):
             // Share and rename are the browser's flows, and the actions screen is its own slice.

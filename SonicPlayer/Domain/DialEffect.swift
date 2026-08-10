@@ -50,11 +50,24 @@ enum DialEffect: Equatable {
     /// Both handles at once, because they are one selection and `DialTrimRange` is what keeps them
     /// from crossing. Sending them separately would let a listener see a crossed intermediate.
     case setTrim(start: TimeInterval, end: TimeInterval)
+    /// Play just the kept region, so the trim can be heard before it is kept.
+    ///
+    /// **Removed and restored within the hour**, which is worth recording: it went out with the
+    /// `Preview` chip on the reasoning that a third control stood between you and the trim. The
+    /// control was the problem, not the capability — hearing the result before committing is the
+    /// whole point of an editor. It is the hub's second state now rather than a chip of its own.
+    case previewTrim(itemID: String, start: TimeInterval, end: TimeInterval)
     case commitTrim(itemID: String, start: TimeInterval, end: TimeInterval)
 
     // MARK: - Items
 
     case item(DialItemAction, itemID: String)
+
+    /// Rename the recording open in the editor.
+    ///
+    /// Separate from `.item` because `DialItemAction` is the stick's four nudges now, and rename is
+    /// not one of them — it lives on the edit screen, where you are already changing the recording.
+    case renameItem(itemID: String)
 
     /// Open the system file picker. A library is the place you add to, and reaching one from a card
     /// marked `Library` with no way to put anything in is the gap this fills.

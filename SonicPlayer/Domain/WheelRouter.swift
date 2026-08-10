@@ -13,7 +13,18 @@ enum WheelRouter {
     static let secondsPerDetent: TimeInterval = 0.1
 
     /// One detent of volume, as a fraction of the full range. Fifty detents end to end.
+    ///
+    /// Right for a wheel, which is turned continuously — fifty steps across the range is what makes
+    /// it feel like a dial rather than a set of buttons.
     static let volumePerDetent: Double = 0.02
+
+    /// One *nudge* of volume, from the stick's vertical axis.
+    ///
+    /// **Five times the detent, because a nudge is a press and not a turn.** The stick reused
+    /// `volumePerDetent`, so one push moved the level by two percent — which is doing exactly what
+    /// it was told and completely inaudible, and reads as a control that does nothing. Ten steps end
+    /// to end is roughly what iOS gives its own hardware buttons.
+    static let volumePerNudge: Double = 0.1
 
     static func route(_ command: WheelCommand, focus: WheelFocus) -> [ShellEffect] {
         switch command {

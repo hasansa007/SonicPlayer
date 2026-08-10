@@ -32,12 +32,6 @@ enum FolderImport {
     ) async -> Result {
         var result = Result()
 
-        let containsFolder = urls.contains { url in
-            let accessing = url.startAccessingSecurityScopedResource()
-            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-            return (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-        }
-
         // **Loose files land in the root, not in a collection minted for them.**
         //
         // This used to call `createCollectionForImport()`, which resolves a *unique* name from

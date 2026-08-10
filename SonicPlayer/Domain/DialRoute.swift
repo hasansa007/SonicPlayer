@@ -23,8 +23,6 @@ enum DialRoute: Equatable {
     case recording
     /// 1e.
     case edit(itemID: String)
-    /// 1f.
-    case actions(itemID: String)
     /// The guard in front of `Delete`.
     ///
     /// **A screen rather than a system alert.** Every other decision in this app is made by turning
@@ -32,12 +30,17 @@ enum DialRoute: Equatable {
     /// only irreversible one — so the gesture you had just been using stopped working exactly where
     /// care mattered most.
     case confirmDelete(itemID: String)
+    /// The gate on the way out of the editor.
+    ///
+    /// **Leaving is the only thing that commits now.** The hub used to commit and pop, which made
+    /// the trim final at the moment you stopped adjusting it — and popping is what discards the
+    /// selection, so `Back` threw the work away with no warning. Both are answered here: the hub
+    /// settles and then previews, and the decision is taken on the way out, where it belongs.
+    case confirmTrim(itemID: String)
 
     /// The header segment, uppercased. `nil` contributes nothing — the mode chooser is a fork
     /// rather than a place, and `DialScreen.Chrome` says an empty breadcrumb is valid.
     ///
-    /// `.actions` is named after the item rather than "ACTIONS" because the list it heads contains
-    /// `Delete`, and the one thing worth knowing before pressing that is *what*.
     func crumb(in content: DialContent) -> String? {
         switch self {
         case .chooseMode: nil
@@ -53,8 +56,8 @@ enum DialRoute: Equatable {
         case .nowPlaying: "NOW PLAYING"
         case .recording: "RECORDING"
         case .edit: "EDIT"
-        case .actions(let id): (content.item(id)?.title).map { $0.uppercased() } ?? "ACTIONS"
         case .confirmDelete: "DELETE"
+        case .confirmTrim: "SAVE?"
         }
     }
 
@@ -90,16 +93,25 @@ enum DialRoute: Equatable {
         }
     }
 
-    /// Whether `1 of 12` is worth drawing. It is a property of the screen rather than of the row
-    /// count: a menu is a place, a list is a position within one.
-    ///
-    /// **The recordings list dropped it.** The ring's lit tick already shows where you are in the
-    /// list, so the line was a second answer to a question already on screen — and it took a row's
-    /// worth of height at the bottom of the card to give it.
-    var countsRows: Bool {
-        switch self {
-        case .actions: true
-        default: false
+    /// The rows of the trim gate, in order. `Save` leads: you arrived here by finishing an edit,
+    /// so keeping it is the answer you meant — the opposite of `DeleteChoice`, where the safe
+    /// answer is to do nothing.
+    enum TrimChoice: String, CaseIterable {
+        case save
+        case discard
+
+        var label: String {
+            switch self {
+            case .save: "Save"
+            case .discard: "Discard"
+            }
+        }
+
+        var icon: DialScreen.Icon {
+            switch self {
+            case .save: .none
+            case .discard: .delete
+            }
         }
     }
 
@@ -169,42 +181,34 @@ struct DialMode: Equatable, Identifiable {
     var axis: DialAxis
 }
 
-/// The rows of 1f.
+/// What can be done to a recording.
 ///
-/// `CaseIterable` in this order *is* the screen's row order, so there is one list rather than an
-/// enum and a parallel array that can disagree about where `Delete` sits.
+/// **These are the stick's four nudges now, not a menu.** They were rows on a pushed screen —
+/// reached by a nudge, scrolled to, pressed — which is three gestures to do one thing, and a whole
+/// route to hold five verbs. Four of them fit the four directions the stick already has, so the
+/// screen went and `Rename` went with it: renaming stays possible in Files and in the browser, and
+/// four directions cannot hold five things.
 enum DialItemAction: String, Equatable, CaseIterable {
-    /// Rename first, Edit second — the two that change the recording itself, ahead of the three
-    /// that move it somewhere. The highlight rests on row 0, so the cheapest thing to reach is the
-    /// one most often wanted.
-    case rename
-    /// **Second, having come off the stick's right nudge.** It is also the one case here the host
-    /// never sees — `DialNavigator` turns it into a push of `.edit`, because the editor is a
-    /// *place* and the rest of these are things done to a file.
+    /// The one case the host never sees — `DialNavigator` turns it into a push of `.edit`, because
+    /// the editor is a *place* and the rest of these are things done to a file.
     case edit
     case share
     case addToPlaylist
-    /// **`export` is gone.** Sharing already hands the file to another app, and the row below it
-    /// offering a second, format-converting way to do nearly the same thing was a choice nobody
-    /// wanted to have to make.
     case delete
 
     var label: String {
         switch self {
-        case .rename: "Rename"
         case .edit: "Edit"
-        case .share: "Share file…"
+        case .share: "Share"
         case .addToPlaylist: "Add to playlist"
         case .delete: "Delete"
         }
     }
 
-    /// One glyph per row, still — which used to be worth saying because `.export` and `.share`
-    /// were two rows making nearly the same promise. Removing `export` settled that argument by
-    /// deleting one side of it.
+    /// One glyph each, and on the stick they are the *only* label — a nudge has no room for a word,
+    /// so a symbol that reads wrong is a control that lies.
     var icon: DialScreen.Icon {
         switch self {
-        case .rename: .rename
         case .edit: .edit
         case .share: .share
         case .addToPlaylist: .playlist

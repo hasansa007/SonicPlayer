@@ -54,8 +54,7 @@ enum DialPreviewData {
                 .init(id: "standup", icon: .recording, title: "Standup notes", trailing: "08:55"),
                 .init(id: "lecture", icon: .recording, title: "Lecture — acoustics", trailing: "51:20")
             ],
-            highlighted: 0,
-            position: "1 of 12"
+            highlighted: 0
         )),
         actions: [
             .init(id: "back", label: "‹ Back"),
@@ -127,41 +126,9 @@ enum DialPreviewData {
             playheadFraction: 0.42,
             scale: ["0:00", "IN 02:25", "OUT 10:37", "12:07"]
         )),
-        actions: [
-            .init(id: "start", label: "Start handle", emphasis: .selected),
-            .init(id: "end", label: "End handle"),
-            .init(id: "preview", label: "Preview"),
-            .init(id: "delete", label: "Delete selection"),
-            .init(id: "split", label: "Split at playhead")
-        ],
+        actions: [],
         ring: .init(ticks: .browse(thumb: 0.2), hub: .label("DONE")),
-        hint: "rotate to nudge the active handle · press when done"
-    )
-
-    // MARK: - 1f · Item actions
-
-    static let itemActions = DialScreen(
-        chrome: .init(breadcrumb: ["RECORDINGS", "ACTIONS"], status: nil),
-        content: .list(.init(
-            rows: [
-                .init(id: "share", icon: .share, title: "Share file…", trailing: "▸"),
-                .init(id: "playlist", icon: .playlist, title: "Add to playlist", trailing: "3 ▸"),
-                // `.none`, not `.add`: `DialScreen.Icon` has no export role and a plus beside
-                // "Export as MP3" says the wrong thing. The row holds the icon column open rather
-                // than closing it, so the titles stay on one margin. See the report's contract notes.
-                .init(id: "export", icon: .none, title: "Export as MP3"),
-                .init(id: "rename", icon: .rename, title: "Rename"),
-                .init(id: "delete", icon: .delete, title: "Delete")
-            ],
-            highlighted: 0,
-            position: "1 of 5"
-        )),
-        actions: [
-            .init(id: "back", label: "‹ Back"),
-            .init(id: "select", label: "Select", emphasis: .primary)
-        ],
-        ring: .init(ticks: .browse(thumb: 0.03), hub: .label("SELECT")),
-        hint: "rotate to highlight an action · press to confirm"
+        hint: "drag or rotate to move the handle · tap the other to switch"
     )
 
     // MARK: - 1g · Empty state
@@ -206,8 +173,7 @@ enum DialPreviewData {
                     subtitle: "New recording · 4h 12m free"
                 )
             ],
-            highlighted: 0,
-            position: "1 of 2"
+            highlighted: 0
         )),
         actions: [
             .init(id: "open", label: "Open", emphasis: .primary),
@@ -259,11 +225,6 @@ enum DialPreviewData {
 
 #Preview("1e · Edit") {
     DialScreenView(screen: DialPreviewData.edit) { _ in }
-        .preferredColorScheme(.dark)
-}
-
-#Preview("1f · Item actions") {
-    DialScreenView(screen: DialPreviewData.itemActions) { _ in }
         .preferredColorScheme(.dark)
 }
 

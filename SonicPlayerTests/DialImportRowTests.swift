@@ -81,7 +81,7 @@ struct DialImportRowTests {
         #expect(navigator.screen.ring.directions == nil)
 
         _ = navigator.receive(.tick(1))
-        #expect(navigator.screen.ring.directions?.up?.id == "more")
+        #expect(navigator.screen.ring.directions?.up?.id == "edit")
     }
 
     /// Waiting for a second press costs a delay, and there is no double-press meaning here to wait
@@ -110,13 +110,33 @@ struct DialImportRowTests {
         #expect(navigator.receive(.press).contains(.play(itemID: "rec-0")))
     }
 
-    @Test func theActionsMenuActsOnTheHighlightedRecording() {
+    /// The stick's four nudges all act on the highlighted *recording*, so each has to un-offset the
+    /// highlight. `delete` is the one that shows it, because the guard names the file it opens on.
+    @Test func theNudgesActOnTheHighlightedRecording() {
         var navigator = onImportRow()
         _ = navigator.receive(.tick(3))     // the third recording
 
-        _ = navigator.receive(.action("more"))
+        _ = navigator.receive(.action("delete"))
 
-        #expect(navigator.route == .actions(itemID: "rec-2"))
+        #expect(navigator.route == .confirmDelete(itemID: "rec-2"))
+    }
+
+    @Test func theShareNudgeNamesTheHighlightedRecording() {
+        var navigator = onImportRow()
+        _ = navigator.receive(.tick(2))
+
+        let effects = navigator.receive(.action("share"))
+
+        #expect(effects == [.item(.share, itemID: "rec-1"), .feedback(.commit)])
+    }
+
+    /// Nothing to act on while the highlight is on Import.
+    @Test func theNudgesAreRefusedOnTheImportRow() {
+        var navigator = onImportRow()
+
+        #expect(navigator.receive(.action("share")) == [.feedback(.limit)])
+        #expect(navigator.receive(.action("delete")) == [.feedback(.limit)])
+        #expect(navigator.receive(.action("add")) == [.feedback(.limit)])
     }
 
     @Test func theEditorOpensTheHighlightedRecording() {

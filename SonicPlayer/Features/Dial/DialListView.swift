@@ -72,39 +72,156 @@ struct DialListView: View {
         .accessibilityAddTraits(.isHeader)
     }
 
+    /// **The list follows the highlight, and the finger cannot move it.**
+    ///
+    /// The comment above says the navigator hands over the rows that fit — and nothing ever did.
+    /// With six recordings the stack simply overflowed the card, so turning the wheel walked the
+    /// highlight off the bottom edge and the screen stopped agreeing with the ring.
+    ///
+    /// A `ScrollView` with scrolling **disabled** is what squares that with "it does not scroll":
+    /// the point of the rule was never that content cannot move, it was that a drag must not become
+    /// a second way to change the selection. Here the wheel remains the only thing that moves the
+    /// highlight, and the view merely keeps it in sight.
     var body: some View {
-        VStack(spacing: isProminent ? Spacing.md : Spacing.xxs) {
-            if let subject = list.subject {
-                subjectHeader(subject)
-            }
+        if isProminent { cards } else { rows }
+    }
 
+    /// **Two tiles side by side, filling the card.**
+    ///
+    /// They were full-width rows stacked vertically, which left most of the card empty below them —
+    /// two rows of content in a space built for a list. Side by side they use the width they were
+    /// wasting and the height they were leaving behind, and the menu reads as a choice between two
+    /// things rather than the top of a list that stops after two.
+    private var cards: some View {
+        HStack(spacing: Spacing.md) {
             ForEach(Array(list.rows.enumerated()), id: \.element.id) { index, row in
                 Button {
                     onSelect(index)
                 } label: {
-                    DialRowView(
-                        row: row,
-                        isHighlighted: index == list.highlighted,
-                        isProminent: isProminent,
-                        reservesIconColumn: reservesIconColumn
-                    )
+                    DialCardView(row: row, isHighlighted: index == list.highlighted)
                 }
                 .buttonStyle(.plain)
             }
+        }
+        // **Fills the height, tiles centred in it.** The tiles are square, so left to hug they made
+        // this card far shorter than every other screen's — and the dial, a fixed 236 points under a
+        // flexible spacer, moved with it. Taking the full height keeps the wheel in the same place
+        // on every screen, which is the one thing on this layout the thumb learns by position rather
+        // than by looking.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
 
-            // The cards sat between two of these and were therefore *centred* in whatever height
-            // the card gave them — which is where the empty band above and below them came from.
-            // A menu of two or three things should hug; only a list needs a floor to push `1 of 12`
-            // down to.
-            if !isProminent { Spacer(minLength: 0) }
+    private var rows: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.vertical) {
+                VStack(spacing: Spacing.xxs) {
+                    if let subject = list.subject {
+                        subjectHeader(subject)
+                    }
 
-            if let position = list.position {
-                Text(position)
-                    .font(.caption2)
-                    .monospacedDigit()
-                    .foregroundColor(.sonicTextMuted)
-                    .frame(maxWidth: .infinity)
+                    ForEach(Array(list.rows.enumerated()), id: \.element.id) { index, row in
+                        Button {
+                            onSelect(index)
+                        } label: {
+                            DialRowView(
+                                row: row,
+                                isHighlighted: index == list.highlighted,
+                                isProminent: false,
+                                reservesIconColumn: reservesIconColumn
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .id(index)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .top)
             }
+            .scrollDisabled(true)
+            // Bounded, so there is something to scroll within. Sized to its content, a `ScrollView`
+            // is just a `VStack` that overflows — which is how the highlight walked off the bottom.
+            .frame(maxHeight: .infinity)
+            .scrollBounceBehavior(.basedOnSize)
+            .onChange(of: list.highlighted) { _, index in
+                withAnimation(Motion.settle) { proxy.scrollTo(index, anchor: .center) }
+            }
+        }
+    }
+}
+
+/// One tile on a top-level menu: icon above, title and second line below, filling its half of the
+/// card. Separate from `DialRowView` rather than another flag on it — a tile stacks vertically and
+/// a row runs horizontally, so almost nothing but the colours was shared.
+private struct DialCardView: View {
+
+    let row: DialScreen.List.Row
+    let isHighlighted: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            if let systemImage = DialIcon.systemImage(for: row.icon) {
+                Image(systemName: systemImage)
+                    .font(.title2)
+                    .foregroundColor(isHighlighted ? .white : .sonicPrimary)
+                    .frame(width: Sizing.dialChoiceTile, height: Sizing.dialChoiceTile)
+                    .background(
+                        Color.white.opacity(isHighlighted ? ControlTint.on : 0),
+                        in: RoundedRectangle(cornerRadius: Radius.lg)
+                    )
+                    .background(
+                        Color.sonicPrimary.opacity(isHighlighted ? 0 : ControlTint.on),
+                        in: RoundedRectangle(cornerRadius: Radius.lg)
+                    )
+                    .accessibilityHidden(true)
+            }
+
+            Spacer(minLength: 0)
+
+            Text(row.title)
+                .font(.title3)
+                .fontWeight(.bold)
+                .foregroundColor(isHighlighted ? .white : .sonicTextPrimary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let subtitle = row.subtitle {
+                Text(subtitle)
+                    .font(.footnote)
+                    .foregroundColor(isHighlighted ? Color.white.opacity(0.75) : .sonicTextSecondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let trailing = row.trailing {
+                Text(trailing)
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundColor(isHighlighted ? Color.white.opacity(0.75) : .sonicTextMuted)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        // **Square.** Two tiles side by side each take half the width, so a 1:1 ratio makes the pair
+        // as tall as one is wide and the card sizes itself off them rather than the other way round.
+        .aspectRatio(1, contentMode: .fit)
+        .padding(Spacing.lg)
+        .background(background)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isHighlighted ? [.isSelected] : [])
+    }
+
+    @ViewBuilder
+    private var background: some View {
+        if isHighlighted {
+            RoundedRectangle(cornerRadius: Radius.sheet)
+                .fill(DialSurface.fill)
+                .sonicShadow(Elevation.control)
+        } else {
+            RoundedRectangle(cornerRadius: Radius.sheet)
+                .fill(Color.sonicPrimary.opacity(ControlTint.off))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.sheet)
+                        .strokeBorder(Color.sonicBorder)
+                )
         }
     }
 }

@@ -308,6 +308,16 @@ final class AppViewModel {
         // and drops its cached waveform — three things that are easy to forget and silent when you
         // do. Calling it here rather than re-implementing them means the dial's delete and the
         // browser's delete cannot drift apart.
+        // Renaming moved onto the edit screen when the actions menu became four stick nudges —
+        // four directions cannot hold five verbs. The flow is still the browser's, and `AppView`
+        // attaches its alert at the root, so it renders over the dial with nothing further to build.
+        dial.onRenameItem = { [weak self] itemID in
+            guard let self,
+                  let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
+            else { return }
+            filesRoot.renameItemTapped(.file(file))
+        }
+
         dial.onDeleteItem = { [weak self] itemID in
             guard let self,
                   let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
@@ -346,11 +356,25 @@ final class AppViewModel {
         recording.onSaved = { [weak self] url in
             guard let self else { return }
             markers.set(recording.markers, for: url)
+            // **A new take has to enter the library, and nothing was putting it there.** This filed
+            // the markers and stopped, so the recording existed on disk and in no list — invisible
+            // until some unrelated reload happened to run. Stopping a take now lands you on the
+            // library, which made the gap obvious the moment you looked.
+            home.loadAllFiles()
+            filesRoot.refreshFiles()
         }
 
-        // Trimming (#74). **Preview is gone from the editor** — the screen is a waveform you drag
-        // and a wheel you nudge, and a third control to hear the result was one more thing between
-        // you and the trim. `trimPreview` survives because `commitTrim` still stops it.
+        // Trimming (#74). Preview is the hub's second state — press once to settle the handles,
+        // again to hear what survives.
+        dial.onPreviewTrim = { [weak self] itemID, start, end in
+            guard let self,
+                  let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
+            else { return }
+            // The preview takes the shared engine, so the transport must stop claiming it is
+            // playing something it no longer owns.
+            if player.isPlaying { player.playPauseTapped() }
+            trimPreview.play(url: file.url, from: start, to: end)
+        }
         dial.onCommitTrim = { [weak self] itemID, start, end in
             guard let self,
                   let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
@@ -369,10 +393,6 @@ final class AppViewModel {
             else { return }
 
             switch action {
-            case .rename:
-                // The browser's own flow, and `AppView` already attaches its alert at the root —
-                // so it renders over the dial with nothing further to build.
-                filesRoot.renameItemTapped(.file(file))
             case .share:
                 shareItem = ShareItem(url: file.url)
             case .addToPlaylist:

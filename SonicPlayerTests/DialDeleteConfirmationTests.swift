@@ -65,9 +65,7 @@ struct DialDeleteConfirmationTests {
         // under it and a tick here would land on Record instead.
         app.dial.receive(.press)            // into the library, highlight on Import
         app.dial.receive(.tick(1))          // onto the file
-        app.dial.receive(.action("more"))   // the actions menu
-        app.dial.receive(.tick(4))          // Rename, Edit, Share, Add to playlist, Delete
-        app.dial.receive(.press)
+        app.dial.receive(.action("delete"))     // the stick's down nudge
     }
 
     @MainActor

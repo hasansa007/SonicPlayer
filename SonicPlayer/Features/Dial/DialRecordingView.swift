@@ -65,7 +65,15 @@ struct DialRecordingView: View {
                     )
             }
         }
+        // **Bounded and clipped, newest kept.** Fifty bars at four points plus four of spacing is
+        // 400pt of intrinsic width against roughly 345 of usable screen — so once the window filled,
+        // at five seconds of recording, the stack demanded more room than it had and widened
+        // everything around it, the dial included. `maxWidth: .infinity` makes it accept the width
+        // it is given instead of asking for its ideal, and trailing alignment keeps the newest bars
+        // on screen when there are more than fit.
+        .frame(maxWidth: .infinity, alignment: .trailing)
         .frame(height: Sizing.dialWave)
+        .clipped()
         .accessibilityHidden(true)
     }
 

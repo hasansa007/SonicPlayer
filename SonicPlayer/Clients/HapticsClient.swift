@@ -21,10 +21,10 @@ extension HapticsClient {
             // iPad, the simulator, and older phones. `UIImpactFeedbackGenerator` is a coarser
             // instrument — one fixed pulse shape, intensity only — but silence would make the
             // wheel feel broken rather than plain.
-            let generator = UIImpactFeedbackGenerator(style: .rigid)
+            let impact = ImpactBox()
             return Self(
-                prepare: { generator.prepare() },
-                fire: { pulse in generator.impactOccurred(intensity: pulse.intensity) },
+                prepare: { impact.prepare() },
+                fire: { pulse in impact.fire(intensity: pulse.intensity) },
                 stop: {}
             )
         }
@@ -36,6 +36,28 @@ extension HapticsClient {
             stop: { engine.stop() }
         )
     }()
+}
+
+/// The coarse fallback generator, boxed for the same reason `HapticEngineBox` is.
+///
+/// **`UIImpactFeedbackGenerator` is `@MainActor`-isolated and the client's closures are `@Sendable`
+/// and nonisolated**, so calling it directly warns — and would eventually be an error.
+///
+/// `assumeIsolated` rather than a `Task { @MainActor in … }` hop, deliberately: every caller is
+/// already on the main actor (`DialViewModel` and `ShellViewModel` are both `@MainActor`), and a
+/// haptic that arrives a hop late is worse than none. A detent pulse has to land under the thumb
+/// that caused it; delayed, it reads as the wheel clicking at the wrong moment.
+private final class ImpactBox: @unchecked Sendable {
+
+    private let generator = UIImpactFeedbackGenerator(style: .rigid)
+
+    func prepare() {
+        MainActor.assumeIsolated { generator.prepare() }
+    }
+
+    func fire(intensity: Double) {
+        MainActor.assumeIsolated { generator.impactOccurred(intensity: intensity) }
+    }
 }
 
 /// Holds the engine and the two lifecycle facts that make CoreHaptics awkward in practice: it stops

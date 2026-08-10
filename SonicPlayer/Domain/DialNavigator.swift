@@ -40,6 +40,12 @@ struct DialNavigator {
         var mode: Int = 0
         /// The trim editor's selection. Only `.edit` has one, and popping is what discards it.
         var trim: DialTrimRange?
+        /// Whether the editor's handles have been settled with the hub.
+        ///
+        /// Before: the hub says `DONE` and a press settles. After: it offers to play the kept
+        /// region, so you can hear the trim before deciding to keep it. Nothing about the selection
+        /// changes either way — this only moves what the one button means.
+        var isTrimSettled = false
     }
 
     /// One detent of input gain. Fifty detents end to end, matching `WheelRouter.volumePerDetent` —
@@ -261,6 +267,15 @@ struct DialNavigator {
         }
     }
 
+    /// Whether the editor's handles have been moved off the whole recording.
+    ///
+    /// The selection starts as the entire file, so "unchanged" and "keep everything" are the same
+    /// range — and neither is worth stopping to ask about on the way out.
+    private var hasUnsavedTrim: Bool {
+        guard let editing = content.editing, let trim = level.trim else { return false }
+        return trim.start > 0 || trim.end < editing.duration
+    }
+
     /// The editor's selection — the one this level holds, or a whole-file range derived from the
     /// material when it has none yet.
     ///
@@ -294,12 +309,6 @@ struct DialNavigator {
             // With Import gone from the dial the mechanism had no setter left, so it went with it
             // rather than sitting here waiting for a second first user.
             guard let destination = section.destination else { return [.feedback(.limit)] }
-            // **Opening the recorder *is* starting a take.** This used to `open(.recording)` like
-            // any other destination, which pushed the screen and asked the host for nothing — so
-            // the card landed you on "Not recording · press the hub to start", and pressing the hub
-            // there stops and pops. A dead end, and it survived because the only tested way in was
-            // the `Record` chip on the empty library, which called this properly and has since gone.
-            if destination == .recording { return startRecording() }
             return open(destination)
 
         case .recordings:
@@ -319,19 +328,57 @@ struct DialNavigator {
             content.playback?.isPlaying.toggle()
             return [.togglePlayPause, .feedback(.commit)]
 
+        // **Arriving is not starting.** For an hour this screen started a take the instant the card
+        // was pressed, which is worse than the dead end it replaced: you were recording before you
+        // had decided to. The screen says "press the hub to start" — this is that press, and the
+        // same button stops once a take is running.
         case .recording:
+            guard content.capture != nil else { return beginRecording() }
+            // **Stopping lands on the library, not back where you came from.** Popping returned you
+            // to whatever pushed the recorder — home, usually — which is the one place the thing you
+            // just made is not. You stop a take to have it; the library is where it now is.
             pop()
+            push(.recordings)
             return [.stopRecording, .feedback(.commit)]
 
+        // **The hub settles, then plays. It no longer commits.**
+        //
+        // Committing on the hub made the trim final the moment you stopped adjusting it, with no
+        // way to hear the result first — and it popped, which is also what *discards* a selection,
+        // so `Back` and `Done` were one keystroke apart with opposite meanings. Saving moved to the
+        // way out, where `.confirmTrim` asks.
         case .edit(let itemID):
-            // **Refusing beats committing an empty range.** The old fallback was
+            // **Refusing beats acting on an empty range.** The old fallback was
             // `DialTrimRange(start: 0, end: 0, duration: 0)`, so pressing the hub before the
             // material had loaded asked the host to keep nothing at all — and the host is about to
-            // rewrite a real file. Nothing loaded is a screen that says so, and a hub that says the
-            // same rather than destroying a lecture.
+            // rewrite a real file.
             guard let trim = currentTrim else { return [.feedback(.limit)] }
-            pop()
-            return [.commitTrim(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
+
+            guard level.isTrimSettled else {
+                stack[stack.count - 1].isTrimSettled = true
+                return [.feedback(.commit)]
+            }
+            return [
+                .previewTrim(itemID: itemID, start: trim.start, end: trim.end),
+                .feedback(.commit)
+            ]
+
+        case .confirmTrim(let itemID):
+            let choices = DialRoute.TrimChoice.allCases
+            let choice = choices[min(level.highlighted, choices.count - 1)]
+            let trim = stack.dropLast().last?.trim
+            pop()                                   // the gate
+            pop()                                   // the editor
+            switch choice {
+            case .discard:
+                return [.feedback(.commit)]
+            case .save:
+                guard let trim else { return [.feedback(.limit)] }
+                return [
+                    .commitTrim(itemID: itemID, start: trim.start, end: trim.end),
+                    .feedback(.commit)
+                ]
+            }
 
         case .confirmDelete(let itemID):
             let choices = DialRoute.DeleteChoice.allCases
@@ -342,18 +389,17 @@ struct DialNavigator {
             case .delete: return [.item(.delete, itemID: itemID), .feedback(.commit)]
             }
 
-        case .actions(let itemID):
-            let action = DialItemAction.allCases[min(level.highlighted, DialItemAction.allCases.count - 1)]
-            pop()
-            // **Edit is a place, not a thing done to a file.** Emitting `.item(.edit, …)` like the
-            // others would hand it to `onItemAction`, which is deliberately unwired — the row would
-            // have looked identical and done nothing at all.
-            guard action != .edit else { return openEditor(itemID: itemID) }
-            // **Delete goes through its own screen.** The menu has already popped by the time this
-            // runs, so the guard rises over the library — where the file is about to vanish from.
-            guard action != .delete else { return open(.confirmDelete(itemID: itemID)) }
-            return [.item(action, itemID: itemID), .feedback(.commit)]
         }
+    }
+
+    /// The recording under the highlight, if the highlight is on one at all.
+    ///
+    /// Row 0 is Import, so this is `nil` there — and the stick's four nudges all act on a recording,
+    /// which is why every one of them guards on it.
+    private var highlightedRecording: DialContent.Item? {
+        guard case .recording(let index)? = RecordingsRow.at(level.highlighted, recordings: content.recordings.count)
+        else { return nil }
+        return content.recordings[safe: index]
     }
 
     /// Only the recordings list has a second meaning for a second press.
@@ -389,6 +435,15 @@ struct DialNavigator {
     private mutating func perform(_ id: String) -> [DialEffect] {
         if id == "back" {
             guard stack.count > 1 else { return [.feedback(.limit)] }
+            // **Leaving the editor is where the trim is decided.** Popping is what discards a
+            // selection, so an unguarded `Back` threw the work away silently — the same hazard
+            // `Delete` has, on a screen that rewrites a real file.
+            //
+            // Only when there is something to lose: an untouched selection is the whole recording,
+            // and asking whether to save what you have not changed is a dialogue for nothing.
+            if case .edit(let itemID) = route, hasUnsavedTrim {
+                return open(.confirmTrim(itemID: itemID))
+            }
             pop()
             return [.feedback(.commit)]
         }
@@ -406,10 +461,22 @@ struct DialNavigator {
 
         case (.recordings, "edit"):
             return doublePress()
-        case (.recordings, "more"):
-            guard case .recording(let index)? = RecordingsRow.at(level.highlighted, recordings: content.recordings.count),
-                  let item = content.recordings[safe: index] else { return [.feedback(.limit)] }
-            return open(.actions(itemID: item.id))
+        // **The stick's four nudges, each acting on the highlighted recording.** They were rows on
+        // a pushed menu, which cost a nudge, a turn and a press to do one thing.
+        case (.recordings, "share"):
+            guard let item = highlightedRecording else { return [.feedback(.limit)] }
+            return [.item(.share, itemID: item.id), .feedback(.commit)]
+        case (.recordings, "add"):
+            guard let item = highlightedRecording else { return [.feedback(.limit)] }
+            return [.item(.addToPlaylist, itemID: item.id), .feedback(.commit)]
+        case (.recordings, "delete"):
+            guard let item = highlightedRecording else { return [.feedback(.limit)] }
+            return open(.confirmDelete(itemID: item.id))
+
+        // **Renaming is the editor's, not the stick's.** Four directions cannot hold five verbs, and
+        // of the five this is the one that belongs where you are already changing the recording.
+        case (.edit(let itemID), "rename"):
+            return [.renameItem(itemID: itemID), .feedback(.commit)]
 
         // The tri-state's two ends. Reusing `.action` rather than inventing commands: previous and
         // next were already sayable, and a spring-return switch is a new *affordance* for them, not
@@ -426,9 +493,9 @@ struct DialNavigator {
         // shrugged, and nothing moved. A command with no case is silent, which is why the
         // command/handler pair wants to be added in one breath.
         case (.nowPlaying, "volumeUp"):
-            return setVolume(by: WheelRouter.volumePerDetent)
+            return setVolume(by: WheelRouter.volumePerNudge)
         case (.nowPlaying, "volumeDown"):
-            return setVolume(by: -WheelRouter.volumePerDetent)
+            return setVolume(by: -WheelRouter.volumePerNudge)
 
         case (.nowPlaying, "previous"):
             return stepQueue(by: -1)
@@ -465,10 +532,17 @@ struct DialNavigator {
     /// The navigator marks its own copy paused in the same breath. Without it the Now playing row
     /// keeps its play glyph until the host answers, and on the recording screen that is a picture
     /// of audio still running while the meter says otherwise.
+    /// Start a take on a screen already showing the recorder.
+    private mutating func beginRecording() -> [DialEffect] {
+        pausePlaybackIfNeeded() + [.startRecording, .feedback(.commit)]
+    }
+
+    /// Open the recorder *and* start a take — the mode chooser's Record, where there is no recording
+    /// screen to arrive at first.
     private mutating func startRecording() -> [DialEffect] {
-        let silence = pausePlaybackIfNeeded()
+        let effects = beginRecording()
         push(.recording)
-        return silence + [.startRecording, .feedback(.commit)]
+        return effects
     }
 
     private mutating func openEditor(itemID: String) -> [DialEffect] {
@@ -519,8 +593,8 @@ struct DialNavigator {
         case .chooseMode: 2
         case .library: content.sections.count
         case .recordings: RecordingsRow.rowCount(recordings: content.recordings.count)
-        case .actions: DialItemAction.allCases.count
         case .confirmDelete: DialRoute.DeleteChoice.allCases.count
+        case .confirmTrim: DialRoute.TrimChoice.allCases.count
         case .nowPlaying, .recording, .edit: 0
         }
     }

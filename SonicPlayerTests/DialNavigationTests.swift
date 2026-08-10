@@ -146,9 +146,9 @@ struct DialNavigationTests {
     @Test func theBreadcrumbGrowsWithTheStack() {
         var navigator = DialSample.inRecordings()
 
-        _ = navigator.receive(.action("more"))
+        _ = navigator.receive(.action("delete"))
 
-        #expect(navigator.screen.chrome.breadcrumb == ["HOME", "LIBRARY", "RECORDING 1"])
+        #expect(navigator.screen.chrome.breadcrumb == ["HOME", "LIBRARY", "DELETE"])
     }
 
     @Test func backPopsALevel() {

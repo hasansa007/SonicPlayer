@@ -65,8 +65,8 @@ struct DialPressTests {
         let effects = navigator.receive(.press)
 
         #expect(effects == [.stopRecording, .feedback(.commit)])
-        // Back to where recording was started from, which is home.
-        #expect(navigator.route == .library)
+        // The library, not wherever you came from — it is where the take now is.
+        #expect(navigator.route == .recordings)
     }
 
     /// **The empty library's hub imports.** It is the Import row alone, and pressing a row does what
@@ -82,39 +82,56 @@ struct DialPressTests {
         #expect(navigator.route == .recordings)
     }
 
-    /// **Recording is reached from home, and nowhere else.** The empty library used to carry a
-    /// `Record` chip; the band it sat in is dead space on every other screen.
-    @Test func theRecordCardStartsRecording() {
+    /// **Arriving is not starting.** The card opens the recorder; the hub starts the take. For an
+    /// hour the card did both, which meant recording began before you had decided to.
+    @Test func theRecordCardOpensTheRecorderWithoutStartingATake() {
         var content = DialSample.content(recordingCount: 0, playback: nil)
         content.sections = [
             .init(id: "record", icon: .recording, title: "Record", destination: .recording)
         ]
         var navigator = DialNavigator(content: content, root: .library)
 
-        let effects = navigator.receive(.press)
+        let opening = navigator.receive(.press)
 
-        #expect(effects == [.startRecording, .feedback(.commit)])
+        #expect(opening == [.feedback(.commit)], "no microphone yet")
         #expect(navigator.route == .recording)
+
+        let starting = navigator.receive(.press)
+
+        #expect(starting == [.startRecording, .feedback(.commit)])
     }
 
-    @Test func pressingOnTheEditorCommitsTheTrimAndComesBack() {
+    /// **The hub settles, then plays; it no longer commits.** Saving is the question `Back` asks.
+    @Test func pressingOnTheEditorSettlesThenPreviews() {
         var navigator = DialSample.whileEditing()
         _ = navigator.receive(.tick(10))       // nudge the start handle a second in
 
-        let effects = navigator.receive(.press)
+        #expect(navigator.receive(.press) == [.feedback(.commit)], "the first press settles")
+        #expect(navigator.receive(.press) == [
+            .previewTrim(itemID: "rec-0", start: 1, end: 600), .feedback(.commit)
+        ])
+        #expect(navigator.route == .edit(itemID: "rec-0"), "and stays put")
+    }
+
+    @Test func leavingTheEditorAsksThenSaves() {
+        var navigator = DialSample.whileEditing()
+        _ = navigator.receive(.tick(10))
+
+        _ = navigator.receive(.action("back"))
+        #expect(navigator.route == .confirmTrim(itemID: "rec-0"))
+
+        let effects = navigator.receive(.press)   // Save leads
 
         #expect(effects == [.commitTrim(itemID: "rec-0", start: 1, end: 600), .feedback(.commit)])
         #expect(navigator.route == .recordings)
     }
 
-    @Test func pressingAnItemActionConfirmsItAndComesBack() {
+    /// **The four nudges act immediately.** They were rows on a pushed menu; each is one gesture now.
+    @Test func theItemNudgesActWithoutLeavingTheLibrary() {
         var navigator = DialSample.inRecordings()
-        _ = navigator.receive(.action("more"))
-        _ = navigator.receive(.tick(2))        // Share, which acts immediately
 
-        let effects = navigator.receive(.press)
-
-        #expect(effects == [.item(.share, itemID: "rec-0"), .feedback(.commit)])
+        #expect(navigator.receive(.action("share")) == [.item(.share, itemID: "rec-0"), .feedback(.commit)])
+        #expect(navigator.receive(.action("add")) == [.item(.addToPlaylist, itemID: "rec-0"), .feedback(.commit)])
         #expect(navigator.route == .recordings)
     }
 
@@ -122,10 +139,8 @@ struct DialPressTests {
     /// pushes a guard, because it is the single thing here that cannot be taken back.
     @Test func pressingDeleteOpensTheGuardInstead() {
         var navigator = DialSample.inRecordings()
-        _ = navigator.receive(.action("more"))
-        _ = navigator.receive(.tick(4))        // Delete, the last row
 
-        let effects = navigator.receive(.press)
+        let effects = navigator.receive(.action("delete"))
 
         #expect(effects == [.feedback(.commit)], "nothing has been asked of the host yet")
         #expect(navigator.route == .confirmDelete(itemID: "rec-0"))
@@ -133,9 +148,7 @@ struct DialPressTests {
 
     @Test func confirmingTheGuardDeletes() {
         var navigator = DialSample.inRecordings()
-        _ = navigator.receive(.action("more"))
-        _ = navigator.receive(.tick(4))
-        _ = navigator.receive(.press)          // the guard
+        _ = navigator.receive(.action("delete"))
         _ = navigator.receive(.tick(1))        // Cancel → Delete
 
         let effects = navigator.receive(.press)
@@ -147,9 +160,7 @@ struct DialPressTests {
     /// Cancel is row 0, so a stray press on arrival is the harmless answer.
     @Test func theGuardOpensOnCancelAndPressingItAsksForNothing() {
         var navigator = DialSample.inRecordings()
-        _ = navigator.receive(.action("more"))
-        _ = navigator.receive(.tick(4))
-        _ = navigator.receive(.press)
+        _ = navigator.receive(.action("delete"))
 
         let effects = navigator.receive(.press)
 

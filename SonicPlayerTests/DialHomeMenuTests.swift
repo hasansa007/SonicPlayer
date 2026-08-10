@@ -54,9 +54,10 @@ struct DialHomeMenuTests {
         #expect(list(navigator)?.isProminent == false, "two recordings are a list, not a menu")
     }
 
-    @Test func theActionsMenuIsNotCards() {
+    /// The delete guard is a list of two verbs, not a menu of destinations.
+    @Test func theDeleteGuardIsNotCards() {
         var navigator = DialSample.inRecordings()
-        _ = navigator.receive(.action("more"))
+        _ = navigator.receive(.action("delete"))
 
         #expect(list(navigator)?.isProminent == false)
     }
@@ -80,9 +81,9 @@ struct DialHomeMenuTests {
         #expect(DialSample.navigator().screen.chrome.status == "20:34 ▸ playing")
         #expect(DialSample.inRecordings().screen.chrome.status == "20:34 ▸ playing")
 
-        var actions = DialSample.inRecordings()
-        _ = actions.receive(.action("more"))
-        #expect(actions.screen.chrome.status == "20:34 ▸ playing")
+        var guarding = DialSample.inRecordings()
+        _ = guarding.receive(.action("delete"))
+        #expect(guarding.screen.chrome.status == "20:34 ▸ playing")
     }
 
     /// Absent where it would be the destination, or stale on arrival: Recording and Edit both pause

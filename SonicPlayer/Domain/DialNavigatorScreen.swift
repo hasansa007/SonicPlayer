@@ -129,13 +129,13 @@ extension DialNavigator {
                 ]
             ))
 
-        case .actions(let itemID):
-            return .list(list(rows: actionRows, subject: subject(for: itemID)))
-
         // The subject is not decoration here — it is the whole guard. Two verbs with nothing
         // naming what they act on is exactly the screen `Delete` must not be.
         case .confirmDelete(let itemID):
             return .list(list(rows: deleteChoiceRows, subject: subject(for: itemID)))
+
+        case .confirmTrim(let itemID):
+            return .list(list(rows: trimChoiceRows, subject: subject(for: itemID)))
         }
     }
 
@@ -146,9 +146,6 @@ extension DialNavigator {
         DialScreen.List(
             rows: rows,
             highlighted: min(level.highlighted, max(0, rows.count - 1)),
-            position: route.countsRows && !rows.isEmpty
-                ? "\(min(level.highlighted, rows.count - 1) + 1) of \(rows.count)"
-                : nil,
             subject: subject,
             isProminent: route.showsProminentRows
         )
@@ -224,14 +221,14 @@ extension DialNavigator {
         }
     }
 
-    private var deleteChoiceRows: [DialScreen.List.Row] {
-        DialRoute.DeleteChoice.allCases.map {
+    private var trimChoiceRows: [DialScreen.List.Row] {
+        DialRoute.TrimChoice.allCases.map {
             .init(id: $0.rawValue, icon: $0.icon, title: $0.label)
         }
     }
 
-    private var actionRows: [DialScreen.List.Row] {
-        DialItemAction.allCases.map {
+    private var deleteChoiceRows: [DialScreen.List.Row] {
+        DialRoute.DeleteChoice.allCases.map {
             .init(id: $0.rawValue, icon: $0.icon, title: $0.label)
         }
     }
@@ -277,7 +274,7 @@ extension DialNavigator {
         case .edit:
             return []
 
-        case .actions, .confirmDelete:
+        case .confirmDelete, .confirmTrim:
             return []
         }
     }
@@ -352,15 +349,21 @@ extension DialNavigator {
                 )
             )
 
-        // **One nudge, upward.** Edit had the right nudge and now lives inside this menu as its top
-        // row, which leaves a single direction — and a lone sideways nudge on a stick that can go
-        // four ways reads as though the other three are broken. Up is where a menu comes from.
-        // Absent on Import: the menu acts on *the highlighted recording*, and offering `Delete`
+        // **All four, and no menu behind them.** These were rows on a pushed screen reached by a
+        // `···` nudge: a nudge, a turn and a press to do one thing, and a whole route to hold five
+        // verbs. Four fit the four directions the stick already has, so the screen went — and
+        // `Rename`, the fifth, moved onto the edit screen, where you are already changing the
+        // recording. A nudge has no room for a word, so the glyph is the whole label.
+        //
+        // Absent on the Import row: they act on the highlighted *recording*, and offering `Delete`
         // while the highlight is on Import is offering to delete nothing.
         case .recordings:
             guard case .recording? = highlightedLibraryRow else { return nil }
             return DialScreen.Directions(
-                up: .init(id: "more", icon: .more, label: "More actions")
+                up: .init(id: "edit", icon: .edit, label: "Edit"),
+                down: .init(id: "delete", icon: .delete, label: "Delete"),
+                left: .init(id: "add", icon: .playlist, label: "Add to playlist"),
+                right: .init(id: "share", icon: .share, label: "Share")
             )
 
         default:
@@ -406,9 +409,13 @@ extension DialNavigator {
         case .recordings: highlightedLibraryRow == .importFiles ? .label("IMPORT") : .label("OPEN")
         case .nowPlaying: .glyph(content.playback?.isPlaying == false ? "play.fill" : "pause.fill")
         case .recording: .recordDot
-        case .edit: .label("DONE")
-        case .actions: .label("SELECT")
+        // **Two states, one button.** `DONE` settles the handles; after that the hub plays the
+        // region you are about to keep. Committing is not here at all — it is the question `Back`
+        // asks, which is what stops `Done` and `Back` being one keystroke apart with opposite
+        // consequences.
+        case .edit: level.isTrimSettled ? .glyph("play.fill") : .label("DONE")
         case .confirmDelete: .label("CONFIRM")
+        case .confirmTrim: .label("CONFIRM")
         }
     }
 
@@ -443,15 +450,17 @@ extension DialNavigator {
             return "ring shows input level · rotate to set gain · press to stop"
 
         case .edit:
-            return "rotate to nudge the active handle · press when done"
-
-        case .actions:
-            return "rotate to highlight an action · press to confirm"
+            return level.isTrimSettled
+                ? "press to hear what you are keeping · back to save or discard"
+                : "drag or rotate to move the handle · tap the other to switch"
 
         // Says what the press will do rather than how to press. This is the one screen where the
         // wrong answer cannot be taken back, so the caption names the outcome.
         case .confirmDelete:
             return "deleting cannot be undone · rotate to choose · press to confirm"
+
+        case .confirmTrim:
+            return "saving rewrites the recording · rotate to choose · press to confirm"
         }
     }
 

@@ -37,7 +37,6 @@ struct DialScreenshotTests {
         // until the card style drew a real chevron beside it and the row read `12 ▸ ›`.
         #expect(rows(navigator)?.rows.map(\.trailing) == ["6", "12", "24", "9", nil])
         #expect(rows(navigator)?.rows.map(\.opensSomewhere) == [false, true, false, false, false])
-        #expect(rows(navigator)?.position == nil)
         #expect(screen.ring.hub == .label("OPEN"))
         #expect(screen.hint == "rotate to browse · press to open · hold for now playing")
     }
@@ -49,9 +48,6 @@ struct DialScreenshotTests {
         let screen = navigator.screen
 
         #expect(screen.chrome.breadcrumb == ["HOME", "LIBRARY"])
-        // No counter here any more — the ring's lit tick already says where you are, and the line
-        // cost a row's height at the bottom of the card to repeat it.
-        #expect(rows(navigator)?.position == nil)
         #expect(rows(navigator)?.rows.first?.id == "import")
         #expect(rows(navigator)?.rows.dropFirst().first?.trailing == "01:00")
         #expect(rows(navigator)?.rows.dropFirst().first?.subtitle == "Today 14:02 · 2 markers")
@@ -60,23 +56,13 @@ struct DialScreenshotTests {
         // menu as its top row, leaving one nudge — upward, because a lone sideways one on a
         // four-way stick reads as though the others are broken.
         #expect(screen.actions.isEmpty)
-        #expect(screen.ring.directions?.up?.id == "more")
-        #expect(screen.ring.directions?.right == nil)
-        #expect(screen.ring.directions?.left == nil)
+        #expect(screen.ring.directions?.up?.id == "edit")
+        #expect(screen.ring.directions?.down?.id == "delete")
+        #expect(screen.ring.directions?.left?.id == "add")
+        #expect(screen.ring.directions?.right?.id == "share")
         #expect(screen.chrome.canGoBack)
         #expect(screen.ring.hub == .label("OPEN"))
         #expect(screen.hint == "rotate to scroll · press to open · double-press to edit")
-    }
-
-    /// The actions menu is the only screen still counting, and it is the one where counting means
-    /// something: a fixed menu of verbs where "1 of 5" says how much you have not seen yet.
-    @Test func theCountedPositionFollowsTheHighlight() {
-        var navigator = DialSample.inRecordings()
-        _ = navigator.receive(.action("more"))
-
-        _ = navigator.receive(.tick(2))
-
-        #expect(rows(navigator)?.position == "3 of 5")
     }
 
     // MARK: - 1c Now playing
@@ -164,34 +150,28 @@ struct DialScreenshotTests {
         #expect(screen.actions.isEmpty)
         #expect(edit.activeHandle == .start)
         #expect(screen.ring.hub == .label("DONE"))
-        #expect(screen.hint == "rotate to nudge the active handle · press when done")
+        #expect(screen.hint == "drag or rotate to move the handle · tap the other to switch")
     }
 
-    // MARK: - 1f Item actions
+    // MARK: - 1f The four nudges that replaced the actions menu
 
-    @Test func itemActions() {
-        var navigator = DialSample.inRecordings()
-        _ = navigator.receive(.action("more"))
-        let screen = navigator.screen
+    /// **There is no actions screen.** Its five rows were reached by a `···` nudge, a turn and a
+    /// press — three gestures for one verb, and a whole route to hold them. Four fit the four
+    /// directions the stick already has; `Rename` moved onto the edit screen.
+    @Test func theStickCarriesTheFourItemActions() {
+        let navigator = DialSample.inRecordings()
+        let directions = navigator.screen.ring.directions
 
-        // Rename and Edit lead — the two that change the recording itself, ahead of the two that
-        // move it somewhere. `Export as MP3` is gone: Share already hands the file to another app.
-        #expect(rows(navigator)?.rows.map(\.title) == [
-            "Rename", "Edit", "Share file…", "Add to playlist", "Delete"
-        ])
-        #expect(rows(navigator)?.position == "1 of 5")
-        #expect(screen.chrome.breadcrumb == ["HOME", "LIBRARY", "RECORDING 1"])
-        #expect(screen.ring.hub == .label("SELECT"))
-        #expect(screen.hint == "rotate to highlight an action · press to confirm")
+        #expect(directions?.up?.id == "edit")
+        #expect(directions?.down?.id == "delete")
+        #expect(directions?.left?.id == "add")
+        #expect(directions?.right?.id == "share")
 
-        // Without a subject this screen is five verbs and no object — "Delete" with nothing saying
-        // what. The breadcrumb names it in shouting caps; the header names it as the file is named.
-        #expect(rows(navigator)?.subject?.title == "Recording 1")
-        #expect(rows(navigator)?.subject?.icon == .recording)
-
-        // Export gets its own glyph. Reusing `.share` would put one symbol on two rows of the five
-        // above and read as a bug rather than as a pair.
-        #expect(rows(navigator)?.rows.map(\.icon) == [.rename, .edit, .share, .playlist, .delete])
+        // A nudge has no room for a word, so the glyph is the whole label.
+        #expect(directions?.up?.icon == .edit)
+        #expect(directions?.down?.icon == .delete)
+        #expect(directions?.left?.icon == .playlist)
+        #expect(directions?.right?.icon == .share)
     }
 
     // MARK: - 1g Empty
@@ -257,7 +237,6 @@ struct DialScreenshotTests {
         navigator.update(DialSample.content(recordingCount: 3))
 
         #expect(rows(navigator)?.highlighted == 3, "Import plus three files is four rows")
-        #expect(rows(navigator)?.position == nil)
     }
 
     /// A library that empties is a one-row list, and the clamp must pull the highlight onto it.

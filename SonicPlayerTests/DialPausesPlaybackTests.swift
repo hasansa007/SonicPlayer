@@ -22,7 +22,8 @@ struct DialPausesPlaybackTests {
         ]
         var navigator = DialNavigator(content: content, root: .library)
 
-        let effects = navigator.receive(.press)     // the Record card
+        _ = navigator.receive(.press)               // the Record card opens the recorder
+        let effects = navigator.receive(.press)     // and the hub starts the take
 
         #expect(effects.contains(.pausePlayback))
         #expect(
@@ -39,12 +40,11 @@ struct DialPausesPlaybackTests {
         #expect(effects.contains(.pausePlayback))
     }
 
-    @Test func theEditRowInTheActionsMenuPausesPlaybackToo() {
+    /// The stick's up nudge opens the editor, and takes the same path as a double-press.
+    @Test func theEditNudgePausesPlaybackToo() {
         var navigator = DialSample.inRecordings()
-        _ = navigator.receive(.action("more"))
-        _ = navigator.receive(.tick(1))         // Rename leads; Edit is second
 
-        let effects = navigator.receive(.press)
+        let effects = navigator.receive(.action("edit"))
 
         #expect(effects.contains(.pausePlayback))
     }
@@ -58,6 +58,7 @@ struct DialPausesPlaybackTests {
         ]
         var navigator = DialNavigator(content: content, root: .library)
 
+        _ = navigator.receive(.press)
         let effects = navigator.receive(.press)
 
         #expect(!effects.contains(.pausePlayback))
