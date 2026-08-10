@@ -17,7 +17,10 @@ struct AppView: View {
 
         return ZStack(alignment: .bottom) {
             // Main content
-            NavigationStack(path: $app.path) {
+            // **A plain `NavigationStack` with no path and no destinations.** It held the Files
+            // browser, pushed by URL; the dial browses now and its stack is its own. What is left
+            // is the container the sheets and alerts below hang from.
+            NavigationStack {
                 // **The dial is the app** (#6, #76). There is no Home screen and no tab bar: the
                 // player is the root, and everything else — recordings, now playing, recording —
                 // is a level of the dial's own stack rather than a separate destination.
@@ -51,19 +54,6 @@ struct AppView: View {
                         Button("Rename") { filesRoot.confirmNameInput() }
                         Button("Cancel", role: .cancel) { filesRoot.cancelNameInput() }
                     }
-                    .sheet(item: $filesRoot.audioToEdit) { file in
-                        EditRecordingView(recording: file) {
-                            filesRoot.audioToEdit = nil
-                            filesRoot.refreshFiles()
-                        }
-                    }
-                    .sheet(isPresented: isCollectionPickerPresented) {
-                        InAppCollectionPicker(
-                            collections: filesRoot.availableCollections,
-                            onPick: { filesRoot.moveToDestination($0) },
-                            onCancel: { filesRoot.cancelMove() }
-                        )
-                    }
                     .sheet(item: $app.shareItem) { item in
                         ActivityView(items: [item.url])
                     }
@@ -72,20 +62,6 @@ struct AppView: View {
                             filesRoot.onAppear()
                             home.loadAllFiles()
                         }
-                    }
-                    .navigationDestination(for: URL.self) { folderURL in
-                        CollectionsView(
-                            directory: folderURL,
-                            onCollectionTapped: { app.path.append($0.url) },
-                            onPlay: { file, queue, source in
-                                player.loadTrack(file, queue: queue, source: source)
-                            },
-                            onWillRemoveItems: { items in
-                                player.clearSessionIfAffected(by: items.map(\.url))
-                            }
-                        )
-                        .navigationTitle(folderURL.lastPathComponent)
-                        .navigationBarTitleDisplayMode(.large)
                     }
             }
             .preferredColorScheme(app.settings.colorScheme.colorScheme)
@@ -96,13 +72,8 @@ struct AppView: View {
             // The record FAB is gone too. The dial carries Record as a section, and a floating
             // button over it would be a second door to the same room.
         }
-        // Global sheets
-        .sheet(isPresented: isRecordingSheetPresented) {
-            RecordingView(viewModel: app.recording)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .interactiveDismissDisabled(true)
-        }
+        // **There is no recording sheet.** The dial's recorder is the only one, reached by its own
+        // Record route and by the Home-screen quick action, which used to raise a second one here.
         .sheet(isPresented: isImportSheetPresented) {
             DocumentPicker { urls in
                 app.isImportSheetPresented = false
@@ -167,27 +138,12 @@ extension AppView {
 
 private extension AppView {
 
-    var isRecordingSheetPresented: Binding<Bool> {
-        Binding(
-            get: { app.isRecordingSheetPresented },
-            set: { if !$0 { app.dismissRecordingSheet() } }
-        )
-    }
-
     var isRenaming: Binding<Bool> {
         Binding(
             get: { filesRoot.renamingItem != nil },
             set: { if !$0 { filesRoot.cancelNameInput() } }
         )
     }
-
-    var isCollectionPickerPresented: Binding<Bool> {
-        Binding(
-            get: { filesRoot.isShowingCollectionPicker },
-            set: { if !$0 { filesRoot.cancelMove() } }
-        )
-    }
-
 
     var isImportSheetPresented: Binding<Bool> {
         Binding(
@@ -255,183 +211,5 @@ private extension AppView {
             .toolbar(.hidden, for: .navigationBar)
     }
 
-    var homeRootContent: some View {
-        ZStack {
-            Color.sonicBackground.ignoresSafeArea()
 
-            if filesRoot.isLoading && filesRoot.items.isEmpty {
-                ProgressView()
-                    .tint(.sonicPrimary)
-            } else if filesRoot.items.isEmpty && home.allFiles.isEmpty {
-                // Empty state
-                VStack(spacing: 20) {
-                    Spacer()
-
-                    Image(systemName: "waveform.circle")
-                        .font(.system(size: 72))
-                        .foregroundStyle(LinearGradient.sonicGradient)
-                        .opacity(0.6)
-
-                    Text("Welcome to SonicPlayer")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.sonicTextPrimary)
-
-                    Text("Record audio, import files, or open media\nfrom other apps to get started.")
-                        .font(.subheadline)
-                        .foregroundColor(.sonicTextSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
-
-                    HStack(spacing: 12) {
-                        Button {
-                            app.isRecordingSheetPresented = true
-                        } label: {
-                            Label("Record", systemImage: "mic.fill")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .background(Color.red, in: Capsule())
-                        }
-
-                        Button {
-                            home.onImportTapped()
-                        } label: {
-                            Label("Import", systemImage: "square.and.arrow.down")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(.sonicPrimary)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .background(Color.sonicPrimary.opacity(0.12), in: Capsule())
-                        }
-                    }
-                    .padding(.top, 4)
-
-                    Spacer()
-                }
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        // 1. Collections
-                        collectionsSection
-
-                        // 2. Recent Files
-                        recentFilesSection
-                    }
-                    .padding(.vertical)
-                    .padding(.bottom, player.shouldShowMiniPlayer ? 80 : 40)
-                }
-                .refreshable {
-                    filesRoot.refreshFiles()
-                    home.loadAllFiles()
-                }
-            }
-        }
-    }
-
-    // MARK: - Section: Recent Files
-
-    @ViewBuilder
-    var recentFilesSection: some View {
-        if !home.allFiles.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Recent Media")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                    Spacer()
-                    HStack(spacing: 3) {
-                        Image(systemName: "hand.draw")
-                            .font(.caption2)
-                        Text("Swipe for actions")
-                            .font(.caption2)
-                    }
-                    .foregroundColor(.sonicTextMuted)
-                }
-                .padding(.horizontal)
-
-                List {
-                    ForEach(home.allFiles) { file in
-                        recentFileRow(file: file)
-                            .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
-                            .listRowBackground(Color.clear)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    home.onDeleteFile(file)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                                Button {
-                                    home.onRenameFile(file)
-                                } label: {
-                                    Label("Rename", systemImage: "pencil")
-                                }
-                                .tint(.sonicPrimary)
-                            }
-                            .swipeActions(edge: .leading) {
-                                Button {
-                                    home.onEditFile(file)
-                                } label: {
-                                    Label("Edit", systemImage: "waveform.and.magnifyingglass")
-                                }
-                                .tint(.blue)
-                                Button {
-                                    app.shareItem = ShareItem(url: file.url)
-                                } label: {
-                                    Label("Share", systemImage: "square.and.arrow.up")
-                                }
-                                .tint(.gray)
-                            }
-                    }
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .scrollDisabled(true)
-                .frame(height: CGFloat(home.allFiles.count) * Sizing.rowHeight)
-            }
-        }
-    }
-
-    /// Second consumer of the shared Row (#48). Home is the one place that shows *which*
-    /// collection a file came from — the browser is already inside one.
-    func recentFileRow(file: AudioFile) -> some View {
-        SonicRow(
-            leading: .tile(image: nil, side: Sizing.thumbnail, fallbackSystemImage: "waveform"),
-            title: file.title,
-            secondary: .durationDateAndCollection(
-                file.durationFormatted,
-                file.creationDate.formatted(date: .abbreviated, time: .omitted),
-                CollectionLabel.name(for: file.url, documentsURL: home.documentsURL)
-            )
-        )
-        .onTapGesture { home.fileTapped(file) }
-    }
-
-    // MARK: - Record FAB
-
-    var recordFAB: some View {
-        Button {
-            app.isRecordingSheetPresented = true
-        } label: {
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.red.opacity(0.85), Color.red],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 56, height: 56)
-                    .shadow(color: Color.red.opacity(0.3), radius: 12, x: 0, y: 6)
-
-                Image(systemName: "mic.fill")
-                    .font(.title3)
-                    .foregroundColor(.white)
-            }
-        }
-    }
 }

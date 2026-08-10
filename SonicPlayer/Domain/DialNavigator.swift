@@ -500,6 +500,28 @@ struct DialNavigator {
     }
 
 
+    /// **Open the recorder from outside the dial** — the Home-screen quick action.
+    ///
+    /// It arrives from `AppDelegate`, where there is no view and no place you were, so this resets
+    /// rather than pushes: a quick action means "start here", and stacking the recorder on top of
+    /// wherever the app happened to be left would put a Back on it that leads somewhere the user
+    /// never chose.
+    ///
+    /// It **opens** the recorder and does not start a take, which is the rule the hub already
+    /// holds — arriving is not starting. The old sheet behaved the same way; it simply had a
+    /// different screen to say it on.
+    ///
+    /// The mode goes to Record and the fork's highlight with it, so going back lands on a home that
+    /// agrees with where you just were rather than on Listen.
+    mutating func openRecorder() -> [DialEffect] {
+        let release = pausePlaybackIfNeeded() + [.releasePlayer]
+        mode = .record
+        stack = [Level(route: .library, highlighted: 1)]
+        push(.recordings)
+        push(.recording)
+        return release + [.feedback(.commit)]
+    }
+
     /// **Open the editor on a take that has just been written.**
     ///
     /// Called by the host rather than reached by a press, because the id is a URL and the URL does

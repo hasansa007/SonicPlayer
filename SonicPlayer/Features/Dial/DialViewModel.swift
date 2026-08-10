@@ -88,6 +88,12 @@ final class DialViewModel {
         receive(.action("nowPlaying"))
     }
 
+    /// The Home-screen quick action, which arrives from UIKit with no view in the picture.
+    func openRecorder() {
+        for effect in navigator.openRecorder() { apply(effect) }
+        onNeedsRefresh?()
+    }
+
     /// The take that just landed is the one you want to name or trim, so the editor opens on it.
     ///
     /// Routed through the same `apply` every command uses, so the effects it produces — pausing

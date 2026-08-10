@@ -92,11 +92,14 @@ capture() {
 }
 
 # Screenshot sequence
+# Dial routes, which is what the app has. `collections`, `editRecording` and
+# `homeWithMiniPlayer` named screens that stopped being reachable — they kept producing images,
+# of the dial, under the wrong filenames.
 capture "home"              "01_home.png"
-capture "collections"       "02_collections.png"
+capture "library"           "02_library.png"
 capture "player"            "03_player.png"             1
 capture "recording"         "04_recording.png"          1
-capture "homeWithMiniPlayer" "05_home_mini_player.png"
+capture "edit"              "05_edit.png"               1
 
 # Terminate the app
 xcrun simctl terminate booted "$BUNDLE_ID" 2>/dev/null || true

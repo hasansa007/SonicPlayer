@@ -135,7 +135,12 @@ final class AppViewModel {
     // The reason this type is reachable statically. `AppDelegate` calls these from UIKit, where
     // there is no view and no environment.
 
-    func quickActionRecord() { isRecordingSheetPresented = true }
+    /// **The dial's recorder, not the old sheet.**
+    ///
+    /// This raised `isRecordingSheetPresented`, so long-pressing the app icon gave a different
+    /// recording experience from the one the dial gives — a modal with a navigation bar, no wheel,
+    /// and no way to drop a marker. One app, two recorders, chosen by how you happened to start it.
+    func quickActionRecord() { dial.openRecorder() }
     func quickActionImport() { isImportSheetPresented = true }
 
     // MARK: - Lifecycle
@@ -153,15 +158,44 @@ final class AppViewModel {
                 ScreenshotDemoData.seedViewModels(
                     player: player, home: home, filesRoot: filesRoot, for: screen
                 )
-            }
-            if ScreenshotMode.targetScreen == .recording || ScreenshotMode.targetScreen == .editRecording {
-                isRecordingSheetPresented = true
+                // Fed before it is driven: the presses below walk a library, and a library the dial
+                // has not been handed yet is a library with nothing to press.
+                refreshDial()
+                showScreenshotScreen(screen)
             }
             return
         }
         player.restoreSession()
         // The restore is asynchronous, so the dial is fed and asked *after* it lands rather than
         // here, where `player.currentTrack` is still nil.
+    }
+
+    /// **Drives the dial to a screenshot target with the commands a thumb would send.**
+    ///
+    /// Not by assigning a route: the navigator's stack is private, and a screenshot of a state the
+    /// app cannot actually be put into is a screenshot of a lie. Pressing through is also the
+    /// cheapest possible check that the route is still reachable — if a press stops leading here,
+    /// the image changes and someone sees it.
+    private func showScreenshotScreen(_ screen: ScreenshotMode.Screen) {
+        switch screen {
+        case .home, .playerEmpty, .playerLoading, .playerError:
+            break                                   // the fork is the root; the player states are seeded
+
+        case .library:
+            dial.receive(.press)                    // Listen → the library
+
+        case .player:
+            dial.receive(.press)
+            dial.receive(.press)                    // and the first recording plays
+
+        case .recording:
+            dial.openRecorder()
+
+        case .edit:
+            dial.receive(.tick(1))                  // home → Record
+            dial.receive(.press)                    // → the library
+            dial.receive(.press)                    // → the editor, on the first recording
+        }
     }
 
     /// A file handed over by another app. The player owns this rather than the coordinator,
@@ -228,19 +262,14 @@ final class AppViewModel {
 
         // Home's former `.none // Handled by parent` cases. Each needed reducer state — the
         // browser's selection, the navigation stack, a sheet flag — and each is a method call now.
-        home.onImportTapped = { [weak self] in self?.isImportSheetPresented = true }
-        home.onNewCollectionTapped = { [filesRoot] in filesRoot.createCollectionTapped() }
-        home.onViewAllCollectionsTapped = { [weak self] in
-            guard let self else { return }
-            path.append(filesRoot.documentsDirectoryURL ?? URL(fileURLWithPath: NSHomeDirectory()))
-        }
-        home.onRenameFile = { [filesRoot] in filesRoot.renameItemTapped(.file($0)) }
-        home.onDeleteFile = { [filesRoot] in
-            filesRoot.select(.file($0))
-            filesRoot.deleteSelectedTapped()
-        }
-        home.onEditFile = { [filesRoot] in filesRoot.audioToEdit = $0 }
-        home.onMoveFile = { [filesRoot] in filesRoot.presentPicker(moving: [.file($0)]) }
+        // **Home's out-edges are gone with the screen that raised them.**
+        //
+        // `onImportTapped`, `onNewCollectionTapped`, `onViewAllCollectionsTapped`, `onRenameFile`,
+        // `onDeleteFile`, `onEditFile` and `onMoveFile` were each called from exactly one place —
+        // `homeRootContent` and the `CollectionsSection` under it — and that screen stopped being
+        // rendered when the dial became the root. Every one of these verbs is on the dial now, and
+        // wiring with no caller is wiring nobody maintains: it compiles, it is tested, and it is
+        // a description of an app that no longer exists.
 
         // **A take on disk is a library that changed**, whether or not the save flow ever runs.
         // The dial drives the recorder directly and never presents `RecordingView`, so `onFinished`
