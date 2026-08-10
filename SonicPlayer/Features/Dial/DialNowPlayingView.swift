@@ -46,6 +46,8 @@ struct DialNowPlayingView: View {
 
             progress
 
+            volumeReadout
+
             Spacer(minLength: 0)
         }
     }
@@ -95,6 +97,40 @@ struct DialNowPlayingView: View {
         // One element, so VoiceOver hears "20:34, −25:11" rather than landing on a bar it cannot
         // drag. Seeking is the dial's adjustable action.
         .accessibilityElement(children: .combine)
+    }
+
+    /// The level the stick's vertical nudges change.
+    ///
+    /// Drawn always rather than as a flash on change: a transient needs timing to be right, and the
+    /// question this answers — "did that do anything?" — is asked *after* the gesture, when a
+    /// transient has gone. The percentage is there because a bar alone cannot distinguish a small
+    /// step from none.
+    private var volumeReadout: some View {
+        HStack(spacing: Spacing.sm) {
+            Image(systemName: nowPlaying.volume > 0 ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                .font(.caption2)
+                .foregroundColor(.sonicTextSecondary)
+
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.sonicTextSecondary.opacity(ControlTint.on))
+
+                    Capsule()
+                        .fill(Color.sonicPrimary)
+                        .frame(width: geometry.size.width * nowPlaying.volume.clampedFraction)
+                }
+            }
+            .frame(height: Sizing.hairlineTrackHeight * 2)
+
+            Text("\(Int((nowPlaying.volume * 100).rounded()))%")
+                .font(.sonicTimeLabel)
+                .monospacedDigit()
+                .foregroundColor(.sonicTextSecondary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text("Volume"))
+        .accessibilityValue(Text("\(Int((nowPlaying.volume * 100).rounded())) percent"))
     }
 
     private static let timeShrink: CGFloat = 0.6

@@ -124,6 +124,14 @@ struct DialScreen: Equatable {
         var remaining: String
         var progress: Double
         var isPlaying: Bool
+        /// `0...1`, this app's own output level.
+        ///
+        /// **Nothing on this screen showed volume, which made the control unfalsifiable.** The
+        /// stick's up and down nudges change it, and the ring draws seek position — so a working
+        /// volume control and a dead one looked exactly alike, and the only way to tell was to
+        /// listen for a ten-percent change. A control you cannot see is a control you cannot
+        /// report a bug about.
+        var volume: Double = 1
     }
 
     struct Recording: Equatable {

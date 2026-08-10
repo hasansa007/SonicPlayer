@@ -84,7 +84,8 @@ extension DialNavigator {
                 elapsed: DialTimeFormat.clock(playback.position),
                 remaining: DialTimeFormat.remaining(playback.duration - playback.position),
                 progress: playback.progress,
-                isPlaying: playback.isPlaying
+                isPlaying: playback.isPlaying,
+                volume: playback.volume
             ))
 
         case .recording:

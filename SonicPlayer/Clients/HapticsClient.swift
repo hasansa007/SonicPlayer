@@ -70,7 +70,7 @@ private final class ImpactBox: @unchecked Sendable {
 }
 
 /// Holds the engine and the two lifecycle facts that make CoreHaptics awkward in practice: it stops
-/// when the app backgrounds, and it resets if the media server restarts. Both leave a handle that
+/// when the app backgrounds, andx it resets if the media server restarts. Both leave a handle that
 /// looks fine and plays nothing, so both are handled rather than hoped about.
 private final class HapticEngineBox: @unchecked Sendable {
     private let lock = NSLock()
