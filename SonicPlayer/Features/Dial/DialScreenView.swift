@@ -48,6 +48,44 @@ struct DialScreenView: View {
         }
     }
 
+    /// **Back sits in the card's bottom-left corner, not its top-left.**
+    ///
+    /// It was the first thing in the header — the furthest corner of the card from the hand, and
+    /// the only thing up there pressed often. Moved down it is a short reach from the wheel, and the
+    /// header goes back to being what it says it is: where you are, and what is playing.
+    ///
+    /// Inside the card rather than loose on the screen, because it acts on the card — it pops the
+    /// level the card is showing. A control floating beside the dial would read as belonging to the
+    /// dial, which nudges and presses and never navigates.
+    private var bottomBar: some View {
+        HStack(spacing: 0) {
+            backControl
+            Spacer(minLength: 0)
+        }
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.sonicBorder)
+                .frame(height: Sizing.hairlineTrackHeight)
+        }
+    }
+
+    private var backControl: some View {
+        Button {
+            onCommand(.action("back"))
+        } label: {
+            Image(systemName: "chevron.left")
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundColor(.sonicPrimary)
+                // A real target, not a glyph-sized one. In the header this was caption-sized with a
+                // padded hit area to compensate; it stopped being chrome when it became the control
+                // you press most.
+                .frame(width: Sizing.tapTarget, height: Sizing.tapTarget)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel(Text("Back"))
+    }
+
     /// The same gradient `ShellView` established for the wheel canvas: teal falling into the
     /// background, so the top of the screen is lit and the dial sits in the dark half.
     ///
@@ -96,6 +134,11 @@ struct DialScreenView: View {
                 content
                 ScrollView { content }
             }
+
+            // **A bar, not an overlay.** Sitting on top of the content it covered the last row of a
+            // full list; as the stack's final element it holds its own height, so the list ends
+            // above it and nothing is hidden however long the list gets.
+            if screen.chrome.canGoBack { bottomBar }
         }
         .padding(Spacing.lg)
         // **Wide, but only as tall as it needs to be.** `maxHeight: .infinity` made the card fill

@@ -2,6 +2,10 @@ import SwiftUI
 
 /// A screen's top line: where you are on the left, what is happening on the right (#6).
 ///
+/// **Back is not here any more** — it moved to the bottom-left corner, beside the wheel, where a
+/// thumb can reach it. It was the most-pressed control on the screen sitting at the point furthest
+/// from the hand. `DialScreenView` draws it; this row is now only ever a statement of position.
+///
 /// **With no breadcrumb the status centres**, which is not a special case so much as the same rule
 /// read honestly — the status is the only thing there, so it belongs in the middle. That is what
 /// gives the recording screen its centred `● RECORDING` without the contract needing a field for it.
@@ -17,22 +21,6 @@ struct DialChrome: View {
 
     var body: some View {
         HStack(spacing: Spacing.sm) {
-            if chrome.canGoBack {
-                Button {
-                    onCommand(.action("back"))
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.sonicPrimary)
-                        // A hit area the size of a real target, drawn as a small chevron. The glyph
-                        // is chrome; the thing you press is not allowed to be chrome-sized.
-                        .frame(width: Sizing.tapTarget, height: Sizing.compactControl, alignment: .leading)
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel(Text("Back"))
-            }
-
             if hasBreadcrumb {
                 Text(chrome.breadcrumb.joined(separator: " ▸ "))
                     .font(.caption2)

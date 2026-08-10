@@ -6,12 +6,21 @@ import UIKit
 ///
 /// No new dependency — CoreHaptics ships with iOS. `.test` lives in the test target, which is where
 /// every `.test` has lived since #20.
+/// **The closures are `@MainActor`, and that is load-bearing.** `UIImpactFeedbackGenerator` is
+/// main-actor isolated, so the fallback path reaches it through `MainActor.assumeIsolated` — which
+/// does not check and fall back, it *traps*. As plain `@Sendable` closures the type invited calls
+/// from anywhere and the assumption was enforced only by a comment. Typed this way the compiler
+/// rejects an off-main call site outright, so the assertion is checked rather than believed.
+///
+/// It also keeps the pulse synchronous. Hopping to the main actor would make every detent arrive a
+/// hop late, and a haptic that lands after the thumb has moved on reads as the wheel clicking at
+/// the wrong moment.
 struct HapticsClient {
     /// Called before the first pulse. Starting the engine lazily on the first detent costs a
     /// perceptible delay on exactly the pulse the user judges the whole feature by.
-    var prepare: @Sendable () -> Void = {}
-    var fire: @Sendable (DetentFeedback.Pulse) -> Void = { _ in }
-    var stop: @Sendable () -> Void = {}
+    var prepare: @MainActor @Sendable () -> Void = {}
+    var fire: @MainActor @Sendable (DetentFeedback.Pulse) -> Void = { _ in }
+    var stop: @MainActor @Sendable () -> Void = {}
 }
 
 extension HapticsClient {
@@ -43,10 +52,10 @@ extension HapticsClient {
 /// **`UIImpactFeedbackGenerator` is `@MainActor`-isolated and the client's closures are `@Sendable`
 /// and nonisolated**, so calling it directly warns — and would eventually be an error.
 ///
-/// `assumeIsolated` rather than a `Task { @MainActor in … }` hop, deliberately: every caller is
-/// already on the main actor (`DialViewModel` and `ShellViewModel` are both `@MainActor`), and a
-/// haptic that arrives a hop late is worse than none. A detent pulse has to land under the thumb
-/// that caused it; delayed, it reads as the wheel clicking at the wrong moment.
+/// `assumeIsolated` rather than a `Task { @MainActor in … }` hop, and it is safe because
+/// `HapticsClient`'s closures are `@MainActor` — the compiler will not let anything call in from
+/// off the main actor, so the assertion cannot be wrong. A hop would cost every detent a frame,
+/// and a pulse that lands after the thumb has moved on is worse than none.
 private final class ImpactBox: @unchecked Sendable {
 
     private let generator = UIImpactFeedbackGenerator(style: .rigid)
