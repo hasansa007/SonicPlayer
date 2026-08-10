@@ -420,6 +420,21 @@ struct DialRing: View {
                     }
                 }
                 guard hasDirections else { return }
+
+                // **Travel cancels the hold.** `didNudge` was declared, reset, and never once set —
+                // so a push that outlasted `holdDuration` fired `.hold` instead, and `onEnded`
+                // discarded the nudge. On Now Playing `hold` is a no-op, because you are already
+                // there, so the push simply vanished. A deliberate shove toward volume is exactly
+                // the gesture most likely to take longer than half a second.
+                //
+                // Once the thumb has moved this far it cannot be a hold: a hold is a press that
+                // stays put.
+                if !didNudge, Self.isPastThreshold(value.translation) {
+                    didNudge = true
+                    holdTask?.cancel()
+                    holdTask = nil
+                }
+
                 // Follow the thumb, bounded, so the stick reads as a stick rather than as a button
                 // that happens to react.
                 nudge = CGSize(
@@ -451,12 +466,18 @@ struct DialRing: View {
     private func directionID(for translation: CGSize) -> String? {
         guard let directions else { return nil }
         let dx = translation.width, dy = translation.height
-        guard max(abs(dx), abs(dy)) >= Self.nudgeThreshold else { return nil }
+        guard Self.isPastThreshold(translation) else { return nil }
         if abs(dx) >= abs(dy) {
             return (dx > 0 ? directions.right : directions.left)?.id
         }
         // Screen y grows downward, so up is the negative direction.
         return (dy < 0 ? directions.up : directions.down)?.id
+    }
+
+    /// One threshold, read by both the hold-cancel and the direction resolution — so the travel
+    /// that stops a hold is by construction the same travel that counts as a nudge.
+    private static func isPastThreshold(_ translation: CGSize) -> Bool {
+        max(abs(translation.width), abs(translation.height)) >= nudgeThreshold
     }
 
     private static func bounded(_ value: CGFloat) -> CGFloat {
