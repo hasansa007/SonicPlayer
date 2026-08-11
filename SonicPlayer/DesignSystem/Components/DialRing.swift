@@ -11,7 +11,7 @@ import SwiftUI
 /// and `level` turns the ring into a meter — which is the idea that gives the wheel a job during
 /// recording, the one activity it otherwise has none.
 ///
-/// **Pinned to `.leftToRight`, deliberately**, following `RotaryWheel` and `PlayerView:319`: a
+/// **Pinned to `.leftToRight`, deliberately**, as `RotaryWheel` and the old player both were: a
 /// rotation points at the direction the *media* travels, not the direction text is read. Clockwise
 /// is forward in Arabic too. `ScrubGeometry` records the measurement that makes this free — a
 /// `DragGesture`'s `location.x` is not mirrored, so `atan2` already yields a physical angle.

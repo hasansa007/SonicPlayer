@@ -32,7 +32,7 @@ enum ScrubClamp {
     /// An arbitrary position, held inside the recording (#6).
     ///
     /// The two functions above step by a fixed `interval`; this one takes a position the caller has
-    /// already computed — the wheel's detent seek, whose step is 0.1s and comes from `WheelRouter`.
+    /// already computed — the wheel's detent seek, whose step is 0.1s and comes from `WheelMetrics`.
     /// It lives here so the bounds of a scrub position have exactly one answer in this codebase.
     ///
     /// A non-positive duration means the asset has not loaded, and the answer is the start rather

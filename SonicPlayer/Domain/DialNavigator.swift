@@ -53,7 +53,7 @@ struct DialNavigator {
         var trimOperation: DialScreen.TrimOperation = .keep
     }
 
-    /// One detent of input gain. Fifty detents end to end, matching `WheelRouter.volumePerDetent` —
+    /// One detent of input gain. Fifty detents end to end, matching `WheelMetrics.volumePerDetent` —
     /// separate from it because gain and volume are different quantities and tuning one on a device
     /// must not silently move the other.
     static let gainPerDetent: Double = 0.02
@@ -86,7 +86,7 @@ struct DialNavigator {
         case .tick(let detents): tick(detents)
         case .volumeTick(let detents):
             // The small wheel has one job, so it bypasses the axis entirely.
-            setVolume(by: Double(detents) * WheelRouter.volumePerDetent)
+            setVolume(by: Double(detents) * WheelMetrics.volumePerDetent)
         case .press: press()
         case .doublePress: doublePress()
         case .hold: hold()
@@ -137,11 +137,11 @@ struct DialNavigator {
 
         switch axis {
         case .highlight: return moveHighlight(by: detents)
-        case .seek: return seek(by: Double(detents) * WheelRouter.secondsPerDetent)
-        case .volume: return setVolume(by: Double(detents) * WheelRouter.volumePerDetent)
+        case .seek: return seek(by: Double(detents) * WheelMetrics.secondsPerDetent)
+        case .volume: return setVolume(by: Double(detents) * WheelMetrics.volumePerDetent)
         case .queue: return stepQueue(by: detents)
         case .gain: return setGain(by: Double(detents) * Self.gainPerDetent)
-        case .trimStart, .trimEnd: return nudgeTrim(by: Double(detents) * WheelRouter.secondsPerDetent)
+        case .trimStart, .trimEnd: return nudgeTrim(by: Double(detents) * WheelMetrics.secondsPerDetent)
         }
     }
 
@@ -309,7 +309,7 @@ struct DialNavigator {
             markers: content.editing?.markers ?? [],
             // One detent, per §5 — the wheel's half of "tolerance scales with the input". The
             // finger's half is wider and arrives with the waveform that can measure it in points.
-            tolerance: WheelRouter.secondsPerDetent
+            tolerance: WheelMetrics.secondsPerDetent
         ) else { return false }
 
         if isStart {
@@ -675,9 +675,9 @@ struct DialNavigator {
             return [.toggleShuffle, .feedback(.commit)]
 
         case (.nowPlaying, "volumeUp"):
-            return setVolume(by: WheelRouter.volumePerNudge)
+            return setVolume(by: WheelMetrics.volumePerNudge)
         case (.nowPlaying, "volumeDown"):
-            return setVolume(by: -WheelRouter.volumePerNudge)
+            return setVolume(by: -WheelMetrics.volumePerNudge)
 
         case (.nowPlaying, "previous"):
             return stepQueue(by: -1)

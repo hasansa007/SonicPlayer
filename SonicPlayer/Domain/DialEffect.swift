@@ -6,7 +6,7 @@ import Foundation
 /// assert intent instead of observing side effects, and so a pure `Domain/` type can ask for
 /// playback and recording without importing either.
 ///
-/// **Positions are absolute, not deltas.** `ShellEffect.seekBy` hands the shell a delta and lets it
+/// **Positions are absolute, not deltas.** `ShellEffect.seekBy` handed the shell a delta and let it
 /// do the clamping, which means the bounds of a seek live wherever the effect is applied. Here the
 /// navigator already holds the position and the duration, so it clamps once with `ScrubClamp` and
 /// says where to land. An effect that has already been bounded cannot be applied wrongly.

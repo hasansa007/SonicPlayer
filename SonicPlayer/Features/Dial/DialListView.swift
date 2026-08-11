@@ -246,7 +246,7 @@ private struct DialRowView: View {
             icon
 
             VStack(alignment: .leading, spacing: Spacing.xxs) {
-                // Two lines and tail truncation, **not** the middle truncation `SonicRow` uses.
+                // Two lines and tail truncation, **not** the middle truncation `SonicRow` used.
                 // That mode is right for a filename, where the extension is the informative end;
                 // here it turned "Recordings" into "R…gs" at AX5. A second line costs nothing at
                 // ordinary sizes, where these titles are one line anyway.
