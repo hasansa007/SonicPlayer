@@ -52,8 +52,9 @@ enum Radius {
 
 /// Control and artwork dimensions.
 ///
-/// `tapTarget` is 44 because that is Apple's documented minimum — several buttons in the old
-/// player were smaller than it, which `IconControlButton` now makes impossible.
+/// `tapTarget` is 44 because that is Apple's documented minimum — several buttons in the deleted
+/// player were smaller than it. `IconControlButton` used to enforce this and went with them (#76);
+/// the dial's chips carry `Sizing.compactControl` plus padding to clear the same floor.
 enum Sizing {
     /// 44 × 44 — the smallest a control may be.
     static let tapTarget: CGFloat = 44
@@ -102,8 +103,10 @@ enum Sizing {
     /// 130 — a collection card. Fixed so a grid row stays level whether a folder's name wraps to
     /// one line or two.
     static let collectionCard: CGFloat = 130
-    /// 64 — one `SonicRow`. Home reserves this per row because its list is inside a fixed-height
-    /// frame with scrolling disabled, so it has to know the height in advance.
+    /// 64 — the height one row was given when `SonicRow` drew it for Home's recents. Both are gone
+    /// (#6, #76). Kept because the dial's list still reserves a per-row height, and because the
+    /// reason it was ever needed is worth remembering: a fixed height against text that scales is
+    /// what made Home overlap itself at AX5 (#57).
     static let rowHeight: CGFloat = 64
 
     // The rotary wheel. **None of these scale with Dynamic Type**, and that is the point: the wheel
@@ -248,7 +251,7 @@ enum Motion {
 
 /// Point sizes the dial navigator draws numerals at, plus the one tracking value its chrome needs.
 ///
-/// These exist for the same reason `DisplayFont` does — **a `.system(size:)` is the same number of
+/// These exist for the same reason `DisplayFont` did — **a `.system(size:)` is the same number of
 /// points at every accessibility setting** — and carry the same obligation: read each one through
 /// `@ScaledMetric`, never inline.
 ///
@@ -256,7 +259,8 @@ enum Motion {
 /// @ScaledMetric(relativeTo: .largeTitle) private var elapsed = DialFont.elapsed
 /// ```
 ///
-/// They are here rather than beside `DisplayFont` in `Typography.swift` only because the dial's UI
+/// They are here rather than in `Typography.swift`, where `DisplayFont` held its pair until #76
+/// deleted it for want of a consumer, only because the dial's UI
 /// half was built on a branch that owns `Tokens.swift` and not that file. They are the same idea
 /// and should be folded in when the two land together.
 ///
@@ -277,4 +281,19 @@ enum DialFont {
     static let fraction: CGFloat = 26
     /// 1.5 — letter spacing on a breadcrumb. Set in caps at caption size, it needs the air.
     static let breadcrumbTracking: CGFloat = 1.5
+}
+
+/// The two background tints a tinted surface may have.
+///
+/// Named because the old code used *three* values for two states: repeat and shuffle painted
+/// `0.05` when off and `0.1` when on, while the queue toggle used `0.1` and `0.15` — so "off"
+/// and "on" looked different depending on which control you were looking at.
+///
+/// **Moved here from `IconControlButton.swift` in #76**, which was deleted with the player chrome.
+/// It had thirteen callers across the dial and none in the file that housed it — a token living
+/// inside a component is a token that disappears when the component does, which is exactly what
+/// happened: the build broke on `DialActionRow`, four files away from anything the deletion named.
+enum ControlTint {
+    static let off: Double = 0.05
+    static let on: Double = 0.1
 }

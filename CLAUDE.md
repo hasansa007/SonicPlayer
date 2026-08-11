@@ -104,9 +104,22 @@ five clients use its `@DependencyClient` macro; #20 removes it.
 
 ### The dial is the app (#6)
 
-**There are no screens beside the dial.** Player, Files, Settings, Recording and Edit each had a
-view, and each was reachable only from a shell the dial replaced — so all five were deleted along
-with the sheets and pushes that presented them. What is left is one view rendering one value:
+**There are no screens beside the dial**, with two named exceptions below. Player, Files, Settings,
+Recording and Edit each had a view, each reachable only from a shell the dial replaced, and all five
+are gone along with the sheets and pushes that presented them.
+
+**That sentence was false for four months and this paragraph is the correction (#76).** It was
+written when the deletion was *intended*; `ShellView`, `ShellViewModel`, `PlayerView`,
+`MiniPlayerView` and `SettingsView` in fact stayed in the tree, compiled into every build, and
+unreachable. Three issues were later closed as "unreachable, not fixed" — #55, #57, #77 — because
+their defects were still in those files. A doc that describes an intention in the present tense is
+worse than one that says nothing, because the next reader greps and believes it.
+
+**The two exceptions are real and live:** `AboutView` and `HelpView` are conventional screens,
+presented as sheets from `AppView` and reached from the dial's Settings rows. They are the last two,
+and #50 owns restructuring them.
+
+What is left is one view rendering one value:
 
 ```
 DialCommand  ->  DialNavigator (pure state machine)  ->  DialScreen (a value)  ->  DialScreenView
