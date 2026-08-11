@@ -29,11 +29,19 @@ The workflow reads `RELEASE_NOTES.md` for the section whose heading equals `## <
 `<version>` is `CFBundleShortVersionString` from `SonicPlayer/Info.plist`, and ships it as What's
 New.
 
-**Add the section before bumping the version.** With no matching section, testers get a
-placeholder and the build logs a warning — it still ships, so this fails quietly.
+**Add the section before bumping the version.** With no matching section **the run now fails**,
+early, before the archive. It used to ship a placeholder and log a warning, which meant the whole
+thing failed quietly — testers got *"see the commit history for what changed"* and the only evidence
+was a line in a log nobody opens.
+
+**The half that is still on you: a section that exists and describes the wrong release.** Nothing
+can check that. It happened here — `## 2.3.0` described multi-select in the file browser and the
+Home screen's recents while the branch waiting to promote had deleted both and replaced the entire
+interface with the dial. A wrong section passes every check a machine can make, and reads as current.
 
 Write for testers, not for the changelog: what changed for someone using the app. Leave refactors,
-dependency bumps and test work out.
+dependency bumps and test work out. **What ships is plain text** — `**bold**` arrives as literal
+asterisks, and blank lines are stripped, so read the extracted output rather than the Markdown.
 
 ## Proving the pipeline without shipping
 
@@ -41,6 +49,16 @@ Actions → **Distribute to TestFlight** → Run workflow, with **dry_run** chec
 checked). That archives, exports and validates, then stops before the upload.
 
 Use it after any change to the workflow, the signing setup, or the Xcode pin.
+
+**There is no Run workflow button until this file is on `main`.** GitHub only offers
+`workflow_dispatch` for workflows present on the **default branch**, and `distribute.yml` lives on
+`feat`. So the dry run is unavailable *before* the first promotion and available ever after —
+which is exactly backwards from when it is most wanted. Until then the first promotion merge both
+installs the pipeline and fires it for real.
+
+`gh run list --workflow=distribute.yml` says so plainly if you forget: *"workflow distribute.yml not
+found on the default branch"*. That is not a missing file; it is a file on the wrong branch for the
+purpose.
 
 ## The Xcode pin
 
