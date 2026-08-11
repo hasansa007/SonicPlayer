@@ -40,16 +40,39 @@ jobs:
 
       - name: Assert the toolchain can build this project
         run: |
-          # Fail here, with a reason, rather than inside package resolution.
+          # Fail here, with a reason, rather than minutes later inside the archive.
+          #
+          # **The floor is no longer a package constraint, and this no longer says it is.**
+          # ComposableArchitecture and swift-sharing declared swift-tools-version 6.1, so an older
+          # Xcode failed during resolution with an error that never mentioned Xcode. #20 removed
+          # every package. A guard that blames a dependency the project does not have sends whoever
+          # trips it looking for a Package.resolved that is not there.
           SWIFT_VERSION=$(swift -version 2>&1 | grep -oE 'Swift version [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+' | head -1)
           REQUIRED=6.1
           if [ "$(printf '%s\n%s' "$REQUIRED" "$SWIFT_VERSION" | sort -V | head -1)" != "$REQUIRED" ]; then
-            echo "::error::Swift $SWIFT_VERSION is too old. This project's dependencies declare"
-            echo "::error::swift-tools-version: 6.1, so Swift $REQUIRED or newer is required."
+            echo "::error::Swift $SWIFT_VERSION is older than the $REQUIRED this project builds against."
             echo "::error::Pick a newer Xcode in the Select Xcode step."
             exit 1
           fi
           echo "Swift $SWIFT_VERSION satisfies the $REQUIRED floor."
+
+      - name: Assert the release notes belong to this release
+        run: |
+          # **The quiet failure this closes.** "Read What's New" below fell back to a placeholder
+          # when RELEASE_NOTES.md had no section for the version — a warning in a log nobody reads,
+          # and testers get "see the commit history". Failing the run costs a re-push; shipping
+          # filler costs the one thing a TestFlight build is for.
+          #
+          # It cannot check the harder case — a section that exists and describes a *different*
+          # release, which is what was sitting in this repo when the dial epic was ready to
+          # promote. Nothing automatic can. This checks the half that can be checked.
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" SonicPlayer/Info.plist)
+          if ! grep -qx "## $VERSION" RELEASE_NOTES.md; then
+            echo "::error::RELEASE_NOTES.md has no '## $VERSION' section."
+            echo "::error::Add one before bumping CFBundleShortVersionString — testers read it as What's New."
+            exit 1
+          fi
+          echo "Found the $VERSION section."
 
       - name: Install signing certificate
         env:
@@ -80,11 +103,9 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp "$PROFILE_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/
 
-      - name: Resolve packages
-        run: |
-          xcodebuild -resolvePackageDependencies \
-            -project SonicPlayer.xcodeproj \
-            -scheme SonicPlayer
+      # `Resolve packages` stood here and is gone with #20. `Package.resolved` pins zero packages,
+      # so the step resolved nothing — and a resolution step in a release pipeline is a standing
+      # claim that this project has dependencies to resolve.
 
       - name: Archive
         run: |
@@ -118,8 +139,10 @@ jobs:
           ' RELEASE_NOTES.md | sed '/^$/d')
 
           if [ -z "$NOTES" ]; then
-            echo "::warning::RELEASE_NOTES.md has no section for $VERSION — shipping a placeholder."
-            NOTES="This build has no release notes. See the commit history for what changed."
+            # Unreachable from the heading check above, which stops the run first. Kept for the one
+            # case it cannot see: a heading that exists with nothing underneath it.
+            echo "::error::The '## $VERSION' section in RELEASE_NOTES.md is empty."
+            exit 1
           fi
 
           echo "$NOTES" > $RUNNER_TEMP/whats_new.txt
