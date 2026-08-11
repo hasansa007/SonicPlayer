@@ -50,9 +50,26 @@ it.
 
 ## Limits
 
-App Store Connect caps *What's New* at **4000 characters** per localisation. Counts are in
-characters, not bytes — Arabic runs roughly two bytes per character, so `wc -c` overstates it:
+One file per field per language. The caps differ by an order of magnitude, and **the cap is what
+decides the shape** — 170 characters is one sentence, not a trimmed list.
+
+| File | Field | Cap |
+|---|---|---|
+| `whats-new.<lang>.md` | What's New in This Version | **4000** |
+| `promotional-text.<lang>.md` | Promotional Text | **170** |
+
+Promotional Text can be changed **without submitting a build**, which What's New cannot — so it is
+the one to edit when the pitch needs to move between releases.
+
+Counts are in characters, not bytes. Arabic runs roughly two bytes per character, so `wc -c`
+overstates it by nearly double:
 
 ```bash
 wc -m docs/appstore/3.0.0/*.md
 ```
+
+Trailing newlines count in `wc -m` and not in the field, so a file one over the cap is fine; two
+over is not. Check the number, not the verdict.
+
+**The short pair must mirror the long pair.** Both languages open on the same claim in the same
+shape, because a listing that pitches one thing in English and another in Arabic is two products.
