@@ -19,8 +19,29 @@ enum MoveDestinations {
         var path: String
     }
 
+    /// One row of the Move screen: somewhere that exists, or the offer to make somewhere.
+    ///
+    /// **A single list, read by the projection that draws it and by the press that acts on it.**
+    /// `New folder` is a row rather than a chip because it is a destination in the sentence the
+    /// screen is asking — *where does this go?* — and the answer "somewhere that does not exist
+    /// yet" belongs among the others rather than beside them.
+    ///
+    /// It is an enum rather than a `Destination` with a nil id and a flag, so that the two halves
+    /// index the *same* array and nothing has to subtract one. The Import row was a row in a list
+    /// of files with an offset held elsewhere, and removing it took 28 tests with it; this is that
+    /// lesson applied in advance.
+    enum Row: Equatable {
+        case newFolder
+        case existing(Destination)
+    }
+
     static let rootTitle = "Library"
     static let separator = " › "
+
+    /// Every row of the Move screen, in the order it is drawn.
+    static func rows(in items: [DialContent.Item], excluding itemID: String? = nil) -> [Row] {
+        [.newFolder] + all(in: items, excluding: itemID).map(Row.existing)
+    }
 
     /// **The moving item's own folder is included and its own self is not.** Filing something where
     /// it already lives is a no-op the guard below refuses; filing it *into itself* is the one that

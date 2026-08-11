@@ -56,7 +56,14 @@ enum DialEffect: Equatable {
 
     // MARK: - Recording
 
-    case startRecording
+    /// Begin a take. `intoItemID` is the folder it should land in — `nil` for the library root.
+    ///
+    /// **Where you are standing is where it goes.** Every take landed in one fixed `Recordings`
+    /// folder however deep in the library you were when you pressed Record, so recording into a
+    /// folder you had just opened meant recording somewhere else and filing it afterwards. The
+    /// folder is on the breadcrumb the whole time the recorder is open, which is what makes this
+    /// answerable before the take rather than after it.
+    case startRecording(intoItemID: String?)
     case stopRecording
     case toggleRecordingPause
     case addMarker
@@ -106,6 +113,13 @@ enum DialEffect: Equatable {
     /// never by intent. The naming is the host's: a folder needs a name before it exists, and the
     /// dial has no text entry.
     case createFolder(inItemID: String?)
+    /// Make a folder at the library root and file `itemID` into it — the Move screen's first row.
+    ///
+    /// **One effect rather than `createFolder` and a move**, because the two are one intention and
+    /// splitting them puts the work back on the user: the folder would appear, the Move screen
+    /// would be gone, and filing would have to be started again against a list that had changed
+    /// underneath.
+    case createFolderForMove(itemID: String)
     /// File a recording into a folder — `nil` for the library root.
     case moveItem(itemID: String, toFolderID: String?)
 

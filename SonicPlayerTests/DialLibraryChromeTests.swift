@@ -21,7 +21,7 @@ struct DialLibraryChromeTests {
     /// **Back leads, Settings trails, and the screen's own verbs sit between.** One layout on every
     /// screen, so the two that mean the same thing everywhere never move.
     @Test func theLibraryCarriesBothVerbsBetweenBackAndSettings() {
-        #expect(chips(DialSample.inRecordings()) == ["back", "record", "import", "newFolder", "sort", "settings"])
+        #expect(chips(DialSample.inRecordings()) == ["record", "import", "newFolder", "sort", "settings"])
     }
 
     @Test func aFolderCarriesTheSameRow() {
@@ -31,23 +31,31 @@ struct DialLibraryChromeTests {
         #expect(chips(navigator) == ["back", "record", "import", "newFolder", "sort", "settings"])
     }
 
-    /// **Back is reserved, not absent, at the root.** There is nowhere to pop, and a chip arriving
-    /// one level down would shove every other one sideways under a thumb that had learned where
-    /// they were.
-    @Test func backHoldsItsSlotAtTheRootAndIsDisabled() {
-        let root = DialSample.inRecordings().screen.actions
-        #expect(root.first?.id == "back")
-        #expect(root.first?.emphasis == .disabled)
+    /// **Back is absent at the root, not reserved and greyed.**
+    ///
+    /// It held a disabled slot for a while, on the argument that a chip arriving one level down
+    /// shifts the row under a thumb that had learned it. Seen on the phone that trade is the wrong
+    /// way round: the shift is a one-off on a screen you have just changed, and the greyed chip is
+    /// permanent on the screen you spend the most time on, offering the one thing it cannot do.
+    @Test func backIsNotDrawnWhereThereIsNowhereToGo() {
+        #expect(!chips(DialSample.inRecordings()).contains("back"))
 
         var deeper = DialFolderTests.navigator()
         _ = deeper.receive(.press)
-        #expect(deeper.screen.actions.first?.emphasis != .disabled, "and it lights up once it leads somewhere")
+        #expect(deeper.screen.actions.first?.id == "back", "and it leads the row once it leads somewhere")
+        #expect(deeper.screen.actions.first?.emphasis != .disabled)
     }
 
-    @Test func settingsIsOnEveryScreen() {
+    /// **Settings is on every screen except its own** — a door into the room you are standing in is
+    /// the same defect as a Back that cannot go back.
+    @Test func settingsIsOnEveryScreenButItsOwn() {
         #expect(chips(DialSample.inRecordings()).last == "settings")
         #expect(chips(DialSample.whileEditing()).last == "settings")
         #expect(chips(DialSample.whileRecording()).last == "settings")
+
+        var settings = DialSample.inRecordings()
+        _ = settings.receive(.action("settings"))
+        #expect(chips(settings) == ["back"], "the way out, and nothing else")
     }
 
     /// **The guard screen is the one exception**, and deliberately: `Cancel` is already the way
@@ -80,7 +88,7 @@ struct DialLibraryChromeTests {
         var navigator = DialSample.inRecordings(recordingCount: 2)
         _ = navigator.receive(.tick(1))                     // the last file
 
-        for expected in ["back", "record", "import", "newFolder", "sort", "settings"] {
+        for expected in ["record", "import", "newFolder", "sort", "settings"] {
             _ = navigator.receive(.tick(1))
             #expect(navigator.highlightedChipID == expected)
         }
@@ -93,7 +101,7 @@ struct DialLibraryChromeTests {
     /// from, because two implementations that agree today are what rule 3 forbids.
     @Test func pressingAChipDoesExactlyWhatTappingItDoes() {
         var byWheel = DialSample.inRecordings()
-        _ = byWheel.receive(.tick(13))                      // twelve files, then Back, then Record
+        _ = byWheel.receive(.tick(12))                      // twelve files, then Record
         #expect(byWheel.highlightedChipID == "record")
         var byTap = DialSample.inRecordings()
 
@@ -105,11 +113,11 @@ struct DialLibraryChromeTests {
         var navigator = DialSample.inRecordings(recordingCount: 1)
 
         _ = navigator.receive(.tick(1))
-        #expect(navigator.screen.ring.hub == .label("BACK"))
-        _ = navigator.receive(.tick(1))
         #expect(navigator.screen.ring.hub == .label("RECORD"))
         _ = navigator.receive(.tick(1))
         #expect(navigator.screen.ring.hub == .label("IMPORT"))
+        _ = navigator.receive(.tick(1))
+        #expect(navigator.screen.ring.hub == .label("NEW FOLDER"))
     }
 
     /// **Only where the wheel scrolls.** Now Playing, the recorder and the editor bind it to seek,
@@ -150,7 +158,7 @@ struct DialLibraryChromeTests {
 
         #expect(effects.contains(.releasePlayer))
         #expect(effects.last == .feedback(.commit))
-        #expect(!effects.contains(.startRecording), "arrived, not started")
+        #expect(!effects.contains(.startRecording(intoItemID: nil)), "arrived, not started")
         #expect(navigator.route == .recording)
     }
 

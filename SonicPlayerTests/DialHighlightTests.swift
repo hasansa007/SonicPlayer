@@ -60,19 +60,20 @@ struct DialHighlightTests {
     /// in the order they are drawn:
     ///
     ///     0  1  2                the files
-    ///     3 … 8                  the chips: Back, Record, Import, New folder, Sort, Settings
+    ///     3 … 7                  the chips: Record, Import, New folder, Sort, Settings
     ///
     /// Nothing sits above the list any more — Record and Import were the last things pinned there
-    /// and they are chips now, so the ring starts at row 0. Every count in this section is that
-    /// count, which is why they move together whenever the row changes; the arithmetic is
-    /// deliberately in one place so that is the only cost.
+    /// and they are chips now, so the ring starts at row 0. **Back is not in the span at the root**,
+    /// because it is not drawn there: a chip that cannot do anything is not a stop worth turning to.
+    /// Every count in this section is that count, which is why they move together whenever the row
+    /// changes; the arithmetic is deliberately in one place so that is the only cost.
     @Test func turningPastTheLastRowLandsOnTheFirstChip() {
         var navigator = DialSample.inRecordings(recordingCount: 3)
         _ = navigator.receive(.tick(2))             // the last file, row 2
 
         let effects = navigator.receive(.tick(1))
 
-        #expect(navigator.isBackHighlighted)
+        #expect(navigator.highlightedChipID == "record")
         #expect(highlight(navigator) == -1, "and no row wears the cursor")
         #expect(effects == [.feedback(.detent)], "a move is a detent, not a wall")
     }
@@ -92,7 +93,7 @@ struct DialHighlightTests {
     @Test func aFullRevolutionComesBackToTheFirstRow() {
         var navigator = DialSample.inRecordings(recordingCount: 3)
 
-        _ = navigator.receive(.tick(9))             // nine positions
+        _ = navigator.receive(.tick(8))             // eight positions
 
         #expect(highlight(navigator) == 0)
     }
@@ -100,9 +101,9 @@ struct DialHighlightTests {
     /// A flick far larger than the list still lands somewhere sensible rather than running out of
     /// bounds — `detents` is reduced modulo the ring before it is applied.
     @Test func aFlickLongerThanTheListStillLands() {
-        var navigator = DialSample.inRecordings(recordingCount: 3)   // 9 positions, highlight on 0
+        var navigator = DialSample.inRecordings(recordingCount: 3)   // 8 positions, highlight on 0
 
-        let effects = navigator.receive(.tick(46))                   // 46 % 9 == 1
+        let effects = navigator.receive(.tick(41))                   // 41 % 8 == 1
 
         #expect(highlight(navigator) == 1)
         #expect(effects == [.feedback(.detent)])
@@ -112,9 +113,9 @@ struct DialHighlightTests {
     /// started, and a tick that changes nothing reports `.limit` — the law this suite opens with,
     /// which wrapping does not repeal.
     @Test func awholeNumberOfRevolutionsChangesNothing() {
-        var navigator = DialSample.inRecordings(recordingCount: 3)   // 9 positions
+        var navigator = DialSample.inRecordings(recordingCount: 3)   // 8 positions
 
-        let effects = navigator.receive(.tick(45))                   // 45 % 9 == 0
+        let effects = navigator.receive(.tick(40))                   // 40 % 8 == 0
 
         #expect(highlight(navigator) == 0)
         #expect(effects == [.feedback(.limit)])
@@ -149,8 +150,8 @@ struct DialHighlightTests {
             Issue.record("expected browse ticks, got \(navigator.screen.ring.ticks)")
             return
         }
-        // Five files and six chips — eleven positions, and row 2 is the third of them.
-        #expect(abs((thumb ?? .nan) - 0.2) < 1e-9)
+        // Five files and five chips — ten positions, and row 2 is the third of them.
+        #expect(abs((thumb ?? .nan) - 2.0 / 9.0) < 1e-9)
     }
 
     @Test func theThumbSitsAtEachEndOnTheFirstAndLastStop() {
@@ -164,12 +165,12 @@ struct DialHighlightTests {
     /// **There is no thumbless browse screen left.**
     ///
     /// This asserted that an empty library has no span to place a thumb along, which held while the
-    /// list was the whole ring — no rows, nothing to point at. Its six chips are stops, so it has a
-    /// span of six and the thumb sits at the top of it, on Back.
+    /// list was the whole ring — no rows, nothing to point at. Its five chips are stops, so it has a
+    /// span of five and the thumb sits at the top of it, on the first thing there is to do.
     @Test func anEmptyListPlacesItsThumbOnTheFirstChip() {
         let navigator = DialSample.inRecordings(recordingCount: 0)
 
-        #expect(navigator.isBackHighlighted)
+        #expect(navigator.highlightedChipID == "record")
         #expect(navigator.screen.ring.ticks == .browse(thumb: 0))
     }
 }

@@ -34,7 +34,7 @@ struct DialScreenshotTests {
         #expect(rows(navigator)?.rows.first?.trailing == "01:00")
         #expect(rows(navigator)?.rows.first?.subtitle == "Today 14:02 · 2 markers")
         #expect(rows(navigator)?.rows.dropFirst().first?.subtitle == nil)
-        #expect(screen.actions.map(\.id) == ["back", "record", "import", "newFolder", "sort", "settings"])
+        #expect(screen.actions.map(\.id) == ["record", "import", "newFolder", "sort", "settings"])
         // **All four nudges, and no mode deciding which.** Up was absent in Listen and Rename in
         // Record; the fork is gone, so every verb a file answers is here, always.
         #expect(screen.ring.directions?.up?.id == "edit")
@@ -42,7 +42,7 @@ struct DialScreenshotTests {
         #expect(screen.ring.directions?.left?.id == "move")
         #expect(screen.ring.directions?.right?.id == "share")
         #expect(!screen.chrome.canGoBack, "the library is the root now")
-        #expect(screen.actions.map(\.id) == ["back", "record", "import", "newFolder", "sort", "settings"])
+        #expect(screen.actions.map(\.id) == ["record", "import", "newFolder", "sort", "settings"])
         #expect(screen.ring.hub == .label("PLAY"))
         // **The nudge clause has gone out of the caption and onto the stick.** It named the same
         // four things `ring.directions` names, one line of prose away from them, so the sentence
@@ -169,9 +169,11 @@ struct DialScreenshotTests {
         #expect(screen.chrome.breadcrumb == ["LIBRARY"])
         // **The row is unchanged by the list being empty**, which is the point of it being a row
         // rather than a pinned element: nothing appears or disappears with the contents.
-        #expect(screen.actions.map(\.id) == ["back", "record", "import", "newFolder", "sort", "settings"])
+        #expect(screen.actions.map(\.id) == ["record", "import", "newFolder", "sort", "settings"])
         #expect(!screen.chrome.canGoBack, "the library is the root")
-        #expect(screen.ring.hub == .label("BACK"), "an empty list opens on the first chip")
+        // The first chip used to be Back, which is the one chip the root does not draw any more —
+        // so an empty library opens on the first thing there is to *do* in it.
+        #expect(screen.ring.hub == .label("RECORD"), "an empty list opens on the first chip")
     }
 
     // MARK: - 1h Listen vs record

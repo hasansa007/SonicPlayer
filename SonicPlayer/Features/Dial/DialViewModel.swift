@@ -26,6 +26,8 @@ final class DialViewModel {
     var onImportFiles: ((String?) -> Void)?
     /// The dial has no text entry, so naming a new folder is the host's.
     var onCreateFolder: ((String?) -> Void)?
+    /// Name a folder and file this recording into it, in one flow — the Move screen's first row.
+    var onCreateFolderForMove: ((String) -> Void)?
     var onMoveItem: ((String, String?) -> Void)?
     /// Raised only after the user has confirmed. The composition root does the deleting, because a
     /// file leaving disk concerns the player, the markers and the waveform cache as well.
@@ -36,7 +38,8 @@ final class DialViewModel {
     var operationError: String?
     var onSeek: ((TimeInterval) -> Void)?
     var onSelectTrack: ((Int) -> Void)?
-    var onStartRecording: (() -> Void)?
+    /// The folder the take should land in — `nil` for the library root.
+    var onStartRecording: ((String?) -> Void)?
     var onSetting: ((DialSetting) -> Void)?
     var onStopRecording: (() -> Void)?
     var onTogglePause: (() -> Void)?
@@ -320,10 +323,12 @@ final class DialViewModel {
             onCreateFolder?(itemID)
         case .moveItem(let itemID, let folderID):
             onMoveItem?(itemID, folderID)
+        case .createFolderForMove(let itemID):
+            onCreateFolderForMove?(itemID)
         case .setting(let setting):
             onSetting?(setting)
-        case .startRecording:
-            onStartRecording?()
+        case .startRecording(let itemID):
+            onStartRecording?(itemID)
         case .stopRecording:
             onStopRecording?()
         case .toggleRecordingPause:

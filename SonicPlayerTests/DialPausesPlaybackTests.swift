@@ -45,7 +45,7 @@ struct DialPausesPlaybackTests {
         #expect(opening.contains(.releasePlayer))
 
         let starting = navigator.receive(.press)
-        #expect(starting == [.startRecording, .feedback(.commit)])
+        #expect(starting == [.startRecording(intoItemID: nil), .feedback(.commit)])
     }
 
     /// **The hub plays and the nudge edits**, so the press that used to open the editor cannot.
@@ -75,7 +75,7 @@ struct DialPausesPlaybackTests {
         let effects = navigator.receive(.press)
 
         #expect(!effects.contains(.pausePlayback))
-        #expect(effects == [.startRecording, .feedback(.commit)])
+        #expect(effects == [.startRecording(intoItemID: nil), .feedback(.commit)])
     }
 
     /// The navigator marks its own copy paused in the same breath, rather than waiting for the host

@@ -117,7 +117,7 @@ struct DialTeachingTests {
 
         _ = navigator.receive(.tick(1))
 
-        #expect(navigator.highlightedChipID == "back")
+        #expect(navigator.highlightedChipID == "record")
         #expect(!navigator.screen.chipsAreNext)
     }
 

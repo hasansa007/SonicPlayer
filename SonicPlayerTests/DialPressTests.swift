@@ -72,11 +72,11 @@ struct DialPressTests {
     /// **An empty library is no longer a dead end, it opens on a chip.**
     ///
     /// This asserted a refusal, from when the list was the whole ring and a library with nothing in
-    /// it had nothing under the hub. The chips are stops, so a library with no rows still has six
-    /// positions and the screen opens on the first of them.
+    /// it had nothing under the hub. The chips are stops, so a library with no rows still has five
+    /// positions and the screen opens on the first of them — which, now that Back is not drawn at
+    /// the root, is Record: the first thing there is to do about a library with nothing in it.
     @Test func pressingOnTheEmptyLibraryReachesAChipRatherThanRefusing() {
         var navigator = DialSample.navigator(recordingCount: 0)
-        _ = navigator.receive(.tick(1))     // past Back, onto Record
 
         let effects = navigator.receive(.press)
 
@@ -92,12 +92,12 @@ struct DialPressTests {
 
         let opening = navigator.receive(.action("record"))
 
-        #expect(!opening.contains(.startRecording), "no microphone yet")
+        #expect(!opening.contains(.startRecording(intoItemID: nil)), "no microphone yet")
         #expect(navigator.route == .recording)
 
         let starting = navigator.receive(.press)
 
-        #expect(starting == [.startRecording, .feedback(.commit)])
+        #expect(starting == [.startRecording(intoItemID: nil), .feedback(.commit)])
     }
 
     /// **`DONE` is the only thing that writes**, and it applies whichever operation the nudges

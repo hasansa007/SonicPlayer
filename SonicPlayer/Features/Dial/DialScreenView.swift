@@ -26,6 +26,11 @@ struct DialScreenView: View {
     @State private var shownVolume: Double?
     @State private var hideTask: Task<Void, Never>?
 
+    /// **`.compact` here is landscape on a phone**, whatever the width class says — a 393×852 phone
+    /// turned sideways is `.compact` vertically and `.regular` horizontally on the larger models,
+    /// so height is the axis that answers "is the screen short now".
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
     let screen: DialScreen
     let onCommand: (DialCommand) -> Void
 
@@ -33,42 +38,102 @@ struct DialScreenView: View {
         ZStack {
             background
 
-            // **The card yields; the controls do not.** Every band below the card gets layout
-            // priority, so when text grows the list gives up height rather than the caption losing
-            // its last words or the chips being clipped. At AX5 without this the caption truncated
-            // to "rotate to browse ·…" — and it is shorter now precisely so that there is less of
-            // it to lose.
-            VStack(spacing: Spacing.lg) {
-                stage
-                    .layoutPriority(0)
+            if verticalSizeClass == .compact {
+                sideBySide
+            } else {
+                stacked
+            }
+        }
+    }
 
-                Spacer(minLength: 0)
+    /// Portrait: the card, then the controls beneath it.
+    ///
+    /// **The card yields; the controls do not.** Every band below the card gets layout priority, so
+    /// when text grows the list gives up height rather than the caption losing its last words or
+    /// the chips being clipped. At AX5 without this the caption truncated to "rotate to browse ·…"
+    /// — and it is shorter now precisely so that there is less of it to lose.
+    private var stacked: some View {
+        VStack(spacing: Spacing.lg) {
+            stage
+                .layoutPriority(0)
 
-                // The line and the chips are one band: an announcement about the row below it wants
-                // to arrive *next to* what it announces, not a full gap away from it. It also keeps
-                // what the line costs when it appears down to its own height plus four points,
-                // which the spacer above absorbs before the card is asked for anything.
-                VStack(spacing: Spacing.xs) {
-                    if screen.chipsAreNext { chipsAheadLine }
-                    DialActionRow(actions: screen.actions, onCommand: onCommand)
-                }
-                .animation(Motion.selection, value: screen.chipsAreNext)
+            Spacer(minLength: 0)
+
+            controls
+                .layoutPriority(1)
+        }
+        .padding(.horizontal, Spacing.xxl)
+        .padding(.top, Spacing.lg)
+        // **The wheel sits well clear of the bottom edge**, which is a screen inset rather than
+        // a gap between two things. The caption below it and this together lift the dial about
+        // fifty points into the thumb's arc; the card gives up that height, which is the trade
+        // taken knowingly — the wheel is what the hand is on for the whole session and the card
+        // is what it looks at between turns.
+        .padding(.bottom, Spacing.xxxl)
+    }
+
+    /// Landscape: the card on the leading side, the wheel and its chips on the trailing one.
+    ///
+    /// **Stacked, the dial does not fit.** It is a fixed 262 points and does not scale, and a
+    /// landscape phone is about 390 tall — so the wheel, the chips and the caption alone are more
+    /// than the screen, and the card was squeezed to a strip before anything else gave.
+    ///
+    /// Side by side each half gets the axis it needs: the card is tall-and-narrow work, the wheel
+    /// is a fixed square. **Trailing rather than leading**, and deliberately not mirrored in
+    /// Arabic — the wheel goes where the hand holding the phone is, which is the right side for the
+    /// same reason it is at the bottom in portrait. `DialRing` already pins itself to
+    /// `.leftToRight` for the neighbouring reason: a rotation points the way the media travels,
+    /// not the way text is read.
+    private var sideBySide: some View {
+        HStack(spacing: Spacing.lg) {
+            stage
+                .layoutPriority(0)
+
+            // **The controls turn from a column into a row, and the wheel keeps its size.** Stacked,
+            // the chips, the dial and the caption come to about 370 points against roughly 340 of
+            // landscape screen — so something had to give, and shrinking the dial would have made
+            // the one control the whole app is built on a different size depending on which way the
+            // phone is held. Laid out across, only the dial's own 262 is on the vertical axis.
+            chipBand(axis: .vertical)
                 .layoutPriority(1)
 
+            VStack(spacing: Spacing.sm) {
                 dial
-                    .layoutPriority(1)
-
                 caption
-                    .layoutPriority(1)
             }
-            .padding(.horizontal, Spacing.xxl)
-            .padding(.top, Spacing.lg)
-            // **The wheel sits well clear of the bottom edge**, which is a screen inset rather than
-            // a gap between two things. The caption below it and this together lift the dial about
-            // fifty points into the thumb's arc; the card gives up that height, which is the trade
-            // taken knowingly — the wheel is what the hand is on for the whole session and the card
-            // is what it looks at between turns.
-            .padding(.bottom, Spacing.xxxl)
+            .layoutPriority(1)
+        }
+        .environment(\.layoutDirection, .leftToRight)
+        .padding(.horizontal, Spacing.xxl)
+        .padding(.vertical, Spacing.lg)
+    }
+
+    /// The chips, the wheel and the caption — one band, in the same order whichever way the phone
+    /// is held, so that what the thumb has learned survives a rotation.
+    private var controls: some View {
+        VStack(spacing: Spacing.lg) {
+            chipBand(axis: .horizontal)
+            dial
+            caption
+        }
+    }
+
+    /// The announcement and the chips it announces, as one band.
+    ///
+    /// They belong together in both layouts: a line about the controls below it wants to arrive
+    /// *next to* what it announces, not a full gap away. The chevron points along the run of chips
+    /// either way — down at the row in portrait, down the column in landscape.
+    ///
+    /// **Its space is held whether or not it is there.** Inserted and removed, it moved every band
+    /// below it by its own height as the wheel crossed the last row — so the card resized under the
+    /// thumb at the exact moment the line was asking you to keep turning. Reserved and faded, the
+    /// layout is identical on every row and only the ink changes.
+    private func chipBand(axis: Axis) -> some View {
+        VStack(spacing: Spacing.xs) {
+            chipsAheadLine
+                .opacity(screen.chipsAreNext ? 1 : 0)
+                .animation(Motion.selection, value: screen.chipsAreNext)
+            DialActionRow(actions: screen.actions, onCommand: onCommand, axis: axis)
         }
     }
 
@@ -194,8 +259,9 @@ struct DialScreenView: View {
         .font(.caption2)
         .foregroundColor(.sonicTextSecondary)
         .dynamicTypeSize(...Self.captionCeiling)
-        .transition(.opacity)
-        // It describes the row below it, which VoiceOver reaches by swiping rather than by turning.
+        // It describes the row below it, which VoiceOver reaches by swiping rather than by turning
+        // — and its space is held on every row, so it must not be announced on the rows where it is
+        // invisible.
         .accessibilityHidden(true)
     }
 

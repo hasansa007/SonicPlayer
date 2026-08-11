@@ -435,12 +435,19 @@ struct DialNavigator {
             }
 
         case .move(let itemID):
-            let destinations = MoveDestinations.all(in: content.recordings, excluding: itemID)
-            guard let destination = destinations[safe: level.highlighted] else {
-                return [.feedback(.limit)]
-            }
+            let rows = MoveDestinations.rows(in: content.recordings, excluding: itemID)
+            guard let row = rows[safe: level.highlighted] else { return [.feedback(.limit)] }
             pop()
-            return [.moveItem(itemID: itemID, toFolderID: destination.id), .feedback(.commit)]
+            switch row {
+            // **Naming is the host's and filing follows it**, which is why this is one effect and
+            // not `createFolder` plus a move the user has to make again. A folder needs a name
+            // before it exists and the dial has no keyboard; what the dial can say is what the
+            // folder is *for*.
+            case .newFolder:
+                return [.createFolderForMove(itemID: itemID), .feedback(.commit)]
+            case .existing(let destination):
+                return [.moveItem(itemID: itemID, toFolderID: destination.id), .feedback(.commit)]
+            }
 
         case .confirmDelete(let itemID):
             let choices = DialRoute.DeleteChoice.allCases
@@ -704,7 +711,21 @@ struct DialNavigator {
     /// of audio still running while the meter says otherwise.
     /// Start a take on a screen already showing the recorder.
     private mutating func beginRecording() -> [DialEffect] {
-        pausePlaybackIfNeeded() + [.startRecording, .feedback(.commit)]
+        pausePlaybackIfNeeded() + [.startRecording(intoItemID: enclosingFolderID), .feedback(.commit)]
+    }
+
+    /// The folder a new take belongs in: the nearest one below wherever you are, or `nil` at the
+    /// library root.
+    ///
+    /// **Read off the stack rather than off `route`.** The recorder is pushed *on top* of the
+    /// folder you opened it from, so by the time the hub starts the take the current route is
+    /// `.recording` and `currentFolderID` is nil — which is exactly how every take ended up in one
+    /// fixed folder. The quick action resets the stack to the root, so it correctly answers nil.
+    var enclosingFolderID: String? {
+        for level in stack.reversed() {
+            if case .folder(let itemID) = level.route { return itemID }
+        }
+        return nil
     }
 
     /// Open the recorder *and* start a take — the mode chooser's Record, where there is no recording
@@ -842,9 +863,14 @@ struct DialNavigator {
     /// **Back leads, Settings trails, and what the screen does sits between them.**
     ///
     /// One layout everywhere, so the two controls that mean the same thing on every screen are
-    /// always in the same place and only the middle changes. Back's slot is *reserved* at the root
-    /// rather than absent — there is nowhere to pop, and a chip that appeared one level down would
-    /// shove every other one sideways under a thumb that had learned where they were.
+    /// always in the same place and only the middle changes.
+    ///
+    /// **Neither is drawn where it would do nothing.** Back held a reserved, disabled slot at the
+    /// root for a while, on the argument that a chip arriving one level down shifts the row under a
+    /// thumb that had learned it. Seen on the phone that trade is the wrong way round: the shift is
+    /// a one-off on a screen you have just changed, and the greyed-out chip is on the screen you
+    /// spend the most time on, offering the one thing it cannot do. Settings goes the same way on
+    /// its own screen — a door into the room you are standing in.
     ///
     /// **Record and Import are in here**, not pinned above the list. They are the same kind of
     /// thing — the two ways material comes in — and pinning one while the other sat in the row was
@@ -858,17 +884,17 @@ struct DialNavigator {
         // Back chip beside it would be a second one, differently worded.
         if case .confirmDelete = stack[depth].route { return [] }
 
-        var ids = ["back"]
+        var ids: [String] = canGoBack(atDepth: depth) ? ["back"] : []
         switch stack[depth].route {
         case .recordings, .folder: ids += ["record", "import", "newFolder", "sort"]
         case .nowPlaying where content.playback != nil: ids += ["repeat", "shuffle"]
         default: break
         }
-        ids.append("settings")
+        if case .settings = stack[depth].route {} else { ids.append("settings") }
         return ids
     }
 
-    /// Whether Back is real here, or a reserved gap holding the row's shape.
+    /// Whether there is anywhere to pop to — and therefore whether Back is drawn at all.
     func canGoBack(atDepth depth: Int) -> Bool { depth > 0 }
 
     var chipIDs: [String] { chipIDs(atDepth: stack.count - 1) }
@@ -929,7 +955,7 @@ struct DialNavigator {
         case .settings: return DialSetting.allCases.count
         case .recordings, .folder: return items.count
         case .confirmDelete: return DialRoute.DeleteChoice.allCases.count
-        case .move(let itemID): return MoveDestinations.all(in: content.recordings, excluding: itemID).count
+        case .move(let itemID): return MoveDestinations.rows(in: content.recordings, excluding: itemID).count
         case .nowPlaying, .recording, .edit: return 0
         }
     }

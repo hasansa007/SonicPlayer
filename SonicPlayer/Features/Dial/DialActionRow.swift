@@ -8,9 +8,12 @@ import SwiftUI
 /// collapse to a single `.action(id:)` case.
 ///
 /// **Back leads, Settings trails, and the screen's own verbs sit between them.** The two controls
-/// that mean the same thing everywhere never move; only the middle changes. Back's slot is
-/// reserved rather than empty at the root, because a chip appearing one level down would shove
-/// every other one sideways under a thumb that had learned where they were.
+/// that mean the same thing everywhere never move; only the middle changes.
+///
+/// Neither is *drawn* where it would do nothing — there is no Back at the library root and no
+/// Settings inside Settings — but **the slot is held either way**, so the middle group is in the
+/// same place on every screen. See `end(_:)`: the reservation is what keeps the row from being
+/// laid out one way at the root and another one level down.
 ///
 /// **It falls back to two lines rather than scrolling** when it cannot fit — which is what happens
 /// at accessibility text sizes, since the glyphs scale. Scrolling was the first attempt and was
@@ -21,18 +24,59 @@ struct DialActionRow: View {
     let actions: [DialScreen.Action]
     let onCommand: (DialCommand) -> Void
 
+    /// **Horizontal in portrait, vertical in landscape**, where the screen is under 400 points tall
+    /// and the wheel alone is 262 of them. Stacking the row above the dial there left nothing for
+    /// either — the card was crushed and the wheel ran off the bottom edge. Turned on its side the
+    /// row costs width, which landscape has in abundance, and the dial keeps the size your thumb
+    /// learned in portrait.
+    var axis: Axis = .horizontal
+
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            oneLine
-            twoLines
+        switch axis {
+        case .horizontal:
+            ViewThatFits(in: .horizontal) {
+                oneLine
+                twoLines
+            }
+        case .vertical:
+            ViewThatFits(in: .vertical) {
+                column
+                pairedColumns
+            }
+        }
+    }
+
+    /// The same order read top to bottom: Back leads, Settings trails, the screen's verbs between.
+    private var column: some View {
+        VStack(spacing: Spacing.sm) {
+            end("back")
+            ForEach(middle) { action in chip(action) }
+            end("settings")
+        }
+    }
+
+    /// **The vertical answer to `twoLines`, and for the same reason.** Six chips down a landscape
+    /// screen is about 320 points of its roughly 370, so at accessibility text sizes the column runs
+    /// off the bottom. It spends width, which landscape has and portrait does not — and it keeps
+    /// every chip visible, which scrolling would not: a chip nobody can see is a stop nobody knows
+    /// to turn to.
+    private var pairedColumns: some View {
+        let half = (middle.count + 1) / 2
+        return HStack(alignment: .top, spacing: Spacing.sm) {
+            VStack(spacing: Spacing.sm) {
+                end("back")
+                ForEach(Array(middle.prefix(half))) { chip($0) }
+            }
+            VStack(spacing: Spacing.sm) {
+                ForEach(Array(middle.dropFirst(half))) { chip($0) }
+                end("settings")
+            }
         }
     }
 
     private var oneLine: some View {
         HStack(spacing: Spacing.sm) {
-            if let leading = actions.first, leading.id == "back" {
-                chip(leading)
-            }
+            end("back")
 
             Spacer(minLength: 0)
 
@@ -45,9 +89,7 @@ struct DialActionRow: View {
 
             Spacer(minLength: 0)
 
-            if let trailing = actions.last, trailing.id == "settings" {
-                chip(trailing)
-            }
+            end("settings")
         }
         .padding(.horizontal, Spacing.xxs)
     }
@@ -57,15 +99,39 @@ struct DialActionRow: View {
     private var twoLines: some View {
         VStack(spacing: Spacing.sm) {
             HStack(spacing: Spacing.sm) {
-                if let leading = actions.first, leading.id == "back" { chip(leading) }
+                end("back")
                 Spacer(minLength: 0)
-                if let trailing = actions.last, trailing.id == "settings" { chip(trailing) }
+                end("settings")
             }
             HStack(spacing: Spacing.sm) {
                 ForEach(middle) { action in chip(action) }
             }
         }
         .padding(.horizontal, Spacing.xxs)
+    }
+
+    /// One of the two fixed ends — **and its space when the screen does not have it.**
+    ///
+    /// The navigator draws neither where it would do nothing: no Back at the library root, no
+    /// Settings inside Settings. Left as a plain absence that shifts the whole middle group
+    /// sideways on the screen you spend the most time on, so the row you had learned is laid out
+    /// one way at the root and another everywhere else.
+    ///
+    /// **A held slot rather than a greyed chip**, which is what this replaced. A disabled control
+    /// is a thing to read and decide about, and it is a ring stop the wheel has to be turned past;
+    /// empty space is neither, and it holds the layout just as well.
+    @ViewBuilder
+    private func end(_ id: String) -> some View {
+        if let action = actions.first(where: { $0.id == id }) {
+            chip(action)
+        } else {
+            // Measured by rendering the chip it stands in for, so the reservation follows the glyph
+            // at every Dynamic Type size rather than pinning a width that is right at one of them.
+            chip(.init(id: id, label: "", icon: id == "back" ? .back : .settings))
+                .opacity(0)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 
     /// Everything that is neither of the two fixed ends.

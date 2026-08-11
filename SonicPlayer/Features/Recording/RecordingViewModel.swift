@@ -151,26 +151,34 @@ final class RecordingViewModel {
     ///
     /// Requesting is cheap when the answer is already yes: the system returns the stored grant
     /// without prompting, so this path costs one await rather than a dialog.
-    func startRecordingTapped() {
+    /// `destination` is the folder the take should land in. **`nil` keeps the old behaviour** — the
+    /// app's `Recordings` folder — which is what the library root, the quick action and the
+    /// recording screen's own button all mean.
+    func startRecordingTapped(into destination: URL? = nil) {
         guard hasPermission else {
             workTask = Task { [weak self, audioRecorder] in
                 let granted = await audioRecorder.requestPermissions()
                 self?.hasPermission = granted
                 self?.showPermissionAlert = !granted
                 guard granted else { return }
-                self?.beginTake()
+                self?.beginTake(into: destination)
             }
             return
         }
-        beginTake()
+        beginTake(into: destination)
     }
 
-    private func beginTake() {
-        guard let recordingsCollection else { return }
+    /// **A take lands where you were standing, not in one fixed folder.** Recording from inside a
+    /// folder used to write to `Recordings` regardless, so the take you had just made was the one
+    /// thing not in the list you made it from — and filing it was a separate job you had to
+    /// remember. The folder is on the breadcrumb while the recorder is open, so where it will land
+    /// is answerable before the take rather than discovered after it.
+    private func beginTake(into destination: URL? = nil) {
+        guard let folder = destination ?? recordingsCollection else { return }
 
-        try? FileManager.default.createDirectory(at: recordingsCollection, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
-        let recordingURL = recordingsCollection
+        let recordingURL = folder
             .appendingPathComponent(RecordingFilename.make(at: Date()))
 
         currentRecordingURL = recordingURL

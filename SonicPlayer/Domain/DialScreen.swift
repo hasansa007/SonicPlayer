@@ -255,8 +255,14 @@ struct DialScreen: Equatable {
         case next
         case pause
         case play
-        /// Cutting a recording down to the selected region.
+        /// Cutting a recording down to the selected region — the editor's own verb.
         case trim
+        /// **Opening the editor**, which is not the same role as `trim` and had been sharing its
+        /// glyph. On the library the up nudge takes you *to* the workshop; scissors said you were
+        /// about to cut something there and then, which is the one thing that press does not do.
+        /// Sharing the case also meant the editor's `Keep` nudge and the library's `Edit` nudge
+        /// could never be told apart.
+        case edit
         case more
         case share
         /// Writing a copy out of the app. Distinct from `share`, which hands the existing file to

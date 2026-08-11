@@ -29,6 +29,9 @@ enum DialIcon {
         // *is*, and this nudge is one specific thing an editor does — keep the selection and cut
         // everything outside it. On a four-way stick beside a bin, the glyph has to say which cut.
         case .trim: "scissors"
+        // Working *on* a recording, not cutting one. `pencil` is taken by `rename`, and two verbs
+        // under one glyph is how `trim` and `edit` came to be indistinguishable in the first place.
+        case .edit: "hammer"
         case .more: "ellipsis"
         case .share: "square.and.arrow.up"
         case .export: "arrow.down.doc"

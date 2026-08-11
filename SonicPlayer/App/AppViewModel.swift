@@ -382,36 +382,23 @@ final class AppViewModel {
         // **Filing a recording.** The destination is a folder id — a URL string — or `nil` for the
         // library root, which is the one destination that has no item to name it.
         dial.onMoveItem = { [weak self] itemID, folderID in
-            guard let self,
-                  let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
-            else { return }
-
-            let destination = folderID.flatMap(URL.init(string:)) ?? fileManager.documentsDirectory()
-            // The player may be holding the file at its old path; moving it out from under an
-            // `AVPlayer` is the same hazard a delete is, and takes the same edge.
-            player.clearSessionIfAffected(by: [file.url])
-
-            Task { [weak self, fileManager] in
-                do {
-                    try await fileManager.moveItem(file.url, destination)
-                } catch {
-                    await MainActor.run { [weak self] in
-                        self?.dial.operationError = error.localizedDescription
-                    }
-                    return
-                }
-                await MainActor.run { [weak self] in
-                    self?.markers.forget(file.url)
-                    self?.dial.forgetWaveform(for: file.url)
-                    self?.home.loadAllFiles()
-                    self?.filesRoot.refreshFiles()
-                }
-            }
+            self?.moveItem(itemID, toFolderID: folderID)
         }
 
         dial.onCreateFolder = { [weak self] itemID in
             guard let self else { return }
             newFolderParent = itemID.flatMap(URL.init(string:))
+            fileIntoNewFolder = nil
+            isNamingNewFolder = true
+        }
+
+        // **The Move screen's first row: name a folder, and the recording goes in it.** The same
+        // alert and the same creation as everywhere else — what is different is only that the file
+        // follows, which is what stops "file it somewhere new" being three separate jobs.
+        dial.onCreateFolderForMove = { [weak self] itemID in
+            guard let self else { return }
+            newFolderParent = nil
+            fileIntoNewFolder = itemID
             isNamingNewFolder = true
         }
         // **The edge that was missing.** `loadAllFiles` is asynchronous, and nothing was told when
@@ -502,7 +489,12 @@ final class AppViewModel {
             }
             refreshDial()
         }
-        dial.onStartRecording = { [recording] in recording.startRecordingTapped() }
+        // **The take lands in the folder the dial was standing in.** The id is a folder URL, and
+        // `nil` means the library root — which the recorder reads as its own `Recordings` folder,
+        // the behaviour every take used to get regardless of where Record was pressed.
+        dial.onStartRecording = { [recording] itemID in
+            recording.startRecordingTapped(into: itemID.flatMap(URL.init(string:)))
+        }
         dial.onStopRecording = { [recording] in recording.stopRecordingTapped() }
 
         // Capture (#75). The recorder owns the hardware and the take; the dial owns where you are.
@@ -623,16 +615,56 @@ final class AppViewModel {
         }
     }
 
+    /// **Filing a recording.** The destination is a folder id — a URL string — or `nil` for the
+    /// library root, which is the one destination that has no item to name it.
+    ///
+    /// A method rather than a closure body because two flows reach it: the Move screen's existing
+    /// folders, and its first row, which names a folder and then files into the one it just made.
+    /// Two copies of this would be two places to forget the player, the markers and the waveform.
+    func moveItem(_ itemID: String, toFolderID folderID: String?) {
+        guard let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
+        else { return }
+
+        let destination = folderID.flatMap(URL.init(string:)) ?? fileManager.documentsDirectory()
+        // The player may be holding the file at its old path; moving it out from under an
+        // `AVPlayer` is the same hazard a delete is, and takes the same edge.
+        player.clearSessionIfAffected(by: [file.url])
+
+        Task { [weak self, fileManager] in
+            do {
+                try await fileManager.moveItem(file.url, destination)
+            } catch {
+                await MainActor.run { [weak self] in
+                    self?.dial.operationError = error.localizedDescription
+                }
+                return
+            }
+            await MainActor.run { [weak self] in
+                self?.markers.forget(file.url)
+                self?.dial.forgetWaveform(for: file.url)
+                self?.home.loadAllFiles()
+                self?.filesRoot.refreshFiles()
+            }
+        }
+    }
+
     /// Where a new folder should land — `nil` for the library root. Paired with
     /// `isNamingNewFolder`, which raises the alert that gives it a name.
     var newFolderParent: URL?
     var isNamingNewFolder = false
     var newFolderName = ""
 
-    /// Creates the folder the alert just named, in `newFolderParent`.
+    /// A recording waiting on the folder being named — the Move screen's first row. `nil` for an
+    /// ordinary New folder, which creates and stops there.
+    var fileIntoNewFolder: String?
+
+    /// Creates the folder the alert just named, in `newFolderParent` — and files a recording into
+    /// it when one was waiting on it.
     func confirmNewFolder(named name: String) {
         let parent = newFolderParent
+        let waiting = fileIntoNewFolder
         newFolderParent = nil
+        fileIntoNewFolder = nil
         isNamingNewFolder = false
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let folderName = trimmed.isEmpty ? "New Folder" : trimmed
@@ -644,6 +676,13 @@ final class AppViewModel {
             await MainActor.run { [weak self] in
                 self?.home.loadAllFiles()
                 self?.filesRoot.refreshFiles()
+                // **Through the same edge the Move screen's other rows take**, so a file landing in
+                // a brand-new folder and one landing in an old one are the same act — including
+                // clearing the player, forgetting the markers and dropping the cached waveform,
+                // which are three things easy to forget and silent when you do.
+                if let waiting {
+                    self?.moveItem(waiting, toFolderID: destination.absoluteString)
+                }
             }
         }
     }

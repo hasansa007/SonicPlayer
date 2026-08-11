@@ -179,16 +179,31 @@ extension DialNavigator {
     }
 
     private func moveRows(for itemID: String) -> [DialScreen.List.Row] {
-        MoveDestinations.all(in: content.recordings, excluding: itemID).map { destination in
-            .init(
-                id: destination.id ?? "root",
-                icon: destination.id == nil ? .library : .playlist,
-                title: destination.path,
-                // **The folder it is already in says so rather than being hidden.** Removing it
-                // would make the list depend on where the file happens to live, so the same folder
-                // would be at a different index depending on what you are filing.
-                subtitle: destination.id == currentFolderID ? "Where it is now" : nil
-            )
+        MoveDestinations.rows(in: content.recordings, excluding: itemID).map { row in
+            switch row {
+            // **A destination that does not exist yet leads the list.** A flat list of every folder
+            // answers "where does this go?" only while the right answer is already in it; without
+            // this, filing into somewhere new meant leaving, making the folder, and starting again.
+            case .newFolder:
+                return .init(
+                    id: "newFolder",
+                    icon: .newFolder,
+                    title: "New folder",
+                    subtitle: "Name it, and this lands inside",
+                    opensSomewhere: true
+                )
+
+            case .existing(let destination):
+                return .init(
+                    id: destination.id ?? "root",
+                    icon: destination.id == nil ? .library : .playlist,
+                    title: destination.path,
+                    // **The folder it is already in says so rather than being hidden.** Removing it
+                    // would make the list depend on where the file happens to live, so the same
+                    // folder would be at a different index depending on what you are filing.
+                    subtitle: destination.id == currentFolderID ? "Where it is now" : nil
+                )
+            }
         }
     }
 
@@ -305,13 +320,10 @@ extension DialNavigator {
         let isUnderTheWheel = highlightedChipID == id
 
         switch id {
-        // **Disabled at the root rather than absent**, so the row keeps its shape: Back leads
-        // everywhere, and a chip that appeared one level down would shove every other one sideways
-        // under a thumb that had learned where they were.
+        // Drawn only where it leads somewhere — `chipIDs` decides that, so there is no disabled
+        // state left to render. It held a greyed slot at the root for a while; that put the one
+        // control that could not work on the screen you look at most.
         case "back":
-            guard canGoBack(atDepth: stack.count - 1) else {
-                return .init(id: id, label: "Back", icon: .back, emphasis: .disabled)
-            }
             return .init(id: id, label: "Back", icon: .back, emphasis: isUnderTheWheel ? .selected : .plain)
 
         case "settings":
@@ -406,6 +418,14 @@ extension DialNavigator {
         return currentItems[level.highlighted]
     }
 
+    /// Whether the Move screen's highlight is on its first row, which is the one that makes a
+    /// destination rather than choosing one. The hub and the caption both have to say so — a
+    /// `FILE HERE` over a row that files nowhere yet is the hub lying about the press.
+    private var isOnNewFolderRow: Bool {
+        guard case .move = route else { return false }
+        return level.highlighted == 0
+    }
+
     /// Whether this screen is a folder — asked in a couple of places that do not care which one.
     private var isFolder: Bool {
         if case .folder = route { return true }
@@ -489,7 +509,7 @@ extension DialNavigator {
             // because it is the one that rewrites the file — the same reason it releases the player
             // on the way in.
             return DialScreen.Directions(
-                up: .init(id: "edit", icon: .trim, label: "Trim"),
+                up: .init(id: "edit", icon: .edit, label: "Edit"),
                 down: .init(id: "delete", icon: .delete, label: "Delete"),
                 left: .init(id: "move", icon: .move, label: "Move"),
                 right: .init(id: "share", icon: .share, label: "Share")
@@ -581,7 +601,7 @@ extension DialNavigator {
         case .confirmDelete:
             return .label("CONFIRM")
         case .move:
-            return .label("FILE HERE")
+            return .label(isOnNewFolderRow ? "NAME IT" : "FILE HERE")
         }
     }
 
@@ -627,7 +647,9 @@ extension DialNavigator {
                 : "rotate to scroll · press to change"
 
         case .move:
-            return "rotate to choose a folder · press to file it there"
+            return isOnNewFolderRow
+                ? "rotate to choose a folder · press to make a new one"
+                : "rotate to choose a folder · press to file it there"
 
         case .nowPlaying:
             // One sentence, because the wheel does one thing. Track and volume are the stick's, and
