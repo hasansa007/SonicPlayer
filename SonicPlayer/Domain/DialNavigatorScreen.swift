@@ -29,7 +29,6 @@ extension DialNavigator {
             status: status,
             isRecording: content.capture.map { !$0.isPaused } ?? false,
             isSettingsHighlighted: isSettingsHighlighted,
-            isLive: isLive,
             transport: transport,
             canGoBack: stack.count > 1,
             isBackHighlighted: isBackHighlighted
@@ -318,11 +317,18 @@ extension DialNavigator {
     /// here for free — `highlightedChipID` is the whole of that.
     private func chip(_ id: String) -> DialScreen.Action? {
         let isUnderTheWheel = highlightedChipID == id
+        // **Drawn everywhere, disabled where it would refuse** — and the ring reads the same answer,
+        // so a chip that is greyed out is by construction one the wheel turns past rather than
+        // stops on. `isChipEnabled` is that single answer.
+        guard isChipEnabled(id) else {
+            switch id {
+            case "back": return .init(id: id, label: "Back", icon: .back, emphasis: .disabled)
+            case "settings": return .init(id: id, label: "Settings", icon: .settings, emphasis: .disabled)
+            default: return nil
+            }
+        }
 
         switch id {
-        // Drawn only where it leads somewhere — `chipIDs` decides that, so there is no disabled
-        // state left to render. It held a greyed slot at the root for a while; that put the one
-        // control that could not work on the screen you look at most.
         case "back":
             return .init(id: id, label: "Back", icon: .back, emphasis: isUnderTheWheel ? .selected : .plain)
 
@@ -396,8 +402,7 @@ extension DialNavigator {
             ticks: ticks,
             hub: hub,
             defersPress: defersPress,
-            directions: directions,
-            isLive: isLive
+            directions: directions
         )
     }
 
@@ -524,12 +529,6 @@ extension DialNavigator {
     private var transport: DialScreen.Chrome.Transport? {
         guard case .nowPlaying = route, let playback = content.playback else { return nil }
         return .init(repeatMode: playback.repeatMode, isShuffled: playback.isShuffled)
-    }
-
-    /// The border cycles while audio is moving, and only then.
-    private var isLive: Bool {
-        if let capture = content.capture { return !capture.isPaused }
-        return content.playback?.isPlaying == true && route == .nowPlaying
     }
 
     private var ticks: DialScreen.Ticks {

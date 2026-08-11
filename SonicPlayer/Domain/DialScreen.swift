@@ -60,14 +60,6 @@ struct DialScreen: Equatable {
         /// the fact the emphasis is derived *from*.
         var isSettingsHighlighted: Bool = false
 
-        /// Whether the **card's** border cycles while audio moves.
-        ///
-        /// It used to be the wheel's, and the wheel is the wrong place for it: an animated rainbow
-        /// on the one thing you are holding competes with the thing it is drawn on, and the wheel's
-        /// border has a better job now — it is the volume. The card is where you look to see what
-        /// is playing, so it is where "this is playing" belongs.
-        var isLive: Bool = false
-
         /// The queue toggles, on screens that own the transport. `nil` everywhere else.
         var transport: Transport?
 
@@ -350,10 +342,6 @@ struct DialScreen: Equatable {
         /// above the only one that mattered, and every screen paid for them in height. Folding them
         /// into the stick keeps the promise the dial makes — there is one thing to touch.
         var directions: Directions?
-
-        /// Whether the dial's border is alive: it cycles while something is playing or recording,
-        /// and holds still when nothing is. The only motion on the screen, and it means one thing.
-        var isLive: Bool = false
     }
 
     /// The gear stick's four ways out. Any of them may be absent, and an absent one does nothing —

@@ -38,11 +38,20 @@ struct DialScreenView: View {
         ZStack {
             background
 
-            if verticalSizeClass == .compact {
-                sideBySide
-            } else {
-                stacked
+            Group {
+                if verticalSizeClass == .compact {
+                    sideBySide
+                } else {
+                    stacked
+                }
             }
+            // **Rotation is a swap, not something to animate through.** Both layouts contain
+            // `ViewThatFits`, and an implicit animation in flight when the size class changes makes
+            // them measure a geometry that is still moving — each frame a different candidate fits,
+            // choosing it changes the size, and the new size chooses the other one. The screen
+            // never settles. Cutting the animation on this one value leaves every other animation
+            // on the screen alone.
+            .animation(nil, value: verticalSizeClass)
         }
     }
 
@@ -85,34 +94,65 @@ struct DialScreenView: View {
     /// `.leftToRight` for the neighbouring reason: a rotation points the way the media travels,
     /// not the way text is read.
     private var sideBySide: some View {
-        HStack(spacing: Spacing.lg) {
+        // **Wider gaps than portrait uses between its bands, because these are not bands.** Stacked,
+        // the card, the chips and the wheel are one column read top to bottom and a component gap
+        // is right. Across, they are three separate things the eye moves between and the hand
+        // reaches for in turn — at `lg` the chip column touched both its neighbours and read as
+        // part of whichever it was nearer.
+        HStack(spacing: Spacing.xxxl) {
+            // **As tall as the wheel and as wide as what is left.** Its height is content-driven in
+            // portrait, where the list is the long axis; here the long axis is across, so a card
+            // that grows past the dial makes the two halves of the screen disagree about where the
+            // middle is. Squaring it against the dial is what lets the eye read them as one object.
             stage
-                .layoutPriority(0)
+                .frame(maxWidth: .infinity)
+                .frame(height: Sizing.dialDiameter)
 
             // **The controls turn from a column into a row, and the wheel keeps its size.** Stacked,
             // the chips, the dial and the caption come to about 370 points against roughly 340 of
             // landscape screen — so something had to give, and shrinking the dial would have made
             // the one control the whole app is built on a different size depending on which way the
             // phone is held. Laid out across, only the dial's own 262 is on the vertical axis.
-            chipBand(axis: .vertical)
-                .layoutPriority(1)
+            //
+            // Both columns take their natural width and the card takes the rest — without
+            // `fixedSize` the dial's column bargains for space it does not need and leaves the card
+            // a strip with a gap beside it.
+            // **`horizontal: true` only, and the `vertical: false` is load-bearing.** A bare
+            // `fixedSize()` proposes an unspecified height, and the row's own
+            // `ViewThatFits(in: .vertical)` cannot decide which candidate fits against a height
+            // nobody has named — so it re-measures, the measurement changes what it reports, and
+            // the layout never settles. Pinning only the width leaves the container's height
+            // proposal intact, which is the input that question needs.
+            DialActionRow(actions: screen.actions, onCommand: onCommand, axis: .vertical)
+                .fixedSize(horizontal: true, vertical: false)
 
             VStack(spacing: Spacing.sm) {
+                // Pointing at the column, which is where the chips are from here. In portrait they
+                // are the row below and it points down at them.
+                chipsAheadLine(pointing: "chevron.left")
+                    .opacity(screen.chipsAreNext ? 1 : 0)
+                    .animation(Motion.selection, value: screen.chipsAreNext)
                 dial
                 caption
             }
-            .layoutPriority(1)
+            .frame(width: Sizing.dialDiameter)
         }
         .environment(\.layoutDirection, .leftToRight)
         .padding(.horizontal, Spacing.xxl)
         .padding(.vertical, Spacing.lg)
+        // **After the padding, deliberately.** The chip column pushes Back and Settings to the ends
+        // of whatever height it is given, so the height has to be the screen's rather than the
+        // tallest sibling's — otherwise the two controls that never move would move by however much
+        // the caption beside them happened to wrap. Applied before the padding this would ask for
+        // the full height and then add 32 to it, which overflows.
+        .frame(maxHeight: .infinity)
     }
 
     /// The chips, the wheel and the caption — one band, in the same order whichever way the phone
     /// is held, so that what the thumb has learned survives a rotation.
     private var controls: some View {
         VStack(spacing: Spacing.lg) {
-            chipBand(axis: .horizontal)
+            chipBand
             dial
             caption
         }
@@ -120,20 +160,22 @@ struct DialScreenView: View {
 
     /// The announcement and the chips it announces, as one band.
     ///
-    /// They belong together in both layouts: a line about the controls below it wants to arrive
-    /// *next to* what it announces, not a full gap away. The chevron points along the run of chips
-    /// either way — down at the row in portrait, down the column in landscape.
+    /// They belong together: a line about the controls below it wants to arrive *next to* what it
+    /// announces, not a full gap away.
     ///
     /// **Its space is held whether or not it is there.** Inserted and removed, it moved every band
     /// below it by its own height as the wheel crossed the last row — so the card resized under the
     /// thumb at the exact moment the line was asking you to keep turning. Reserved and faded, the
     /// layout is identical on every row and only the ink changes.
-    private func chipBand(axis: Axis) -> some View {
+    ///
+    /// Landscape does not use this: a 28-character sentence does not fit above a 52-point column,
+    /// so there it sits above the dial and points sideways at the chips instead.
+    private var chipBand: some View {
         VStack(spacing: Spacing.xs) {
-            chipsAheadLine
+            chipsAheadLine(pointing: "chevron.down")
                 .opacity(screen.chipsAreNext ? 1 : 0)
                 .animation(Motion.selection, value: screen.chipsAreNext)
-            DialActionRow(actions: screen.actions, onCommand: onCommand, axis: axis)
+            DialActionRow(actions: screen.actions, onCommand: onCommand)
         }
     }
 
@@ -207,8 +249,14 @@ struct DialScreenView: View {
         // grows exactly as far as it can — it just no longer *claims* the space when empty.
         .frame(maxWidth: .infinity)
         .background(Color.sonicSurface, in: RoundedRectangle(cornerRadius: Radius.stage))
-        // **The card is what goes live**, not the wheel. See `LiveBorder`.
-        .overlay(LiveBorder(isLive: screen.chrome.isLive, cornerRadius: Radius.stage))
+        // **The card's border no longer cycles while audio moves.** It was the wheel's, moved here,
+        // and it was the one thing on the screen animating forever — which is what made a rotation
+        // during playback animate the whole layout and never settle. What it said, the chrome
+        // already says in words: `02:53 ▸ playing`, on every screen you can still be browsing from.
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.stage)
+                .strokeBorder(Color.sonicBorder, lineWidth: Sizing.hairlineTrackHeight / 2)
+        )
         // Content is windowed by the navigator, not scrolled here, so anything that overruns is
         // clipped rather than allowed to escape the card and collide with the action row.
         .clipShape(RoundedRectangle(cornerRadius: Radius.stage))
@@ -251,10 +299,10 @@ struct DialScreenView: View {
     /// caption. A list that has run out looks exactly like a wheel that has run out, and the chips
     /// became ring stops precisely so that no control on this screen could be drawn and unreachable
     /// — an affordance nobody finds is the same defect one step further along.
-    private var chipsAheadLine: some View {
+    private func chipsAheadLine(pointing glyph: String) -> some View {
         HStack(spacing: Spacing.xs) {
             Text("keep turning for the buttons")
-            Image(systemName: "chevron.down")
+            Image(systemName: glyph)
         }
         .font(.caption2)
         .foregroundColor(.sonicTextSecondary)

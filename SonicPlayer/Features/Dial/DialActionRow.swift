@@ -10,10 +10,11 @@ import SwiftUI
 /// **Back leads, Settings trails, and the screen's own verbs sit between them.** The two controls
 /// that mean the same thing everywhere never move; only the middle changes.
 ///
-/// Neither is *drawn* where it would do nothing — there is no Back at the library root and no
-/// Settings inside Settings — but **the slot is held either way**, so the middle group is in the
-/// same place on every screen. See `end(_:)`: the reservation is what keeps the row from being
-/// laid out one way at the root and another one level down.
+/// Both ends are drawn on every screen that has a row, **disabled where they would refuse** — no
+/// Back at the library root, no Settings inside Settings. Removing them outright was tried and read
+/// as a fault: a row of five where every other screen has six is a row with something missing from
+/// it. What changed instead is that the wheel does not stop on a disabled chip, so the row keeps its
+/// shape for the eye without costing a detent.
 ///
 /// **It falls back to two lines rather than scrolling** when it cannot fit — which is what happens
 /// at accessibility text sizes, since the glyphs scale. Scrolling was the first attempt and was
@@ -46,11 +47,24 @@ struct DialActionRow: View {
         }
     }
 
-    /// The same order read top to bottom: Back leads, Settings trails, the screen's verbs between.
+    /// The same arrangement read top to bottom: Back at one end, Settings at the other, the
+    /// screen's verbs between — **and the two spacers are the whole point**, exactly as in
+    /// `oneLine`.
+    ///
+    /// Without them the column hugs its contents, so a screen with two verbs draws a short stack
+    /// and a screen with four draws a tall one, and the two controls that mean the same thing
+    /// everywhere are somewhere different on each. Pushed to the ends of the height the column is
+    /// given, they hold still and only the middle changes — which is what portrait has always done
+    /// horizontally.
     private var column: some View {
         VStack(spacing: Spacing.sm) {
             end("back")
+            // `minLength` rather than zero so this still has an ideal height for `ViewThatFits` to
+            // measure against — a column of pure spacers always "fits", and the two-column fallback
+            // would never be reached.
+            Spacer(minLength: Spacing.sm)
             ForEach(middle) { action in chip(action) }
+            Spacer(minLength: Spacing.sm)
             end("settings")
         }
     }
@@ -66,8 +80,10 @@ struct DialActionRow: View {
             VStack(spacing: Spacing.sm) {
                 end("back")
                 ForEach(Array(middle.prefix(half))) { chip($0) }
+                Spacer(minLength: 0)
             }
             VStack(spacing: Spacing.sm) {
+                Spacer(minLength: 0)
                 ForEach(Array(middle.dropFirst(half))) { chip($0) }
                 end("settings")
             }
@@ -110,27 +126,17 @@ struct DialActionRow: View {
         .padding(.horizontal, Spacing.xxs)
     }
 
-    /// One of the two fixed ends — **and its space when the screen does not have it.**
+    /// One of the two fixed ends.
     ///
-    /// The navigator draws neither where it would do nothing: no Back at the library root, no
-    /// Settings inside Settings. Left as a plain absence that shifts the whole middle group
-    /// sideways on the screen you spend the most time on, so the row you had learned is laid out
-    /// one way at the root and another everywhere else.
-    ///
-    /// **A held slot rather than a greyed chip**, which is what this replaced. A disabled control
-    /// is a thing to read and decide about, and it is a ring stop the wheel has to be turned past;
-    /// empty space is neither, and it holds the layout just as well.
+    /// **The navigator supplies both on every screen that has a row at all**, disabling rather than
+    /// dropping the ones that would refuse — so nothing has to be reserved here and the row is the
+    /// same shape everywhere by construction. The one screen with no ends is the delete guard,
+    /// whose whole row is empty; a placeholder here would give it a band of height for two controls
+    /// it deliberately does not have.
     @ViewBuilder
     private func end(_ id: String) -> some View {
         if let action = actions.first(where: { $0.id == id }) {
             chip(action)
-        } else {
-            // Measured by rendering the chip it stands in for, so the reservation follows the glyph
-            // at every Dynamic Type size rather than pinning a width that is right at one of them.
-            chip(.init(id: id, label: "", icon: id == "back" ? .back : .settings))
-                .opacity(0)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
         }
     }
 

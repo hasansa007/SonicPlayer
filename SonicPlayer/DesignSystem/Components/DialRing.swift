@@ -181,8 +181,9 @@ struct DialRing: View {
 
     /// Closes the loop — the first hue repeats last so the seam does not read as a join.
     ///
-    /// Shared with the card's live border by way of `LiveHues`, so the volume arc and the "this is
-    /// playing" outline are the same colours rather than two palettes that drifted.
+    /// **The last consumer of `LiveHues`**, which were shared with the card's cycling border until
+    /// that border was removed for animating forever. A quantity drawn across a sweep is what an
+    /// angular gradient is actually for; a rectangle's outline never was.
     private static let liveHues: [Color] = LiveHues.all
 
     private var tickMarks: some View {

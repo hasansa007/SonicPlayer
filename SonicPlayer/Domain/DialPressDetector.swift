@@ -23,7 +23,7 @@ struct DialPressDetector {
     private enum State: Equatable {
         case idle
         /// The hub is down. `since` is when, `isSecond` whether a press inside the window preceded
-        /// it, and `didHold` whether the hold has already been paid out.
+        /// it, and `didHold` whether the hold has already been paid out.so
         case down(since: TimeInterval, isSecond: Bool, didHold: Bool)
         /// Released, waiting to find out whether a second press is coming.
         case waiting(since: TimeInterval)

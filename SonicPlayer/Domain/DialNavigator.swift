@@ -865,12 +865,15 @@ struct DialNavigator {
     /// One layout everywhere, so the two controls that mean the same thing on every screen are
     /// always in the same place and only the middle changes.
     ///
-    /// **Neither is drawn where it would do nothing.** Back held a reserved, disabled slot at the
-    /// root for a while, on the argument that a chip arriving one level down shifts the row under a
-    /// thumb that had learned it. Seen on the phone that trade is the wrong way round: the shift is
-    /// a one-off on a screen you have just changed, and the greyed-out chip is on the screen you
-    /// spend the most time on, offering the one thing it cannot do. Settings goes the same way on
-    /// its own screen — a door into the room you are standing in.
+    /// **Both are always drawn, and the wheel skips the ones that cannot act.**
+    ///
+    /// They were removed at the root and on Settings respectively, on the argument that a control
+    /// which does nothing is worse than a gap. On the phone the gap was worse: home read as though
+    /// something had gone missing, because a row of five where every other screen has six is a row
+    /// with a hole in it. So the chip stays and says so by being disabled — what changed instead is
+    /// `ringChipIDs`, which no longer stops on it. **Drawn and turnable-to are different questions,
+    /// and this is the line between them**: the row keeps its shape for the eye, and the wheel
+    /// never lands on something that refuses.
     ///
     /// **Record and Import are in here**, not pinned above the list. They are the same kind of
     /// thing — the two ways material comes in — and pinning one while the other sat in the row was
@@ -884,30 +887,55 @@ struct DialNavigator {
         // Back chip beside it would be a second one, differently worded.
         if case .confirmDelete = stack[depth].route { return [] }
 
-        var ids: [String] = canGoBack(atDepth: depth) ? ["back"] : []
+        var ids = ["back"]
         switch stack[depth].route {
         case .recordings, .folder: ids += ["record", "import", "newFolder", "sort"]
         case .nowPlaying where content.playback != nil: ids += ["repeat", "shuffle"]
         default: break
         }
-        if case .settings = stack[depth].route {} else { ids.append("settings") }
+        ids.append("settings")
         return ids
     }
 
-    /// Whether there is anywhere to pop to — and therefore whether Back is drawn at all.
+    /// Whether there is anywhere to pop to.
     func canGoBack(atDepth depth: Int) -> Bool { depth > 0 }
+
+    /// Whether pressing this chip here would do anything — which is what decides whether the wheel
+    /// stops on it, and what the projection draws as disabled.
+    ///
+    /// Two chips can be dead: Back at the root has nowhere to pop, and Settings on the Settings
+    /// screen is a door into the room you are standing in. **One answer, read by the ring and by
+    /// the drawing**, so a chip cannot be greyed out and still be a stop, or vice versa.
+    func isChipEnabled(_ id: String, atDepth depth: Int) -> Bool {
+        switch id {
+        case "back": return canGoBack(atDepth: depth)
+        case "settings":
+            if case .settings = stack[depth].route { return false }
+            return true
+        default: return true
+        }
+    }
+
+    func isChipEnabled(_ id: String) -> Bool { isChipEnabled(id, atDepth: stack.count - 1) }
 
     var chipIDs: [String] { chipIDs(atDepth: stack.count - 1) }
 
-    /// The chips the **wheel** can reach: all of them, wherever the wheel scrolls a highlight.
+    /// The chips the **wheel** can reach: the ones that would do something, wherever the wheel
+    /// scrolls a highlight.
     ///
-    /// Now Playing, the recorder and the editor bind it to seek, gain and trim — there is no
+    /// **Turning past a dead control is worse than looking at one.** Back at the root and Settings
+    /// on the Settings screen are drawn — the row keeps its shape, and a gap where every other
+    /// screen has a chip reads as something missing — but the ring skips them, so the wheel never
+    /// lands somewhere the press refuses. That is the whole of the difference between what is drawn
+    /// and what is a stop.
+    ///
+    /// Now Playing, the recorder and the editor bind the wheel to seek, gain and trim — there is no
     /// highlight to park on a chip there, and stealing a detent from scrubbing would be the worse
     /// trade. Their chips stay touch-only, which is the one honest exception.
     func ringChipIDs(atDepth depth: Int) -> [String] {
-        stack[depth].route.defaultAxis == .highlight && stack[depth].route.modes.isEmpty
-            ? chipIDs(atDepth: depth)
-            : []
+        guard stack[depth].route.defaultAxis == .highlight, stack[depth].route.modes.isEmpty
+        else { return [] }
+        return chipIDs(atDepth: depth).filter { isChipEnabled($0, atDepth: depth) }
     }
 
     var ringChipIDs: [String] { ringChipIDs(atDepth: stack.count - 1) }

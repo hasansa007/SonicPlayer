@@ -34,7 +34,7 @@ struct DialScreenshotTests {
         #expect(rows(navigator)?.rows.first?.trailing == "01:00")
         #expect(rows(navigator)?.rows.first?.subtitle == "Today 14:02 · 2 markers")
         #expect(rows(navigator)?.rows.dropFirst().first?.subtitle == nil)
-        #expect(screen.actions.map(\.id) == ["record", "import", "newFolder", "sort", "settings"])
+        #expect(screen.actions.map(\.id) == ["back", "record", "import", "newFolder", "sort", "settings"])
         // **All four nudges, and no mode deciding which.** Up was absent in Listen and Rename in
         // Record; the fork is gone, so every verb a file answers is here, always.
         #expect(screen.ring.directions?.up?.id == "edit")
@@ -42,7 +42,7 @@ struct DialScreenshotTests {
         #expect(screen.ring.directions?.left?.id == "move")
         #expect(screen.ring.directions?.right?.id == "share")
         #expect(!screen.chrome.canGoBack, "the library is the root now")
-        #expect(screen.actions.map(\.id) == ["record", "import", "newFolder", "sort", "settings"])
+        #expect(screen.actions.map(\.id) == ["back", "record", "import", "newFolder", "sort", "settings"])
         #expect(screen.ring.hub == .label("PLAY"))
         // **The nudge clause has gone out of the caption and onto the stick.** It named the same
         // four things `ring.directions` names, one line of prose away from them, so the sentence
@@ -80,7 +80,6 @@ struct DialScreenshotTests {
         #expect(screen.ring.directions?.down?.id == "volumeDown")
         #expect(screen.ring.directions?.left?.id == "previous")
         #expect(screen.ring.directions?.right?.id == "next")
-        #expect(screen.ring.isLive, "the border moves while audio moves")
         #expect(screen.ring.hub == .glyph("pause.fill"))
         #expect(screen.hint == "rotate to seek · press to pause")
     }
@@ -106,7 +105,6 @@ struct DialScreenshotTests {
         #expect(screen.actions.map(\.id) == ["back", "settings"])
         #expect(screen.ring.directions?.up?.id == "marker")
         #expect(screen.ring.directions?.left?.id == "pause")
-        #expect(screen.ring.isLive, "the border moves while a take is running")
         #expect(screen.ring.ticks == .level(0.42))
         #expect(screen.ring.hub == .recordDot)
         #expect(screen.hint == "ring shows input level · rotate to set gain · press to stop")
@@ -169,7 +167,7 @@ struct DialScreenshotTests {
         #expect(screen.chrome.breadcrumb == ["LIBRARY"])
         // **The row is unchanged by the list being empty**, which is the point of it being a row
         // rather than a pinned element: nothing appears or disappears with the contents.
-        #expect(screen.actions.map(\.id) == ["record", "import", "newFolder", "sort", "settings"])
+        #expect(screen.actions.map(\.id) == ["back", "record", "import", "newFolder", "sort", "settings"])
         #expect(!screen.chrome.canGoBack, "the library is the root")
         // The first chip used to be Back, which is the one chip the root does not draw any more —
         // so an empty library opens on the first thing there is to *do* in it.

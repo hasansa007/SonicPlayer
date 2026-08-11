@@ -414,32 +414,18 @@ final class AppViewModel {
         // Renaming moved onto the edit screen when the actions menu became four stick nudges —
         // four directions cannot hold five verbs. The flow is still the browser's, and `AppView`
         // attaches its alert at the root, so it renders over the dial with nothing further to build.
+        // **A folder is renameable too, and this is the second time that was silently false.**
+        // Same line, same cause as the delete below: the id was resolved through `home.allFiles`,
+        // which holds audio files, so a folder matched nothing and the guard returned without a
+        // sound. `browserItem(for:)` is the one resolution both of them take now.
         dial.onRenameItem = { [weak self] itemID in
-            guard let self,
-                  let file = home.allFiles.first(where: { $0.url.absoluteString == itemID })
-            else { return }
-            filesRoot.renameItemTapped(.file(file))
+            guard let self, let item = browserItem(for: itemID) else { return }
+            filesRoot.renameItemTapped(item)
         }
 
-        // **A folder is deletable too, and this is where that was silently false.**
-        //
-        // The id was resolved by looking it up in `home.allFiles`, which is a flat sweep of *audio
-        // files* — a folder id matches nothing in it, so the guard returned and the delete never
-        // ran. It read as "the list did not update"; nothing had happened to update it for.
-        //
-        // An id **is** a URL string, for files and folders alike, so resolving it needs no lookup
-        // at all. `home.allFiles` is still consulted, but only to build the richer `FileSystemItem`
-        // the browser's edge wants — and a folder that is not in it falls back to a folder item
-        // rather than falling out of the function.
         dial.onDeleteItem = { [weak self] itemID in
-            guard let self, let url = URL(string: itemID) else { return }
-
-            let item: FileSystemItem = home.allFiles
-                .first { $0.url.absoluteString == itemID }
-                .map(FileSystemItem.file)
-                ?? .folder(CollectionItem(
-                    id: url, url: url, name: url.lastPathComponent, creationDate: Date()
-                ))
+            guard let self, let url = URL(string: itemID), let item = browserItem(for: itemID)
+            else { return }
 
             // Stops playback of the file — or of anything *inside* the folder, which
             // `PathMatching` resolves by containment.
@@ -613,6 +599,27 @@ final class AppViewModel {
             home.loadAllFiles()
             refreshDial()
         }
+    }
+
+    /// A dial item id, resolved to something the file browser's edges understand.
+    ///
+    /// **A folder is not in `home.allFiles`**, which is a flat sweep of *audio files* — so every
+    /// edge that resolved an id by looking it up there worked for recordings and did nothing at all
+    /// for folders, without a sound. Delete had that bug and was fixed in place; rename had the
+    /// same one, from the same line copied, and was found by trying to rename a folder. One
+    /// resolution now, so a third verb cannot inherit it.
+    ///
+    /// An id **is** a URL string, for files and folders alike, so this needs no lookup to *find*
+    /// the item — `allFiles` is consulted only to build the richer `AudioFile` when there is one,
+    /// and anything else is a folder.
+    func browserItem(for itemID: String) -> FileSystemItem? {
+        guard let url = URL(string: itemID) else { return nil }
+        if let file = home.allFiles.first(where: { $0.url.absoluteString == itemID }) {
+            return .file(file)
+        }
+        return .folder(CollectionItem(
+            id: url, url: url, name: url.lastPathComponent, creationDate: Date()
+        ))
     }
 
     /// **Filing a recording.** The destination is a folder id — a URL string — or `nil` for the
