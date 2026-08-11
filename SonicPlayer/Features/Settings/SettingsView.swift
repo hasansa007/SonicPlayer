@@ -1,14 +1,11 @@
-import ComposableArchitecture
 import SwiftUI
 
 struct SettingsView: View {
-    let store: StoreOf<SettingsFeature>
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.systemID
-    private let supportedLanguages = AppLanguage.supportedLanguages
+    @Bindable var viewModel: SettingsViewModel
     @State private var expandedSection: ExpandableSection?
 
     private enum ExpandableSection {
-        case speed, skipDuration, theme, language
+        case speed, skipDuration, theme
     }
 
     var body: some View {
@@ -36,16 +33,16 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationDestination(isPresented: Binding(
-            get: { store.showAbout },
-            set: { _ in store.send(.dismissAbout) }
+            get: { viewModel.showAbout },
+            set: { _ in viewModel.dismissAbout() }
         )) {
-            AboutView(store: store)
+            AboutView(viewModel: viewModel)
         }
         .navigationDestination(isPresented: Binding(
-            get: { store.showHelp },
-            set: { _ in store.send(.dismissHelp) }
+            get: { viewModel.showHelp },
+            set: { _ in viewModel.dismissHelp() }
         )) {
-            HelpView(store: store)
+            HelpView(viewModel: viewModel)
         }
     }
 
@@ -90,7 +87,7 @@ struct SettingsView: View {
                         iconColor: .sonicPrimary
                     ) {
                         HStack(spacing: 4) {
-                            Text(store.defaultPlaybackSpeed.displayText)
+                            Text(viewModel.defaultPlaybackSpeed.displayText)
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                                 .foregroundColor(.sonicPrimary)
@@ -107,7 +104,7 @@ struct SettingsView: View {
                     VStack(spacing: 0) {
                         ForEach(PlaybackSpeed.allCases) { speed in
                             Button {
-                                store.send(.setDefaultPlaybackSpeed(speed))
+                                viewModel.setDefaultPlaybackSpeed(speed)
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     expandedSection = nil
                                 }
@@ -117,7 +114,7 @@ struct SettingsView: View {
                                         .font(.subheadline)
                                         .foregroundColor(.sonicTextPrimary)
                                     Spacer()
-                                    if speed == store.defaultPlaybackSpeed {
+                                    if speed == viewModel.defaultPlaybackSpeed {
                                         Image(systemName: "checkmark")
                                             .font(.caption)
                                             .foregroundColor(.sonicPrimary)
@@ -147,7 +144,7 @@ struct SettingsView: View {
                         iconColor: .sonicPrimary
                     ) {
                         HStack(spacing: 4) {
-                            Text(store.defaultSkipDuration.displayText)
+                            Text(viewModel.defaultSkipDuration.displayText)
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                                 .foregroundColor(.sonicPrimary)
@@ -164,7 +161,7 @@ struct SettingsView: View {
                     VStack(spacing: 0) {
                         ForEach(SkipDuration.allCases) { duration in
                             Button {
-                                store.send(.setDefaultSkipDuration(duration))
+                                viewModel.setDefaultSkipDuration(duration)
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     expandedSection = nil
                                 }
@@ -174,7 +171,7 @@ struct SettingsView: View {
                                         .font(.subheadline)
                                         .foregroundColor(.sonicTextPrimary)
                                     Spacer()
-                                    if duration == store.defaultSkipDuration {
+                                    if duration == viewModel.defaultSkipDuration {
                                         Image(systemName: "checkmark")
                                             .font(.caption)
                                             .foregroundColor(.sonicPrimary)
@@ -203,12 +200,12 @@ struct SettingsView: View {
                     }
                 } label: {
                     SettingsRow(
-                        icon: store.colorScheme.icon,
+                        icon: viewModel.colorScheme.icon,
                         title: "Theme",
                         iconColor: .orange
                     ) {
                         HStack(spacing: 4) {
-                            Text(store.colorScheme.rawValue)
+                            Text(viewModel.colorScheme.rawValue)
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                                 .foregroundColor(.sonicPrimary)
@@ -224,7 +221,7 @@ struct SettingsView: View {
                     VStack(spacing: 0) {
                         ForEach(AppColorScheme.allCases) { scheme in
                             Button {
-                                store.send(.setColorScheme(scheme))
+                                viewModel.setColorScheme(scheme)
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     expandedSection = nil
                                 }
@@ -238,7 +235,7 @@ struct SettingsView: View {
                                         .font(.subheadline)
                                         .foregroundColor(.sonicTextPrimary)
                                     Spacer()
-                                    if scheme == store.colorScheme {
+                                    if scheme == viewModel.colorScheme {
                                         Image(systemName: "checkmark")
                                             .font(.caption)
                                             .foregroundColor(.sonicPrimary)
@@ -257,10 +254,12 @@ struct SettingsView: View {
 
                 Divider()
 
+                // Opens SonicPlayer's own page in iOS Settings rather than picking here. Only the
+                // system can change an app's language: `Text` resolves through `Bundle.main`, which
+                // fixes its localization when the process starts, so an in-app switch could mirror
+                // the layout instantly and never translate a single label. See #68.
                 Button {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        expandedSection = expandedSection == .language ? nil : .language
-                    }
+                    viewModel.openSystemLanguageSettings()
                 } label: {
                     SettingsRow(
                         icon: "globe",
@@ -268,11 +267,11 @@ struct SettingsView: View {
                         iconColor: .sonicPrimary
                     ) {
                         HStack(spacing: 4) {
-                            Text(selectedLanguage.displayName)
+                            Text(currentLanguageName)
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                                 .foregroundColor(.sonicPrimary)
-                            Image(systemName: expandedSection == .language ? "chevron.up" : "chevron.down")
+                            Image(systemName: "arrow.up.forward.app")
                                 .font(.caption2)
                                 .foregroundColor(.sonicTextMuted)
                         }
@@ -280,38 +279,7 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
 
-                if expandedSection == .language {
-                    VStack(spacing: 0) {
-                        ForEach(supportedLanguages) { language in
-                            Button {
-                                setLanguage(language)
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    expandedSection = nil
-                                }
-                            } label: {
-                                HStack {
-                                    Text(language.displayName)
-                                        .font(.subheadline)
-                                        .foregroundColor(.sonicTextPrimary)
-                                    Spacer()
-                                    if language.id == appLanguage {
-                                        Image(systemName: "checkmark")
-                                            .font(.caption)
-                                            .foregroundColor(.sonicPrimary)
-                                    }
-                                }
-                                .padding(.vertical, 8)
-                                .padding(.horizontal, 12)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.leading, 36)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-
-                Text("Language updates immediately.")
+                Text("Choose a language in iOS Settings. The app restarts to apply it.")
                     .font(.caption)
                     .foregroundColor(.sonicTextMuted)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -328,7 +296,7 @@ struct SettingsView: View {
                     title: "About Sonic",
                     iconColor: .blue
                 ) {
-                    store.send(.showAboutTapped)
+                    viewModel.showAboutTapped()
                 }
 
                 Divider()
@@ -338,49 +306,25 @@ struct SettingsView: View {
                     title: "Help & Support",
                     iconColor: .green
                 ) {
-                    store.send(.showHelpTapped)
+                    viewModel.showHelpTapped()
                 }
             }
         }
     }
 
-    private var selectedLanguage: AppLanguage {
-        supportedLanguages.first { $0.id == appLanguage } ?? .system
-    }
-
-    private func setLanguage(_ language: AppLanguage) {
-        appLanguage = language.id
-        if let code = language.code {
-            UserDefaults.standard.set([code], forKey: "AppleLanguages")
-        } else {
-            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
-        }
-    }
-}
-
-struct AppLanguage: Identifiable, Equatable {
-    static let systemID = "system"
-    static let system = AppLanguage(code: nil)
-    static let supportedLanguages: [AppLanguage] = [
-        .system,
-        AppLanguage(code: "en"),
-        AppLanguage(code: "zh-Hans"),
-        AppLanguage(code: "hi"),
-        AppLanguage(code: "es"),
-        AppLanguage(code: "fr"),
-        AppLanguage(code: "ar"),
-        AppLanguage(code: "bn"),
-        AppLanguage(code: "pt"),
-        AppLanguage(code: "ru"),
-    ]
-
-    let code: String?
-    var id: String { code ?? Self.systemID }
-
-    var displayName: String {
-        guard let code else { return NSLocalizedString("System", comment: "System language option") }
-        let locale = Locale(identifier: code)
-        return locale.localizedString(forLanguageCode: code) ?? code
+    /// Read from the bundle rather than from stored state: what the app is actually speaking is
+    /// what `Bundle.main` resolved at launch, which is the only thing that can be true here (#68).
+    ///
+    /// Named **in its own language** — "English", "العربية", "Русский" — because the receiver of
+    /// `localizedString(forLanguageCode:)` decides which language the name is rendered in, and the
+    /// row sits on a screen already drawn in `code`. Using `Locale.current` there was wrong (#70):
+    /// that is the *device's* locale, which differs from the app's whenever the device is set to
+    /// something outside the nine shipped — a German device falls back to English and the row read
+    /// "Englisch" on an otherwise English screen.
+    private var currentLanguageName: String {
+        let code = Bundle.main.preferredLocalizations.first ?? Locale.current.identifier
+        let named = Locale(identifier: code)
+        return named.localizedString(forLanguageCode: code)?.capitalized ?? code
     }
 }
 

@@ -1,0 +1,230 @@
+import Foundation
+import Testing
+
+@testable import SonicPlayer
+
+/// The order the library lists things in (#6).
+///
+/// **Newest-first was the only order there had ever been**, which is right for a recorder and wrong
+/// for the thing the library also turned out to be: a folder of lectures numbered 1 to 6 read
+/// bottom to top, and the numbers went down the screen.
+@Suite
+struct DialSortTests {
+
+    private static func named(_ titles: [String]) -> DialContent {
+        var content = DialContent()
+        content.recordings = titles.enumerated().map { index, title in
+            DialContent.Item(id: "rec-\(index)", title: title, duration: 60)
+        }
+        return content
+    }
+
+    private static func inLibrary(_ titles: [String]) -> DialNavigator {
+        DialNavigator(content: named(titles), root: .recordings)
+    }
+
+    private func titles(_ navigator: DialNavigator) -> [String] {
+        navigator.currentItems.map(\.title)
+    }
+
+    @Test func theDefaultIsWhateverTheHostHandedOver() {
+        let navigator = Self.inLibrary(["Gamma", "Alpha", "Beta"])
+
+        #expect(navigator.level.sort == .newest)
+        #expect(titles(navigator) == ["Gamma", "Alpha", "Beta"], "LibraryTree already orders these")
+    }
+
+    /// **The press still cycles, and it is the finger's gesture.** A tap on the chip has one thing
+    /// it can do; the stick has four and picks an order outright. Both exist and neither is a
+    /// fallback for the other — which is rule 3, applied to a control with two shapes.
+    @Test func oneChipCyclesThroughEveryOrderAndBack() {
+        var navigator = Self.inLibrary(["Gamma", "Alpha", "Beta"])
+
+        #expect(navigator.receive(.action("sort")) == [.feedback(.commit)])
+        #expect(titles(navigator) == ["Beta", "Alpha", "Gamma"], "oldest is newest reversed")
+
+        _ = navigator.receive(.action("sort"))
+        #expect(titles(navigator) == ["Alpha", "Beta", "Gamma"])
+
+        _ = navigator.receive(.action("sort"))
+        #expect(titles(navigator) == ["Gamma", "Beta", "Alpha"])
+
+        _ = navigator.receive(.action("sort"))
+        #expect(titles(navigator) == ["Gamma", "Alpha", "Beta"], "and round to the host's order")
+    }
+
+    // MARK: - The stick picks an order rather than stepping to it
+
+    /// **Four values and four ways out of the hub.** Cycling is what you reach for when a control
+    /// has one gesture; resting on the Sort chip leaves the stick idle, because the library's other
+    /// nudges act on a highlighted file and there is no file under the highlight on a chip.
+    @Test func theStickOffersEveryOrderWhileTheWheelRestsOnSort() {
+        var navigator = Self.inLibrary(["Gamma", "Alpha", "Beta"])
+        _ = navigator.receive(.tick(6))                     // three files, then Record, Import, New folder, Sort
+
+        #expect(navigator.highlightedChipID == "sort")
+        let directions = navigator.screen.ring.directions
+        #expect(directions?.up?.id == DialSort.newest.actionID)
+        #expect(directions?.down?.id == DialSort.oldest.actionID)
+        #expect(directions?.left?.id == DialSort.nameAscending.actionID)
+        #expect(directions?.right?.id == DialSort.nameDescending.actionID)
+        #expect(directions?.left?.label == "A–Z", "two words at most — it is drawn, not only spoken")
+    }
+
+    /// **One push, one order** — not one step along a cycle towards it.
+    @Test func aNudgeChoosesItsOrderOutright() {
+        var navigator = Self.inLibrary(["Gamma", "Alpha", "Beta"])
+
+        #expect(navigator.receive(.action(DialSort.nameDescending.actionID)) == [.feedback(.commit)])
+
+        #expect(titles(navigator) == ["Gamma", "Beta", "Alpha"], "reached in one, not in two")
+        #expect(navigator.level.sort == .nameDescending)
+    }
+
+    /// Asking for the order it is already in is a **limit**, not a silent no-op: a real push against
+    /// a real control that would not move is what `.limit` means everywhere else in the navigator.
+    @Test func pushingTowardsTheOrderItIsAlreadyInIsALimit() {
+        var navigator = Self.inLibrary(["Gamma", "Alpha", "Beta"])
+
+        #expect(navigator.receive(.action(DialSort.newest.actionID)) == [.feedback(.limit)])
+        #expect(navigator.level.sort == .newest)
+    }
+
+    /// The four ids mean the same thing on every list, so they are answered before the route table
+    /// rather than by a case per screen — and refused where there is no list to order.
+    @Test func aSortNudgeIsRefusedWhereThereIsNothingToOrder() {
+        var navigator = DialSample.whileEditing()
+
+        #expect(navigator.receive(.action(DialSort.nameAscending.actionID)) == [.feedback(.limit)])
+    }
+
+    /// **The reason this exists.** Plain `<` puts `Lecture 10` before `Lecture 2`, which is the
+    /// wrong answer for exactly the library that most wants sorting — a numbered series.
+    @Test func digitsCompareAsNumbersNotAsText() {
+        var navigator = Self.inLibrary(["Lecture 10", "Lecture 2", "Lecture 1"])
+
+        _ = navigator.receive(.action(DialSort.nameAscending.actionID))
+
+        #expect(titles(navigator) == ["Lecture 1", "Lecture 2", "Lecture 10"])
+    }
+
+    /// **Folders stay first in every order.** They are the shelves; a shelf sorted in among the
+    /// files is a list you have to read in order to navigate.
+    @Test func foldersLeadWhicheverWayTheFilesGo() {
+        var content = Self.named(["Zebra", "Apple"])
+        content.recordings.append(
+            DialContent.Item(id: "folder-1", title: "Middle", duration: 0, children: [])
+        )
+        var navigator = DialNavigator(content: content, root: .recordings)
+
+        _ = navigator.receive(.action(DialSort.nameAscending.actionID))
+        #expect(titles(navigator) == ["Middle", "Apple", "Zebra"])
+
+        _ = navigator.receive(.action(DialSort.nameDescending.actionID))
+        #expect(titles(navigator) == ["Middle", "Zebra", "Apple"], "still first, going the other way")
+    }
+
+    /// **The order belongs to the list, not to the reader.**
+    ///
+    /// It was one setting for the whole navigator, so sorting the library re-sorted every folder
+    /// you opened afterwards — an order chosen for one list imposed on all the others. A folder of
+    /// lectures wants A–Z and the library above it wants newest-first, and both are right.
+    @Test func aFolderKeepsItsOwnOrderRatherThanInheritingTheOneAbove() {
+        var content = DialContent()
+        content.recordings = [
+            DialContent.Item(id: "folder-1", title: "Lectures", duration: 0, children: [
+                DialContent.Item(id: "rec-b", title: "Beta", duration: 60),
+                DialContent.Item(id: "rec-a", title: "Alpha", duration: 60)
+            ])
+        ]
+        var navigator = DialNavigator(content: content, root: .recordings)
+        _ = navigator.receive(.action(DialSort.nameAscending.actionID))      // A–Z at the root
+
+        _ = navigator.receive(.press)               // into the folder
+
+        #expect(titles(navigator) == ["Beta", "Alpha"], "the order it was handed over in")
+        #expect(navigator.level.sort == .newest)
+
+        _ = navigator.receive(.action(DialSort.nameAscending.actionID))
+        #expect(titles(navigator) == ["Alpha", "Beta"], "and it sorts on its own")
+    }
+
+    /// And going back finds the order you left the level in — the highlight is not the only thing
+    /// a level remembers.
+    @Test func comingBackFindsTheOrderYouLeftBehind() {
+        var content = DialContent()
+        content.recordings = [
+            DialContent.Item(id: "folder-1", title: "Lectures", duration: 0, children: []),
+            DialContent.Item(id: "rec-z", title: "Zebra", duration: 60),
+            DialContent.Item(id: "rec-a", title: "Apple", duration: 60)
+        ]
+        var navigator = DialNavigator(content: content, root: .recordings)
+        _ = navigator.receive(.action(DialSort.nameAscending.actionID))      // A–Z
+        _ = navigator.receive(.press)               // into the folder
+
+        _ = navigator.receive(.action("back"))
+
+        #expect(titles(navigator) == ["Lectures", "Apple", "Zebra"])
+    }
+
+    /// **What the hub opens has to be what the row says**, which is why the sort is applied in
+    /// `items(atDepth:)` rather than in the projection: the press indexes the same ordered list the
+    /// rows are drawn from.
+    @Test func pressingAfterSortingOpensTheRowYouCanSee() {
+        var navigator = Self.inLibrary(["Gamma", "Alpha", "Beta"])
+        _ = navigator.receive(.action(DialSort.nameAscending.actionID))      // Alpha, Beta, Gamma
+
+        _ = navigator.receive(.tick(2))             // Gamma, now last
+
+        #expect(DialSample.playedID(navigator.receive(.press)) == "rec-0")
+    }
+
+    /// A list with nothing to reorder refuses rather than cycling a setting with no visible effect.
+    @Test func aListOfOneCannotBeSorted() {
+        var navigator = Self.inLibrary(["Only"])
+
+        #expect(navigator.receive(.action("sort")) == [.feedback(.limit)])
+        #expect(navigator.level.sort == .newest)
+    }
+
+    @Test func theChipCarriesTheCurrentOrderAndSaysWhenItIsNotTheDefault() {
+        var navigator = Self.inLibrary(["Gamma", "Alpha", "Beta"])
+
+        let byDefault = navigator.screen.actions.first { $0.id == "sort" }
+        #expect(byDefault?.label == "Newest first")
+        #expect(byDefault?.emphasis == .plain)
+
+        _ = navigator.receive(.action(DialSort.nameAscending.actionID))
+
+        let sorted = navigator.screen.actions.first { $0.id == "sort" }
+        #expect(sorted?.label == "Sorted A to Z")
+        // **Tinted, not filled.** `.selected` is the wheel's cursor and nothing else may wear it:
+        // with the wheel on New folder and a non-default sort applied, two chips were the same teal
+        // and the screen could not say which one the hub would press.
+        #expect(sorted?.emphasis == .active, "on, and not where the wheel is")
+    }
+
+    /// And when the wheel *is* on it, the cursor wins — one chip per screen wears the fill.
+    @Test func theCursorOutranksTheAppliedOrderOnTheSameChip() {
+        var navigator = Self.inLibrary(["Gamma", "Alpha", "Beta"])
+        _ = navigator.receive(.action(DialSort.nameAscending.actionID))
+        _ = navigator.receive(.tick(6))                     // three files, then Record, Import, New folder, Sort
+
+        #expect(navigator.highlightedChipID == "sort")
+        #expect(navigator.screen.actions.first { $0.id == "sort" }?.emphasis == .selected)
+        #expect(
+            navigator.screen.actions.filter { $0.emphasis == .selected }.count == 1,
+            "there is one cursor"
+        )
+    }
+
+    /// The caption is built from the chip's label everywhere it can be, which reads as a verb for
+    /// Record and Import and as **"press to new folder"** for this one. A name is not always a verb.
+    @Test func theNewFolderChipsCaptionIsASentence() {
+        var navigator = Self.inLibrary(["Gamma", "Alpha", "Beta"])
+        _ = navigator.receive(.tick(5))                     // three files, then Record, Import, New folder
+
+        #expect(navigator.highlightedChipID == "newFolder")
+        #expect(navigator.screen.hint == "press to make a folder · rotate for the list")
+    }
+}

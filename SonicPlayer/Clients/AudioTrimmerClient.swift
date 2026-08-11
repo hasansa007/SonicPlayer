@@ -1,15 +1,13 @@
 import AVFoundation
-import ComposableArchitecture
 import Foundation
 
-@DependencyClient
 struct AudioTrimmerClient {
     var trimAudio: @Sendable (URL, TimeInterval, TimeInterval) async throws -> URL
     var deleteAudioRange: @Sendable (URL, TimeInterval, TimeInterval) async throws -> URL
 }
 
-extension AudioTrimmerClient: DependencyKey {
-    static let liveValue: AudioTrimmerClient = {
+extension AudioTrimmerClient {
+    static let live: AudioTrimmerClient = {
         return Self(
             trimAudio: { sourceURL, startTime, endTime in
                 let asset = AVURLAsset(url: sourceURL)
@@ -137,18 +135,8 @@ extension AudioTrimmerClient: DependencyKey {
         )
     }()
 
-    static let testValue = Self(
-        trimAudio: { url, _, _ in url },
-        deleteAudioRange: { url, _, _ in url }
-    )
 }
 
-extension DependencyValues {
-    var audioTrimmer: AudioTrimmerClient {
-        get { self[AudioTrimmerClient.self] }
-        set { self[AudioTrimmerClient.self] = newValue }
-    }
-}
 
 enum AudioTrimmerError: Error, LocalizedError {
     case invalidTimeRange

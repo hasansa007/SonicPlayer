@@ -1,4 +1,3 @@
-import ComposableArchitecture
 import Foundation
 import SwiftUI
 
@@ -24,13 +23,29 @@ enum ScreenshotMode {
         return Screen(rawValue: ProcessInfo.processInfo.arguments[index + 1])
     }
 
+    /// **Named for dial routes, because that is what the app has.**
+    ///
+    /// This listed `collections`, `editRecording` and `homeWithMiniPlayer`, and by the time anyone
+    /// looked, four of the six rendered the dial regardless — the screens they named had stopped
+    /// being reachable one at a time and nothing here noticed. A screenshot target aimed at code
+    /// that cannot be shown is worse than a missing one: it produces an image, and the image is of
+    /// something else.
     enum Screen: String {
+        /// The fork: Listen or Record.
         case home
-        case collections
+        /// The file list, in Listen mode.
+        case library
         case player
         case recording
-        case editRecording = "editRecording"
-        case homeWithMiniPlayer = "homeWithMiniPlayer"
+        /// The trim editor, reached the way Record mode reaches it.
+        case edit
+
+        // The player's three non-happy states (#6). They exist here because epic #6 requires every
+        // screen to have designed empty, loading and error states — and a state nobody can put on
+        // screen is a state nobody checks. These are the only way to see them without editing code.
+        case playerEmpty = "playerEmpty"
+        case playerLoading = "playerLoading"
+        case playerError = "playerError"
     }
 }
 
@@ -82,7 +97,7 @@ enum ScreenshotDemoData {
 
     // MARK: - Audio Files
 
-    static let recentFiles: [AudioFile] = [
+    static let allFiles: [AudioFile] = [
         AudioFile(
             url: documentsURL.appendingPathComponent("Deep Focus Session.mp3"),
             title: "Deep Focus Session",
@@ -187,136 +202,63 @@ enum ScreenshotDemoData {
     ]
 
     // MARK: - State Builders
+    //
+    // `buildAppState` is gone with #18: `AppFeature.State` is three sheet flags now, and every
+    // screen's demo data lives on a view model. `AppView` calls `seedViewModels` instead.
 
-    static func buildAppState(for screen: ScreenshotMode.Screen) -> AppFeature.State {
-        var state = AppFeature.State()
-        // Always skip onboarding in screenshot mode
-        state.onboarding = nil
+}
+
+// MARK: - Seeding the view models
+
+extension ScreenshotDemoData {
+
+    /// Player and Home are `@Observable` view models rather than reducer state (#15, #16), so
+    /// `buildAppState` cannot reach them. `AppView` calls this instead.
+    ///
+    /// Miss it and every screenshot run renders an empty Home and a dead player — the same class
+    /// of break as the onboarding skip that moved in #14.
+    @MainActor
+    static func seedViewModels(
+        player: PlayerViewModel,
+        home: HomeViewModel,
+        filesRoot: CollectionsViewModel,
+        for screen: ScreenshotMode.Screen
+    ) {
+        home.allFiles = allFiles
+        filesRoot.seed(items: collections.map { .folder($0) } + allFiles.prefix(5).map { .file($0) })
 
         switch screen {
-        case .home:
-            populateHome(&state)
-
-        case .homeWithMiniPlayer:
-            populateHome(&state)
-            populateMiniPlayer(&state)
-
-        case .collections:
-            populateHome(&state)
-            populateCollectionsBrowser(&state)
-
         case .player:
-            populateHome(&state)
-            populateFullPlayer(&state)
+            let track = allFiles[0]
+            player.currentTrack = track
+            player.isPlaying = true
+            player.isExpanded = true
+            player.duration = track.duration
+            player.currentTime = 1234
+            player.queue = Array(allFiles.prefix(5))
+            player.currentIndex = 0
 
-        case .recording, .editRecording:
-            // Recording/edit states are handled via sheets after launch
-            populateHome(&state)
+        // The three states, each pinned to the exact condition the view branches on.
+
+        case .playerEmpty:
+            player.isExpanded = true
+
+        case .playerLoading:
+            // "Loading" is not "no track": `loadTrack` sets both in the same breath, and the view
+            // gates on a zero duration so the state stays off screen during a track *switch*.
+            player.currentTrack = allFiles[0]
+            player.isExpanded = true
+            player.isLoadingTrack = true
+            player.duration = 0
+
+        case .playerError:
+            player.isExpanded = true
+            player.openError = String(
+                localized: "The file could not be read. It may have been moved or deleted."
+            )
+
+        case .home, .library, .recording, .edit:
+            break
         }
-
-        return state
-    }
-
-    // MARK: - State Population
-
-    private static func populateHome(_ state: inout AppFeature.State) {
-        state.home.recentFiles = recentFiles
-
-        // Build filesystem items from collections + recent files
-        let folderItems: [FileSystemItem] = collections.map { .folder($0) }
-        let fileItems: [FileSystemItem] = recentFiles.prefix(5).map { .file($0) }
-        state.filesRoot.items = folderItems + fileItems
-
-        // Build collection cards
-        var cards: IdentifiedArrayOf<CollectionItemCardFeature.State> = []
-        for collection in collections {
-            cards.append(CollectionItemCardFeature.State(folder: collection))
-        }
-        state.filesRoot.collectionCards = cards
-
-        // Build file rows
-        var rows: IdentifiedArrayOf<FileRowFeature.State> = []
-        for file in recentFiles.prefix(5) {
-            var row = FileRowFeature.State(file: file)
-            row.creationDate = file.creationDate
-            rows.append(row)
-        }
-        state.filesRoot.fileRows = rows
-    }
-
-    private static func populateMiniPlayer(_ state: inout AppFeature.State) {
-        let track = recentFiles[0]
-        state.player.currentTrack = track
-        state.player.isPlaying = true
-        state.player.isExpanded = false
-        state.player.duration = track.duration
-        state.player.currentTime = 847 // ~14 min into the track
-        state.player.queue = [track] + Array(recentFiles.dropFirst().prefix(3))
-        state.player.currentIndex = 0
-
-        state.home.lastPlayedTrack = track
-        state.home.isPlaying = true
-        state.home.playbackProgress = 847 / track.duration
-    }
-
-    private static func populateCollectionsBrowser(_ state: inout AppFeature.State) {
-        // Push a collections view onto the navigation stack showing "Podcasts" folder
-        var collectionsState = CollectionsFeature.State(
-            currentDirectory: documentsURL.appendingPathComponent("Podcasts")
-        )
-
-        // Nested subfolders
-        let subCollections: [CollectionItem] = [
-            CollectionItem(
-                id: documentsURL.appendingPathComponent("Podcasts/Favorites"),
-                url: documentsURL.appendingPathComponent("Podcasts/Favorites"),
-                name: "Favorites",
-                creationDate: Date().addingTimeInterval(-86400 * 10),
-                itemCount: 3,
-                subfolderCount: 0,
-                totalDuration: 5400
-            ),
-            CollectionItem(
-                id: documentsURL.appendingPathComponent("Podcasts/Archive"),
-                url: documentsURL.appendingPathComponent("Podcasts/Archive"),
-                name: "Archive",
-                creationDate: Date().addingTimeInterval(-86400 * 20),
-                itemCount: 15,
-                subfolderCount: 0,
-                totalDuration: 28800
-            ),
-        ]
-
-        let folderItems: [FileSystemItem] = subCollections.map { .folder($0) }
-        let fileItems: [FileSystemItem] = collectionFiles.map { .file($0) }
-        collectionsState.items = folderItems + fileItems
-
-        // Build child states
-        var cards: IdentifiedArrayOf<CollectionItemCardFeature.State> = []
-        for sub in subCollections {
-            cards.append(CollectionItemCardFeature.State(folder: sub))
-        }
-        collectionsState.collectionCards = cards
-
-        var rows: IdentifiedArrayOf<FileRowFeature.State> = []
-        for file in collectionFiles {
-            var row = FileRowFeature.State(file: file)
-            row.creationDate = file.creationDate
-            rows.append(row)
-        }
-        collectionsState.fileRows = rows
-
-        state.filesPath.append(collectionsState)
-    }
-
-    private static func populateFullPlayer(_ state: inout AppFeature.State) {
-        let track = recentFiles[0]
-        state.player.currentTrack = track
-        state.player.isPlaying = true
-        state.player.isExpanded = true
-        state.player.duration = track.duration
-        state.player.currentTime = 1234
-        state.player.queue = Array(recentFiles.prefix(5))
-        state.player.currentIndex = 0
     }
 }

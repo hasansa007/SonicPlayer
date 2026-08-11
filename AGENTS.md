@@ -4,12 +4,19 @@ Instructions for AI agents working on this codebase.
 
 ## Project Context
 
-This is a **SwiftUI + TCA** iOS app. Read `CLAUDE.md` for build instructions, architecture, and conventions.
+This is a SwiftUI iOS app, **mid-migration from TCA to `@Observable` view models** (#5). Some
+features are still reducers and some are view models — check which before touching one. Read
+`CLAUDE.md` for build instructions, the per-feature migration table, and conventions.
 
 ## Rules for All Agents
 
-1. **Read before writing.** Always read the relevant feature files before making changes. Understand the existing TCA reducer/view pattern.
-2. **Follow TCA patterns.** All state changes go through reducers. All side effects use `Effect`. Inject dependencies via `@Dependency`.
+1. **Read before writing.** Always read the relevant feature files before making changes, and check
+   whether the feature is a `{Name}Feature.swift` (reducer) or a `{Name}ViewModel.swift` (migrated).
+2. **Match the feature you are in.** In a reducer: state changes go through the reducer, side
+   effects through `Effect`, dependencies through `@Dependency`. In a view model: mutate properties
+   directly, use `Task` for async work, and take clients as init parameters defaulting to `.live` —
+   there is no `@Dependency` in a view model. **Do not migrate a feature as a side effect of an
+   unrelated change**; the migration is sliced into its own issues.
 3. **Match existing style.** Look at neighboring files for naming, indentation, and structure conventions before writing new code.
 4. **Localize all strings.** Every user-facing string must be added to `Localizable.xcstrings` for all 9 supported languages.
 5. **Use the design system.** Colors from `ColorPalette.swift`, styles from `Theme.swift`, empty states from `EmptyStateView.swift`.
@@ -20,17 +27,19 @@ This is a **SwiftUI + TCA** iOS app. Read `CLAUDE.md` for build instructions, ar
 
 ### Feature Development
 
-When adding a new feature:
-- Create `{Name}Feature.swift` with `@Reducer` struct containing `State`, `Action`, and `body`
-- Create `{Name}View.swift` with the SwiftUI view accepting `Store<{Name}Feature.State, {Name}Feature.Action>`
-- Add the feature as a child in `AppFeature.swift` using `Scope`
-- Add a new tab or navigation destination in `AppView.swift` if needed
+New features go the migrated way — do not add reducers to a codebase that is removing them:
+- Create `{Name}ViewModel.swift`: a `@MainActor @Observable final class` taking its clients as init
+  parameters defaulting to `.live`
+- Create `{Name}View.swift` taking the view model as a plain `let` property
+- Own the view model in `AppView` as `@State`, and wire its callbacks in `AppView.wireViewModels()`
+- Cross-feature communication travels through a **closure wired at that composition root**, never by
+  reading another feature's state
 - Create any needed clients in `Clients/` with both live and test implementations
 
 ### Bug Fixes
 
-- Reproduce the issue by understanding the state flow in the reducer
-- Fix in the reducer logic, not by patching the view
+- Reproduce the issue by understanding the state flow — in the reducer, or in the view model
+- Fix it there, not by patching the view
 - Check for similar patterns in other features that might have the same bug
 
 ### UI Changes
@@ -43,20 +52,38 @@ When adding a new feature:
 
 ### Recording Feature
 
+- `RecordingViewModel` and `EditRecordingViewModel` — migrated in #17; neither reducer exists
 - Audio recording uses `AudioRecorderClient` wrapping `AVAudioRecorder`
 - Trimming uses `AudioTrimmerClient`
+- **Editing is non-destructive until save.** The editor works on a temp copy in
+  `<tmp>/SonicPlayer/edit/`; only `saveChanges()` overwrites the original. Each trim replaces the
+  temp file and deletes the previous one
+- Stopping a recording must `await` the stop **before** tearing down the level meter — the reducer
+  used `.concatenate`, not `.merge`, and inverting the two lines fails silently
 - Recordings are stored in the app's documents directory
 - The `EditRecordingView` handles audio editing after capture
 
 ### Player Feature
 
-- Session state persists via `@Shared(.fileStorage(...))` in `PlayerFeature`
+- The player is `PlayerViewModel` — migrated in #15. `PlayerFeature` no longer exists
+- Session state persists via `SessionStore`, which replaced `@Shared(.fileStorage(...))`. Its path
+  and JSON shape are a **compatibility boundary**: existing installs have a `session.json`, so
+  changing either stops playback resuming after an update
+- Queue sequencing decisions live in `Domain/QueueMath.swift`, not in the view model
 - Lock screen / remote controls are managed via `MPRemoteCommandCenter`
 - Background audio is enabled in `Info.plist`
-- Queue management and track navigation are in `PlayerFeature.swift`
+- `AudioPlayerClient` wraps a process-lifetime `AVPlayer` shared with the recording editor. That is
+  why `stop()` is called before any file move — keep those calls
 
 ### File Management
 
+- `CollectionsViewModel` — migrated in #18. `CollectionsFeature`, `FileRowFeature` and
+  `CollectionItemCardFeature` are all deleted; the row reducers were ~90% "handled by parent" and
+  became closures passed into `ForEach`
+- One view model **per navigation depth**, owned by its screen as `@State`. Push by appending to
+  `AppView`'s `[URL]` path
+- The recursive folder import lives in `FolderImport`; its two decisions — which extensions count
+  as audio, and where a nested file lands — are in `Domain/ImportFilter` and are tested
 - `FileManagerClient` provides all file system operations
 - Files are identified by SHA256 hash of their path (stable IDs)
 - Supported formats: MP3, M4A, WAV
@@ -66,7 +93,7 @@ When adding a new feature:
 
 After making changes, verify the build:
 ```bash
-xcodebuild -project SonicPlayer.xcodeproj -scheme SonicPlayer -destination 'platform=iOS Simulator,name=iPhone 16' build 2>&1 | tail -5
+xcodebuild -project SonicPlayer.xcodeproj -scheme SonicPlayer -destination 'platform=iOS Simulator,name=iPhone 17' build 2>&1 | tail -5
 ```
 
 A successful build ends with `** BUILD SUCCEEDED **`.

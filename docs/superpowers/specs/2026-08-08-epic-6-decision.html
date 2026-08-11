@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Epic #6 — UI Restructure · Decision</title>
+<style>
+  :root{
+    --teal:#2B9EB3; --teal-dark:#1B5B7E; --teal-light:#4DB8CC;
+    --ink:#1A2332; --muted:#5F6B7A; --faint:#9BA5B4;
+    --bg:#F8FAFB; --surface:#FFFFFF; --border:#E5E9EF;
+    --good:#2AA876; --bad:#E4572E; --warn:#E0A100;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --ink:#FFFFFF; --muted:#98989D; --faint:#636366; --bg:#000; --surface:#1C1C1E; --border:#38383A; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;color:var(--ink);background:var(--bg);}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 96px}
+  header.top{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+  .pill{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:3px 10px;border-radius:999px;background:linear-gradient(120deg,var(--teal-dark),var(--teal-light));color:#fff}
+  h1{font-size:30px;margin:10px 0 2px;letter-spacing:-.02em}
+  .sub{color:var(--muted);font-size:15px}
+  h2{font-size:20px;margin:40px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--border);letter-spacing:-.01em}
+  .facts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .fact{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px}
+  .fact b{display:block;font-size:13px;color:var(--teal);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px}
+  .fact span{font-size:14px;color:var(--muted)}
+  .rule{background:linear-gradient(120deg,rgba(43,158,179,.10),rgba(77,184,204,.10));border:1px solid var(--teal-light);border-radius:14px;padding:16px 18px;font-size:15px}
+  .rule strong{color:var(--teal-dark)}
+  .opts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:8px}
+  .opt{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:10px;position:relative}
+  .opt.rec{border:2px solid var(--teal);box-shadow:0 8px 30px rgba(43,158,179,.15)}
+  .opt .tag{position:absolute;top:-11px;right:14px;font-size:11px;font-weight:700;background:var(--teal);color:#fff;padding:3px 10px;border-radius:999px;letter-spacing:.03em}
+  .opt h3{margin:0;font-size:17px}
+  .opt .count{font-size:13px;color:var(--faint);font-weight:600}
+  .flow{font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bg);border:1px dashed var(--border);border-radius:10px;padding:10px;color:var(--muted);white-space:pre-wrap}
+  ul.pc{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
+  ul.pc li{font-size:13.5px;padding-left:22px;position:relative;color:var(--muted)}
+  ul.pc li.g::before{content:"▲";color:var(--good);position:absolute;left:0;font-size:11px;top:3px}
+  ul.pc li.b::before{content:"▼";color:var(--bad);position:absolute;left:0;font-size:11px;top:3px}
+  table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;font-size:14px}
+  th,td{text-align:left;padding:11px 13px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{background:var(--bg);font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+  tr:last-child td{border-bottom:none}
+  td.n{font-weight:700;color:var(--teal);width:34px}
+  code{font:13px ui-monospace,Menlo,monospace;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:1px 5px}
+  .note{font-size:13px;color:var(--faint);margin-top:6px}
+  .q{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--teal);border-radius:12px;padding:14px 16px;margin:10px 0}
+  .q b{color:var(--teal-dark)}
+  .exclude{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .exclude .fact b{color:var(--warn)}
+  @media (max-width:820px){.opts{grid-template-columns:1fr}.facts,.exclude{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <span class="pill">Epic #6 · P1 · Decision needed</span>
+    <h1>Restructure the UI into a Design System</h1>
+    <div class="sub">Decompose one big epic into shippable child slices. Nothing is filed yet — pick an option below.</div>
+  </header>
+
+  <h2>What the epic asks for</h2>
+  <div class="facts">
+    <div class="fact"><b>T1 Baseline</b><span>Screenshot every screen — the documented "before".</span></div>
+    <div class="fact"><b>T2 Components</b><span>Pull shared components out of the big view files.</span></div>
+    <div class="fact"><b>T3 Tokens</b><span>Spacing · type scale · elevation · motion — extend <code>Theme.swift</code>.</span></div>
+    <div class="fact"><b>T4 Behaviour</b><span>Close the "looks right, acts wrong" defects.</span></div>
+    <div class="fact"><b>T5 Nav / IA</b><span>Is single-screen + sheets still the right split?</span></div>
+    <div class="fact"><b>T6 States</b><span>Empty · loading · error as first-class designs.</span></div>
+    <div class="fact"><b>T7 RTL + i18n</b><span>All 9 languages incl. RTL, verified as part of the work.</span></div>
+    <div class="fact"><b>Blocker</b><span>#5 (TCA→MVVM) is <strong>done</strong> → epic is unblocked.</span></div>
+  </div>
+
+  <h2>Current state of the code</h2>
+  <div class="facts">
+    <div class="fact"><b>ColorPalette.swift</b><span>Mature — colors, gradients, dark-mode. Keep as-is.</span></div>
+    <div class="fact"><b>Theme.swift</b><span>THIN — only gradients + 1 button style. No spacing/type/elevation/motion tokens. This is what T3 fills.</span></div>
+    <div class="fact"><b>Big view files</b><span>RecordingView 551 · PlayerView 520 · CollectionsView 477 · SettingsView 471 · EditRecordingView 364</span></div>
+    <div class="fact"><b>Nav today</b><span>Single screen: Home + sheets (player/record/import); Settings pushed. No tab bar.</span></div>
+  </div>
+
+  <h2>The rule every slice must obey</h2>
+  <div class="rule">Each child slice becomes its own <strong>branch → PR → merge to pre-prod</strong>, so each must be
+    <strong>independently shippable</strong> — a real user-visible change, no dead code, no stubs. This one rule is what the three options differ on.</div>
+
+  <h2>Choose the decomposition shape</h2>
+  <div class="opts">
+    <div class="opt">
+      <h3>Option A</h3><span class="count">7 slices</span>
+      <div class="flow">1  Foundation (tokens only)
+2  IA spike (ADR only)
+3  Player
+4  Files
+5  Recording
+6  Settings
+7  Home</div>
+      <ul class="pc">
+        <li class="g">Clean separation; tokens exist before use</li>
+        <li class="b">Slice 1 ships <strong>dead code</strong> — tokens with no consumer</li>
+        <li class="b">Slice 2 ships <strong>nothing</strong> to pre-prod (pure ADR)</li>
+      </ul>
+    </div>
+
+    <div class="opt rec">
+      <span class="tag">RECOMMENDED</span>
+      <h3>Option B — walking skeleton</h3><span class="count">5 slices</span>
+      <div class="flow">IA decision = ADR on Slice 1's branch
+1  Player  ← births tokens + components
+2  Files
+3  Recording
+4  Settings
+5  Home</div>
+      <ul class="pc">
+        <li class="g">Every slice ships a real restructured screen</li>
+        <li class="g">Design system accretes with real consumers</li>
+        <li class="g">IA decided once, up front, beside real code</li>
+        <li class="b">Slice 1 is the heaviest (tokens + components + Player)</li>
+        <li class="b">Early token choices may get small later revisions</li>
+      </ul>
+    </div>
+
+    <div class="opt">
+      <h3>Option C</h3><span class="count">6 slices</span>
+      <div class="flow">1  Foundation-LIVE: tokens applied to
+   EmptyStateView + MiniPlayer
+2  Player
+3  Files
+4  Recording
+5  Settings
+6  Home</div>
+      <ul class="pc">
+        <li class="g">Dedicated foundation slice, but NOT dead code</li>
+        <li class="g">Small, low-risk slice 1 de-risks the token API</li>
+        <li class="b">Slightly artificial choice of first consumers</li>
+        <li class="b">One extra PR vs Option B for ~same outcome</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Option B in detail — the 5 slices (Player first, your call)</h2>
+  <table>
+    <tr><th class="n">#</th><th>Screen</th><th>Ships</th><th>Foundation it carries</th></tr>
+    <tr><td class="n">1</td><td><b>Player</b><br><span class="note">PlayerView, MiniPlayerView, Theme.swift</span></td><td>Restructured player + mini-player; token set v1; IA ADR; baseline shots; PROJECT_MAP created</td><td>Creates spacing/type/elevation/motion tokens + first shared components</td></tr>
+    <tr><td class="n">2</td><td><b>Files</b><br><span class="note">CollectionsView, FileItemRow, MediaFileRowView</span></td><td>Restructured browser</td><td>Extracts shared Row/List components (reused by Home + queue)</td></tr>
+    <tr><td class="n">3</td><td><b>Recording</b><br><span class="note">RecordingView, EditRecordingView</span></td><td>Restructured record + edit</td><td>Reuses foundation; waveform/transport components</td></tr>
+    <tr><td class="n">4</td><td><b>Settings</b><br><span class="note">SettingsView, AboutView, HelpView</span></td><td>Restructured settings</td><td>Reuses foundation; Form/Section rows</td></tr>
+    <tr><td class="n">5</td><td><b>Home</b><br><span class="note">inlined UI in App/AppView.swift</span></td><td>Restructured Home; removes last inline layout</td><td>Reuses everything</td></tr>
+  </table>
+  <p class="note">Each per-screen slice also does, for that screen only: empty/loading/error states · RTL + 9 languages · files any "acts wrong" defect as a linked <code>bug</code>. The epic #6 parent takes no branch and stays open until slices 1–5 close.</p>
+
+  <h2>Not their own slices (all options agree)</h2>
+  <div class="exclude">
+    <div class="fact"><b>T4 · Interaction defects</b><span>Each gets its own linked <code>bug</code> issue as a screen slice surfaces it — the epic says so. (#41 is already one.)</span></div>
+    <div class="fact"><b>T6 states + T7 RTL</b><span>Folded into each per-screen slice, verified screen-by-screen — not a late horizontal sweep.</span></div>
+  </div>
+
+  <h2>Decide these three things</h2>
+  <div class="q"><b>1 · Which shape?</b> &nbsp; A (7) &nbsp;·&nbsp; <b>B (5, recommended)</b> &nbsp;·&nbsp; C (6)</div>
+  <div class="q"><b>2 · Child labels?</b> &nbsp; Proposed: <code>enhancement</code>, no priority inherited (parent is P1). Override if you want.</div>
+  <div class="q"><b>3 · IA call timing?</b> &nbsp; Under B I make the stay-single-screen-vs-tabs recommendation as an ADR on Slice 1 — or you can ask for that recommendation in chat <em>before</em> Slice 1 starts.</div>
+
+  <p class="note" style="margin-top:26px">Tell me your answers in chat and I'll file the child issues against #6, then continue this run on Slice 1.</p>
+</div>
+</body>
+</html>

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rotary trim prototype — wheel vs finger</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:38px 26px 70px;background:#0B0D10;color:#D6DCE2;
+  font:14px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;}
+.page{max-width:1000px;margin:0 auto}
+h2{font-size:23px;margin:0 0 6px;color:#F2F5F8;letter-spacing:-.01em}
+h3{font-size:15px;margin:0 0 6px;color:#E6EAEE}
+h4{color:#E6EAEE}
+.subtitle{color:#8B949D;font-size:13px;margin:0 0 18px;max-width:760px}
+.label{font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#5F6870}
+.section{margin-bottom:26px}
+code{font-family:ui-monospace,Menlo,monospace;font-size:.9em;color:#2DD4BF}
+.cards{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;margin:16px 0}
+.card{flex:1;min-width:290px;background:#13161A;border:1px solid rgba(255,255,255,.09);
+  border-radius:14px;overflow:hidden;cursor:pointer;transition:border-color .15s}
+.card:hover{border-color:rgba(45,212,191,.4)}
+.card.selected{border-color:#2DD4BF;box-shadow:0 0 0 1px #2DD4BF}
+.card-image{padding:20px 14px;background:#0E1114;display:flex;justify-content:center}
+.card-body{padding:15px 17px}
+.card-body p{color:#98A2AC;font-size:12.5px;margin:6px 0 0}
+.options{display:flex;flex-direction:column;gap:11px;margin:14px 0}
+.option{display:flex;gap:14px;padding:15px 17px;background:#13161A;cursor:pointer;
+  border:1px solid rgba(255,255,255,.09);border-radius:12px;transition:border-color .15s}
+.option:hover{border-color:rgba(45,212,191,.4)}
+.option.selected{border-color:#2DD4BF;box-shadow:0 0 0 1px #2DD4BF}
+.letter{width:26px;height:26px;flex:none;border-radius:7px;background:#22272E;color:#2DD4BF;
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px}
+.option .content p{color:#98A2AC;font-size:12.5px;margin:5px 0 0}
+.note{max-width:760px;margin:0 auto 26px;padding:13px 16px;border-radius:10px;
+  background:rgba(45,212,191,.07);border:1px solid rgba(45,212,191,.22);
+  color:#9BE8DD;font-size:12.5px}
+</style></head><body><div class="page">
+<div class="note"><strong>Prototype from the 2026-08-09 rotary-shell brainstorm.</strong>
+Preserved as the tuning surface for <code>RotaryTracker</code> — the constants in
+<code>2026-08-09-rotary-shell-design.md</code> §5 came from driving this. Selection highlighting
+is inert here; it drove the live brainstorm session.</div>
+<style>
+.tl-tabs { display:flex; gap:8px; justify-content:center; margin:14px 0 16px; }
+.tl-tab { padding:8px 20px; border-radius:99px; font-size:12px; cursor:pointer;
+          border:1px solid rgba(255,255,255,.14); background:#1B1F25; color:#98A2AC;
+          user-select:none; }
+.tl-tab.on { background:#2DD4BF; color:#04070A; border-color:transparent; font-weight:700; }
+
+.tl-stage { display:flex; gap:26px; justify-content:center; align-items:flex-start; flex-wrap:wrap; }
+
+.tl-ph { width:306px; height:560px; border-radius:34px; position:relative; overflow:hidden;
+         background:linear-gradient(#15181C,#0A0C0F); flex:none;
+         box-shadow:0 18px 44px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.07);
+         touch-action:none; }
+.tl-strip { position:absolute; top:0; left:0; right:0; height:32px; display:flex;
+            align-items:center; justify-content:space-between; padding:0 18px; z-index:5;
+            font-size:9px; letter-spacing:.16em; text-transform:uppercase;
+            font-family:ui-monospace,Menlo,monospace; color:#5F6870; }
+.tl-strip .hot { color:#2DD4BF; }
+
+.tl-body { position:absolute; top:32px; left:0; right:0; bottom:0; padding:14px 18px 0;
+           box-sizing:border-box; }
+.tl-body.nowheel { bottom:0; }
+
+.tl-wrap { position:relative; height:110px; }
+.tl-wf { display:flex; align-items:center; gap:1px; height:110px; }
+.tl-wf i { flex:1; border-radius:1px; background:#2DD4BF; opacity:.8; }
+.tl-veil { position:absolute; top:0; bottom:0; background:rgba(4,7,10,.74); pointer-events:none; }
+.tl-h { position:absolute; top:-6px; bottom:-6px; width:2px; background:#2DD4BF;
+        box-shadow:0 0 10px rgba(45,212,191,.9); pointer-events:none; }
+.tl-h.dimmed { background:#4A7C77; box-shadow:none; }
+.tl-h::after { content:''; position:absolute; top:-5px; left:-4px; width:10px; height:10px;
+               border-radius:3px; background:inherit; }
+.tl-h.grab { pointer-events:auto; cursor:ew-resize; width:16px; margin-left:-7px; background:transparent;
+             box-shadow:none; }
+.tl-h.grab::before { content:''; position:absolute; left:7px; top:0; bottom:0; width:2px;
+                     background:#2DD4BF; box-shadow:0 0 10px rgba(45,212,191,.9); }
+.tl-h.grab::after { left:3px; background:#2DD4BF; }
+.tl-mk { position:absolute; top:-11px; width:6px; height:6px; margin-left:-3px; border-radius:50%;
+         background:#F0B429; pointer-events:none; }
+.tl-mk.near { box-shadow:0 0 12px #F0B429; transform:scale(1.5); }
+
+.tl-read { text-align:center; margin-top:20px; }
+.tl-read .big { font-size:38px; font-weight:700; color:#E6EAEE; letter-spacing:-.02em;
+                font-family:ui-monospace,Menlo,monospace; }
+.tl-read .big small { font-size:20px; color:#2DD4BF; }
+.tl-read .lab2 { font-size:9px; letter-spacing:.22em; text-transform:uppercase; color:#5F6870;
+                 margin-top:5px; }
+.tl-mult { display:inline-block; margin-top:12px; padding:4px 12px; border-radius:99px;
+           font-size:10px; letter-spacing:.12em; background:rgba(45,212,191,.14); color:#2DD4BF;
+           font-family:ui-monospace,Menlo,monospace; opacity:0; transition:opacity .18s; }
+.tl-mult.show { opacity:1; }
+
+.tl-zone { position:absolute; left:0; right:0; bottom:0; height:200px; z-index:6; }
+.tl-zone::before { content:''; position:absolute; inset:0;
+                   background:linear-gradient(rgba(10,12,15,0), rgba(10,12,15,.94) 24%);
+                   pointer-events:none; }
+.tl-wheel { position:absolute; left:50%; bottom:20px; width:168px; height:168px; margin-left:-84px;
+            cursor:grab; }
+.tl-wheel:active { cursor:grabbing; }
+.tl-ring { position:absolute; inset:0; border-radius:50%; border:2px solid rgba(45,212,191,.2);
+           background:radial-gradient(circle at 50% 30%, rgba(45,212,191,.05), transparent 62%); }
+.tl-ring.lit { border-color:rgba(45,212,191,.55); }
+.tl-thumb { position:absolute; left:50%; top:-7px; width:15px; height:15px; margin-left:-7.5px;
+            border-radius:50%; background:#2DD4BF; box-shadow:0 0 15px rgba(45,212,191,.9);
+            transform-origin:50% 91.5px; opacity:0; transition:opacity .15s; }
+.tl-thumb.on { opacity:1; }
+.tl-hub { position:absolute; left:50%; top:50%; width:70px; height:70px; margin:-35px 0 0 -35px;
+          border-radius:50%; background:linear-gradient(#23272E,#161A1E); cursor:pointer;
+          border:1px solid rgba(255,255,255,.09); box-shadow:0 6px 16px rgba(0,0,0,.55);
+          display:flex; align-items:center; justify-content:center; color:#2DD4BF;
+          font-size:11px; letter-spacing:.1em; font-weight:700; }
+.tl-hub:active { transform:scale(.96); }
+.tl-tick { position:absolute; left:50%; top:50%; width:4px; height:4px; margin:-2px 0 0 -2px;
+           border-radius:50%; background:#2DD4BF; opacity:0; }
+.tl-nub { position:absolute; width:3px; height:8px; margin-left:-1.5px; border-radius:2px;
+          background:rgba(255,255,255,.09); left:50%; top:6px; transform-origin:50% 78px; }
+
+.tl-side { width:300px; }
+.tl-side h4 { margin:0 0 10px; font-size:12px; color:#E6EAEE; letter-spacing:.02em; }
+.tl-stat { display:flex; justify-content:space-between; padding:8px 0; font-size:11.5px;
+           border-bottom:1px solid rgba(255,255,255,.07); color:#98A2AC; }
+.tl-stat b { color:#2DD4BF; font-family:ui-monospace,Menlo,monospace; font-weight:600; }
+.tl-stat b.bad { color:#F87171; }
+.tl-gran { display:flex; gap:6px; margin:14px 0 6px; }
+.tl-gran div { flex:1; text-align:center; padding:7px 0; border-radius:8px; cursor:pointer;
+               font-size:11px; background:#1B1F25; border:1px solid rgba(255,255,255,.1);
+               color:#98A2AC; user-select:none; font-family:ui-monospace,Menlo,monospace; }
+.tl-gran div.on { background:#2DD4BF; color:#04070A; border-color:transparent; font-weight:700; }
+.tl-snd { margin-top:12px; padding:8px 12px; border-radius:8px; cursor:pointer; font-size:11px;
+          background:#1B1F25; border:1px solid rgba(255,255,255,.1); color:#98A2AC;
+          text-align:center; user-select:none; }
+.tl-note { font-size:11px; line-height:1.6; color:#7C868F; margin-top:16px;
+           padding-top:12px; border-top:1px solid rgba(255,255,255,.09); }
+</style>
+
+<h2>Drive it, then decide</h2>
+<p class="subtitle">A 40-minute lecture. Put the IN point exactly on the start of a sentence. Try it both ways — <strong>drag around the ring</strong>, then switch to Finger and drag the handle.</p>
+
+<div class="tl-tabs">
+  <div class="tl-tab on" id="tlWheelTab">Wheel</div>
+  <div class="tl-tab" id="tlFingerTab">Finger</div>
+</div>
+
+<div class="tl-stage">
+  <div class="tl-ph" id="tlPhone">
+    <div class="tl-strip"><span id="tlMode">Edit · wheel</span><span class="hot" id="tlRange">02:10 – 38:40</span></div>
+    <div class="tl-body" id="tlBody">
+      <div class="tl-wrap" id="tlWrap">
+        <div class="tl-wf" id="tlWf"></div>
+        <div class="tl-veil" id="tlVeilL" style="left:0;width:0"></div>
+        <div class="tl-veil" id="tlVeilR" style="right:0;width:0"></div>
+        <div class="tl-h" id="tlHIn"></div>
+        <div class="tl-h dimmed" id="tlHOut"></div>
+      </div>
+      <div class="tl-read">
+        <div class="big" id="tlBig">02:10<small>.0</small></div>
+        <div class="lab2" id="tlWhich">in point</div>
+        <div class="tl-mult" id="tlMult">×1</div>
+      </div>
+    </div>
+    <div class="tl-zone" id="tlZone">
+      <div class="tl-wheel" id="tlWheel">
+        <div class="tl-ring" id="tlRing"></div>
+        <div class="tl-thumb" id="tlThumb"></div>
+        <div class="tl-hub" id="tlHub">IN</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tl-side">
+    <h4>What just happened</h4>
+    <div class="tl-stat"><span>Detents turned</span><b id="tlCount">0</b></div>
+    <div class="tl-stat"><span>Finest step possible</span><b id="tlStep">0.1 s</b></div>
+    <div class="tl-stat"><span>Acceleration now</span><b id="tlAcc">×1</b></div>
+    <div class="tl-stat"><span>Markers snapped to</span><b id="tlSnap">0</b></div>
+    <div class="tl-stat"><span>Error vs 02:10.0 target</span><b id="tlErr">0.0 s</b></div>
+
+    <div style="margin-top:18px">
+      <span class="label">Detent granularity</span>
+      <div class="tl-gran">
+        <div class="on" data-g="0.1">0.1s</div>
+        <div data-g="1">1s</div>
+        <div data-g="10">10s</div>
+      </div>
+      <div class="tl-snd" id="tlSnd">click sound: on</div>
+    </div>
+
+    <div class="tl-note" id="tlNote">
+      12° per detent · 30 per revolution · dead zone under 34pt from centre · shortest-arc
+      unwrap at the 0°/360° seam. These are the exact constants that go into
+      <code>RotaryTracker</code> — if a number feels wrong here, change it here and I'll write
+      that one into the spec.
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top:34px">So — where does the recorder go?</h3>
+<div class="options">
+  <div class="option" data-choice="in-stage" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content"><h3>Both in the stage</h3>
+      <p>Capture and trim both above the wheel. One rule, no exceptions — but 915 lines of recording views get rewritten and this supersedes #49.</p></div>
+  </div>
+  <div class="option" data-choice="full-screen" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content"><h3>Full-screen sheet, wheel hidden</h3>
+      <p>Recording keeps the whole screen exactly as today. Both view files survive, #49 proceeds as written — and trimming keeps the fat-finger problem you just felt.</p></div>
+  </div>
+  <div class="option" data-choice="split" onclick="toggleSelect(this)">
+    <div class="letter">3</div>
+    <div class="content"><h3>Split — capture full-screen, trim on the wheel</h3>
+      <p>The wheel steps aside where it adds nothing and comes back where it wins. Costs one stated exception to the furniture rule.</p></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const DUR = 2400, TARGET = 130;
+  const MARKS = [320, 1180, 1905];
+  const DETENT_DEG = 12, DEAD = 34;
+
+  let inS = 130, outS = 2320, active = 'in';
+  let gran = 0.1, sound = true, mode = 'wheel';
+  let count = 0, snaps = 0, acc = 1, resid = 0, lastAng = null, dragging = false;
+  let tickTimes = [];
+
+  const $ = id => document.getElementById(id);
+  const wf = $('tlWf');
+  let bars = '';
+  for (let i=0;i<86;i++){
+    const h = 18 + Math.abs(Math.sin(i*0.7)*Math.cos(i*0.23)) * 74;
+    bars += '<i style="height:'+h.toFixed(1)+'%"></i>';
+  }
+  wf.innerHTML = bars;
+
+  // ring nubs
+  const ring = $('tlRing');
+  for (let a=0;a<360;a+=DETENT_DEG){
+    const n = document.createElement('div');
+    n.className = 'tl-nub';
+    n.style.transform = 'rotate('+a+'deg)';
+    ring.appendChild(n);
+  }
+
+  // marker pips
+  const wrap = $('tlWrap');
+  const pips = MARKS.map(m => {
+    const d = document.createElement('div');
+    d.className = 'tl-mk';
+    wrap.appendChild(d);
+    return d;
+  });
+
+  let audio = null;
+  function click(strong){
+    if (!sound) return;
+    try {
+      audio = audio || new (window.AudioContext||window.webkitAudioContext)();
+      if (audio.state === 'suspended') audio.resume();
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = 'square';
+      o.frequency.value = strong ? 880 : 1650;
+      g.gain.setValueAtTime(strong ? 0.05 : 0.022, audio.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + (strong?0.045:0.018));
+      o.connect(g); g.connect(audio.destination);
+      o.start(); o.stop(audio.currentTime + 0.05);
+    } catch(e){}
+  }
+
+  const fmt = s => {
+    const m = Math.floor(s/60), r = s - m*60;
+    return m + ':' + (r<10?'0':'') + r.toFixed(1).padStart(4,'0');
+  };
+  const fmtShort = s => {
+    const m = Math.floor(s/60), r = Math.floor(s%60);
+    return m + ':' + (r<10?'0':'') + r;
+  };
+
+  function render(){
+    const W = wrap.clientWidth;
+    const xIn = (inS/DUR)*W, xOut = (outS/DUR)*W;
+    $('tlHIn').style.left = xIn+'px';
+    $('tlHOut').style.left = xOut+'px';
+    $('tlVeilL').style.width = xIn+'px';
+    $('tlVeilR').style.width = (W-xOut)+'px';
+    pips.forEach((p,i)=>{
+      p.style.left = ((MARKS[i]/DUR)*W)+'px';
+      const near = Math.abs((active==='in'?inS:outS) - MARKS[i]) < 3;
+      p.classList.toggle('near', near);
+    });
+    const v = active==='in' ? inS : outS;
+    const whole = fmtShort(v), dec = (v - Math.floor(v)).toFixed(1).slice(1);
+    $('tlBig').innerHTML = whole + '<small>' + dec + '</small>';
+    $('tlWhich').textContent = active==='in' ? 'in point' : 'out point';
+    $('tlHub').textContent = active==='in' ? 'IN' : 'OUT';
+    $('tlHIn').classList.toggle('dimmed', active!=='in');
+    $('tlHOut').classList.toggle('dimmed', active!=='out');
+    $('tlRange').textContent = fmtShort(inS)+' – '+fmtShort(outS);
+    $('tlCount').textContent = count;
+    $('tlStep').textContent = mode==='wheel' ? gran+' s' : (DUR/W).toFixed(1)+' s / pixel';
+    $('tlStep').className = mode==='wheel' ? '' : 'bad';
+    $('tlAcc').textContent = '×'+acc;
+    $('tlSnap').textContent = snaps;
+    const err = Math.abs(inS - TARGET);
+    $('tlErr').textContent = err.toFixed(1)+' s';
+    $('tlErr').className = err <= 0.5 ? '' : 'bad';
+  }
+
+  function bump(dir){
+    count++;
+    tickTimes.push(performance.now());
+    tickTimes = tickTimes.filter(t => performance.now()-t < 220);
+    const rate = tickTimes.length;
+    acc = rate>18 ? 40 : rate>12 ? 15 : rate>7 ? 5 : rate>4 ? 2 : 1;
+    $('tlMult').textContent = '×'+acc;
+    $('tlMult').classList.toggle('show', acc>1);
+
+    let v = (active==='in'?inS:outS) + dir*gran*acc;
+    v = Math.max(0, Math.min(DUR, v));
+    let strong = false;
+    for (const m of MARKS){
+      if (Math.abs(v-m) < gran*acc*0.9 && Math.abs((active==='in'?inS:outS)-m) >= gran*acc*0.9){
+        v = m; strong = true; snaps++; break;
+      }
+    }
+    if (active==='in') inS = Math.min(v, outS-1); else outS = Math.max(v, inS+1);
+    click(strong);
+    render();
+  }
+
+  const wheel = $('tlWheel');
+  function angleAt(e){
+    const r = wheel.getBoundingClientRect();
+    const cx = r.left + r.width/2, cy = r.top + r.height/2;
+    const dx = e.clientX-cx, dy = e.clientY-cy;
+    return { a: Math.atan2(dy,dx)*180/Math.PI, d: Math.hypot(dx,dy) };
+  }
+  wheel.addEventListener('pointerdown', e => {
+    if (e.target === $('tlHub')) return;
+    const {a,d} = angleAt(e);
+    if (d < DEAD) return;
+    dragging = true; lastAng = a; resid = 0;
+    wheel.setPointerCapture(e.pointerId);
+    $('tlRing').classList.add('lit'); $('tlThumb').classList.add('on');
+    $('tlThumb').style.transform = 'rotate('+(a+90)+'deg)';
+  });
+  wheel.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const {a,d} = angleAt(e);
+    if (d < DEAD) { lastAng = null; return; }
+    $('tlThumb').style.transform = 'rotate('+(a+90)+'deg)';
+    if (lastAng === null) { lastAng = a; return; }
+    let del = a - lastAng;
+    while (del > 180) del -= 360;
+    while (del < -180) del += 360;
+    lastAng = a;
+    resid += del;
+    while (Math.abs(resid) >= DETENT_DEG){
+      bump(resid > 0 ? 1 : -1);
+      resid -= Math.sign(resid)*DETENT_DEG;
+    }
+  });
+  const end = () => {
+    dragging = false; lastAng = null;
+    $('tlRing').classList.remove('lit'); $('tlThumb').classList.remove('on');
+    $('tlMult').classList.remove('show'); acc = 1; render();
+  };
+  wheel.addEventListener('pointerup', end);
+  wheel.addEventListener('pointercancel', end);
+
+  $('tlHub').addEventListener('click', e => {
+    e.stopPropagation();
+    active = active==='in' ? 'out' : 'in';
+    click(true); render();
+  });
+
+  // finger mode
+  let fdrag = false;
+  wrap.addEventListener('pointerdown', e => {
+    if (mode !== 'finger') return;
+    fdrag = true; wrap.setPointerCapture(e.pointerId); fmove(e);
+  });
+  wrap.addEventListener('pointermove', e => { if (fdrag) fmove(e); });
+  wrap.addEventListener('pointerup', () => fdrag = false);
+  function fmove(e){
+    const r = wrap.getBoundingClientRect();
+    let t = ((e.clientX - r.left)/r.width)*DUR;
+    t = Math.max(0, Math.min(DUR, t));
+    if (active==='in') inS = Math.min(t, outS-1); else outS = Math.max(t, inS+1);
+    count++; render();
+  }
+
+  function setMode(m){
+    mode = m;
+    $('tlWheelTab').classList.toggle('on', m==='wheel');
+    $('tlFingerTab').classList.toggle('on', m==='finger');
+    $('tlZone').style.display = m==='wheel' ? '' : 'none';
+    $('tlBody').classList.toggle('nowheel', m==='finger');
+    $('tlHIn').classList.toggle('grab', m==='finger');
+    $('tlMode').textContent = 'Edit · ' + m;
+    count = 0; snaps = 0; inS = 130; outS = 2320;
+    render();
+  }
+  $('tlWheelTab').addEventListener('click', ()=>setMode('wheel'));
+  $('tlFingerTab').addEventListener('click', ()=>setMode('finger'));
+
+  document.querySelectorAll('.tl-gran div').forEach(d => {
+    d.addEventListener('click', () => {
+      document.querySelectorAll('.tl-gran div').forEach(x=>x.classList.remove('on'));
+      d.classList.add('on'); gran = parseFloat(d.dataset.g); render();
+    });
+  });
+  $('tlSnd').addEventListener('click', () => {
+    sound = !sound; $('tlSnd').textContent = 'click sound: ' + (sound?'on':'off');
+  });
+
+  render();
+  window.addEventListener('resize', render);
+})();
+</script>
+
+</div>
+<script>function toggleSelect(el){
+  var g = el.parentElement;
+  if (!g.hasAttribute('data-multiselect'))
+    Array.prototype.forEach.call(g.children, function(c){ if(c!==el) c.classList.remove('selected'); });
+  el.classList.toggle('selected');
+}</script>
+</body></html>

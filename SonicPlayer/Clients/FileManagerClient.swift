@@ -1,10 +1,8 @@
 import AVFoundation
-import ComposableArchitecture
 import CryptoKit
 import Foundation
 
-@DependencyClient
-struct FileManagerClient {
+struct FileManagerClient: Sendable {
     var listItems: @Sendable (URL?) async throws -> [FileSystemItem]
     var createCollection: @Sendable (String, URL?) async throws -> Void
     var createCollectionForImport: @Sendable () async throws -> URL
@@ -13,11 +11,19 @@ struct FileManagerClient {
     var renameItem: @Sendable (URL, String) async throws -> Void
     var importFile: @Sendable (URL, URL?) async throws -> Void
     var getMetadata: @Sendable (URL) async throws -> AudioFile
+    /// Empties iOS's hand-off directory. See `ImportFilter.stagingDirectoryName` (#41).
+    ///
+    /// Synchronous on purpose — the only member here that does I/O without being `async`. Its
+    /// caller runs at `scenePhase == .background`, where an `async` hop is not merely slower: it
+    /// does not reliably run at all. Measured 2026-08-08: the app suspends before the continuation
+    /// is scheduled, and the work lands on the *next foreground* instead, which is exactly when an
+    /// `.onOpenURL` import may be in flight over the same directory.
+    var drainStagingDirectory: @Sendable () throws -> Void
     var documentsDirectory: @Sendable () -> URL = { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
 }
 
-extension FileManagerClient: DependencyKey {
-    static let liveValue: FileManagerClient = {
+extension FileManagerClient {
+    static let live: FileManagerClient = {
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
         @Sendable func stableAudioID(for url: URL) -> UUID {
@@ -82,12 +88,15 @@ extension FileManagerClient: DependencyKey {
 
                 let audioExtensions = ["mp3", "m4a", "wav", "aac", "flac", "aiff", "m4b", "mp4", "opus", "ogg"]
                 
+                // `Documents/Inbox` is iOS's hand-off queue, not a collection the user made — and
+                // it is not hidden, so `.skipsHiddenFiles` does not exclude it. Before #41 it
+                // surfaced on Home as a collection nobody created. (#41)
                 let contents = try FileManager.default.contentsOfDirectory(
                     at: targetPath,
                     includingPropertiesForKeys: [.isDirectoryKey, .creationDateKey, .fileSizeKey],
                     options: [.skipsHiddenFiles]
-                )
-                
+                ).filter { !ImportFilter.isStagingDirectory($0, under: documentsDirectory) }
+
                 return try await withThrowingTaskGroup(of: FileSystemItem?.self) { group in
                     for url in contents {
                         group.addTask {
@@ -152,29 +161,13 @@ extension FileManagerClient: DependencyKey {
             createCollection: { name, parentURL in
                 let targetPath = parentURL ?? documentsDirectory
 
-                var finalName = name
-                var newCollectionURL = targetPath.appendingPathComponent(finalName)
-                var counter = 2
-
-                while FileManager.default.fileExists(atPath: newCollectionURL.path) {
-                    finalName = "\(name) \(counter)"
-                    newCollectionURL = targetPath.appendingPathComponent(finalName)
-                    counter += 1
-                }
-
+                let newCollectionURL = UniqueNameResolver.resolve(baseName: name, in: targetPath)
                 try FileManager.default.createDirectory(at: newCollectionURL, withIntermediateDirectories: false)
             },
             createCollectionForImport: {
-                var newCollectionName = "New Collection"
-                var counter = 1
-                var proposedCollectionURL = documentsDirectory.appendingPathComponent(newCollectionName)
-
-                while FileManager.default.fileExists(atPath: proposedCollectionURL.path) {
-                    counter += 1
-                    newCollectionName = "New Collection \(counter)"
-                    proposedCollectionURL = documentsDirectory.appendingPathComponent(newCollectionName)
-                }
-
+                let proposedCollectionURL = UniqueNameResolver.resolve(
+                    baseName: "New Collection", in: documentsDirectory
+                )
                 try FileManager.default.createDirectory(at: proposedCollectionURL, withIntermediateDirectories: false)
                 return proposedCollectionURL
             },
@@ -182,21 +175,12 @@ extension FileManagerClient: DependencyKey {
                 try FileManager.default.removeItem(at: url)
             },
             moveItem: { from, toDirectory in
-                // toDirectory is the destination folder, we need to append the filename
-                let fileName = from.lastPathComponent
-                let destination = toDirectory.appendingPathComponent(fileName)
-
-                // Handle duplicate names
-                var finalDestination = destination
-                var counter = 2
-                let nameWithoutExtension = from.deletingPathExtension().lastPathComponent
-                let fileExtension = from.pathExtension
-
-                while FileManager.default.fileExists(atPath: finalDestination.path) {
-                    let newName = fileExtension.isEmpty ? "\(nameWithoutExtension) \(counter)" : "\(nameWithoutExtension) \(counter).\(fileExtension)"
-                    finalDestination = toDirectory.appendingPathComponent(newName)
-                    counter += 1
-                }
+                // toDirectory is the destination folder; the filename is appended, deduped
+                let finalDestination = UniqueNameResolver.resolve(
+                    baseName: from.deletingPathExtension().lastPathComponent,
+                    ext: from.pathExtension,
+                    in: toDirectory
+                )
 
                 try FileManager.default.moveItem(at: from, to: finalDestination)
             },
@@ -222,18 +206,34 @@ extension FileManagerClient: DependencyKey {
                 }
 
                 let fileName = sourceURL.lastPathComponent
-                var destinationURL = finalDestinationDirectory.appendingPathComponent(fileName)
 
-                // Handle duplicate names
-                var counter = 2
-                let nameWithoutExtension = sourceURL.deletingPathExtension().lastPathComponent
-                let fileExtension = sourceURL.pathExtension
-
-                while FileManager.default.fileExists(atPath: destinationURL.path) {
-                    let newName = fileExtension.isEmpty ? "\(nameWithoutExtension) \(counter)" : "\(nameWithoutExtension) \(counter).\(fileExtension)"
-                    destinationURL = finalDestinationDirectory.appendingPathComponent(newName)
-                    counter += 1
+                // **Already here? Then stop.** See `ImportDedupe` — the resolver below cannot
+                // answer this, because avoiding a collision is the opposite of noticing one.
+                let sourceSize = (try? FileManager.default.attributesOfItem(atPath: sourceURL.path))
+                    .flatMap { $0[.size] as? NSNumber }?.int64Value
+                if let sourceSize {
+                    let siblings = (try? FileManager.default.contentsOfDirectory(
+                        at: finalDestinationDirectory,
+                        includingPropertiesForKeys: [.fileSizeKey],
+                        options: [.skipsHiddenFiles]
+                    )) ?? []
+                    let existing = siblings.compactMap { url -> ImportDedupe.Existing? in
+                        guard let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
+                        else { return nil }
+                        return ImportDedupe.Existing(name: url.lastPathComponent, size: Int64(size))
+                    }
+                    if ImportDedupe.isAlreadyPresent(
+                        name: fileName, size: sourceSize, in: existing
+                    ) {
+                        return
+                    }
                 }
+
+                let destinationURL = UniqueNameResolver.resolve(
+                    baseName: sourceURL.deletingPathExtension().lastPathComponent,
+                    ext: sourceURL.pathExtension,
+                    in: finalDestinationDirectory
+                )
 
                 // Use Data read/write instead of copyItem to avoid corruption
                 do {
@@ -253,35 +253,21 @@ extension FileManagerClient: DependencyKey {
                 }
             },
             getMetadata: getMetadata,
+            // Deletes contents, not the directory: iOS owns `Inbox` and recreates it on the next
+            // hand-off, so removing it is a fight with the system for no gain. Everything in here
+            // is a copy iOS made — the user's original is wherever they keep it — which is what
+            // makes a delete the right operation and not a destructive one. (#41)
+            drainStagingDirectory: {
+                let staging = ImportFilter.stagingDirectory(under: documentsDirectory)
+                guard FileManager.default.fileExists(atPath: staging.path) else { return }
+                for item in try FileManager.default.contentsOfDirectory(
+                    at: staging, includingPropertiesForKeys: nil
+                ) {
+                    try FileManager.default.removeItem(at: item)
+                }
+            },
             documentsDirectory: { documentsDirectory }
         )
     }()
-
-    static let testValue = Self(
-        listItems: { _ in [] },
-        createCollection: { _, _ in },
-        createCollectionForImport: { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] },
-        deleteItem: { _ in },
-        moveItem: { _, _ in },
-        renameItem: { _, _ in },
-        importFile: { _, _ in },
-        getMetadata: { url in
-            AudioFile(
-                url: url,
-                title: "Test",
-                duration: 0,
-                fileSize: 0,
-                format: .mp3,
-                creationDate: Date()
-            )
-        },
-        documentsDirectory: { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
-    )
 }
 
-extension DependencyValues {
-    var fileManager: FileManagerClient {
-        get { self[FileManagerClient.self] }
-        set { self[FileManagerClient.self] = newValue }
-    }
-}

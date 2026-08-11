@@ -1,8 +1,6 @@
 import AVFoundation
-import ComposableArchitecture
 import Foundation
 
-@DependencyClient
 struct AudioRecorderClient {
     let checkPermissions: @Sendable () async -> Bool
     let requestPermissions: @Sendable () async -> Bool
@@ -11,10 +9,26 @@ struct AudioRecorderClient {
     let currentTime: @Sendable () async -> TimeInterval
     let peakPower: @Sendable () async -> Float
     let isRecording: @Sendable () async -> Bool
+    let pauseRecording: @Sendable () async -> Void
+    /// Whether the recorder took the file back. `AVAudioRecorder.record()` reports this, and a
+    /// resume that silently failed would leave a running clock over a dead file.
+    let resumeRecording: @Sendable () async -> Bool
+    /// Whether this hardware has an input gain to set at all — false on most built-in iPhone mics,
+    /// true for a fair number of USB and Lightning interfaces.
+    ///
+    /// Reported rather than assumed because the dial refuses the gain axis when the answer is no
+    /// (#75). A wheel that turns freely against hardware with no gain is exactly the control that
+    /// appears to work and does not.
+    let isInputGainSettable: @Sendable () async -> Bool
+    /// The gain the session is currently on, `0...1`. Read rather than assumed: it is a *system*
+    /// setting, so another app may have moved it since this one last looked.
+    let inputGain: @Sendable () async -> Float
+    /// `0...1`, clamped. Returns whether it took.
+    let setInputGain: @Sendable (Float) async -> Bool
 }
 
-extension AudioRecorderClient: DependencyKey {
-    static let liveValue: AudioRecorderClient = {
+extension AudioRecorderClient {
+    static let live: AudioRecorderClient = {
         let recorder = RecorderActor()
 
         return Self(
@@ -54,27 +68,34 @@ extension AudioRecorderClient: DependencyKey {
             },
             isRecording: {
                 await recorder.isRecording()
+            },
+            pauseRecording: {
+                await recorder.pauseRecording()
+            },
+            resumeRecording: {
+                await recorder.resumeRecording()
+            },
+            isInputGainSettable: {
+                AVAudioSession.sharedInstance().isInputGainSettable
+            },
+            inputGain: {
+                AVAudioSession.sharedInstance().inputGain
+            },
+            setInputGain: { gain in
+                let session = AVAudioSession.sharedInstance()
+                guard session.isInputGainSettable else { return false }
+                do {
+                    try session.setInputGain(min(max(0, gain), 1))
+                    return true
+                } catch {
+                    return false
+                }
             }
         )
     }()
 
-    static let testValue = Self(
-        checkPermissions: { true },
-        requestPermissions: { true },
-        startRecording: { _ in },
-        stopRecording: { nil },
-        currentTime: { 0 },
-        peakPower: { 0 },
-        isRecording: { false }
-    )
 }
 
-extension DependencyValues {
-    var audioRecorder: AudioRecorderClient {
-        get { self[AudioRecorderClient.self] }
-        set { self[AudioRecorderClient.self] = newValue }
-    }
-}
 
 // MARK: - Actor for Thread Safety
 
@@ -135,5 +156,15 @@ private actor RecorderActor {
 
     func isRecording() async -> Bool {
         audioRecorder?.isRecording ?? false
+    }
+
+    /// Pausing keeps the file open and the session active — only `stopRecording()` closes it, which
+    /// is what lets a resumed take continue into the same file rather than starting a second one.
+    func pauseRecording() async {
+        audioRecorder?.pause()
+    }
+
+    func resumeRecording() async -> Bool {
+        audioRecorder?.record() ?? false
     }
 }

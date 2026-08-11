@@ -1,0 +1,250 @@
+name: Distribute to TestFlight
+
+on:
+  push:
+    branches: [main]
+  # A push to main is the only thing that ships. This exists so the pipeline can be PROVEN
+  # without shipping — dry_run archives and exports but skips the upload. #30's "Done when"
+  # asks for one real run, and there was previously no way to have one.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Archive and export, but do not upload to TestFlight"
+        type: boolean
+        default: true
+
+concurrency:
+  group: testflight-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  distribute:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          # 16.2 was pinned here and CANNOT build this project. It exists on macos-15, so
+          # xcode-select succeeds and the failure surfaces later as an opaque SwiftPM manifest
+          # error. That was because ComposableArchitecture and swift-sharing declared
+          # swift-tools-version: 6.1, needing Swift 6.1 — Xcode 16.3 at minimum. #20 removed
+          # every package, so that specific failure is gone; 26.3 stays because it is the
+          # newest on macos-15 and the closest available to the local toolchain.
+          sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+          swift --version
+
+      - name: Assert the toolchain can build this project
+        run: |
+          # Fail here, with a reason, rather than minutes later inside the archive.
+          #
+          # **The floor is no longer a package constraint, and this no longer says it is.**
+          # ComposableArchitecture and swift-sharing declared swift-tools-version 6.1, so an older
+          # Xcode failed during resolution with an error that never mentioned Xcode. #20 removed
+          # every package. A guard that blames a dependency the project does not have sends whoever
+          # trips it looking for a Package.resolved that is not there.
+          SWIFT_VERSION=$(swift -version 2>&1 | grep -oE 'Swift version [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+' | head -1)
+          REQUIRED=6.1
+          if [ "$(printf '%s\n%s' "$REQUIRED" "$SWIFT_VERSION" | sort -V | head -1)" != "$REQUIRED" ]; then
+            echo "::error::Swift $SWIFT_VERSION is older than the $REQUIRED this project builds against."
+            echo "::error::Pick a newer Xcode in the Select Xcode step."
+            exit 1
+          fi
+          echo "Swift $SWIFT_VERSION satisfies the $REQUIRED floor."
+
+      - name: Assert the release notes belong to this release
+        run: |
+          # **The quiet failure this closes.** "Read What's New" below fell back to a placeholder
+          # when RELEASE_NOTES.md had no section for the version — a warning in a log nobody reads,
+          # and testers get "see the commit history". Failing the run costs a re-push; shipping
+          # filler costs the one thing a TestFlight build is for.
+          #
+          # It cannot check the harder case — a section that exists and describes a *different*
+          # release, which is what was sitting in this repo when the dial epic was ready to
+          # promote. Nothing automatic can. This checks the half that can be checked.
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" SonicPlayer/Info.plist)
+          if ! grep -qx "## $VERSION" RELEASE_NOTES.md; then
+            echo "::error::RELEASE_NOTES.md has no '## $VERSION' section."
+            echo "::error::Add one before bumping CFBundleShortVersionString — testers read it as What's New."
+            exit 1
+          fi
+          echo "Found the $VERSION section."
+
+      - name: Install signing certificate
+        env:
+          CERTIFICATE_P12: ${{ secrets.CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          # Create temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate
+          CERT_PATH=$RUNNER_TEMP/certificate.p12
+          echo -n "$CERTIFICATE_P12" | base64 --decode -o "$CERT_PATH"
+          security import "$CERT_PATH" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+      - name: Install provisioning profile
+        env:
+          PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE }}
+        run: |
+          PROFILE_PATH=$RUNNER_TEMP/profile.mobileprovision
+          echo -n "$PROVISIONING_PROFILE" | base64 --decode -o "$PROFILE_PATH"
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp "$PROFILE_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      # `Resolve packages` stood here and is gone with #20. `Package.resolved` pins zero packages,
+      # so the step resolved nothing — and a resolution step in a release pipeline is a standing
+      # claim that this project has dependencies to resolve.
+
+      - name: Archive
+        run: |
+          xcodebuild archive \
+            -project SonicPlayer.xcodeproj \
+            -scheme SonicPlayer \
+            -destination 'generic/platform=iOS' \
+            -archivePath $RUNNER_TEMP/SonicPlayer.xcarchive \
+            -configuration Release
+
+      - name: Write App Store Connect API key
+        env:
+          ASC_API_KEY: ${{ secrets.ASC_API_KEY }}
+        run: |
+          mkdir -p $RUNNER_TEMP/private_keys
+          echo -n "$ASC_API_KEY" | base64 --decode -o "$RUNNER_TEMP/private_keys/AuthKey_${{ secrets.ASC_API_KEY_ID }}.p8"
+
+      - name: Read What's New
+        run: |
+          # Previously derived from merge-commit bodies since the nearest tag. That produced PR
+          # titles ("give the five clients .live/.test independent of swift-dependencies") and
+          # the tag baseline was unreliable — this repo's newest tag is v1.1.1 while the app is
+          # at 2.3.0, so the range would have spanned four major versions. Notes now come from a
+          # file someone wrote for testers.
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" SonicPlayer/Info.plist)
+
+          NOTES=$(awk -v v="## $VERSION" '
+            $0 == v { grab = 1; next }
+            /^## / && grab { exit }
+            grab { print }
+          ' RELEASE_NOTES.md | sed '/^$/d')
+
+          if [ -z "$NOTES" ]; then
+            # Unreachable from the heading check above, which stops the run first. Kept for the one
+            # case it cannot see: a heading that exists with nothing underneath it.
+            echo "::error::The '## $VERSION' section in RELEASE_NOTES.md is empty."
+            exit 1
+          fi
+
+          echo "$NOTES" > $RUNNER_TEMP/whats_new.txt
+          echo "What's New for $VERSION:"
+          cat $RUNNER_TEMP/whats_new.txt
+
+      - name: Export and upload to TestFlight
+        if: ${{ github.event_name == 'push' || !inputs.dry_run }}
+        run: |
+          cat > $RUNNER_TEMP/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>${{ secrets.TEAM_ID }}</string>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>destination</key>
+            <string>upload</string>
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild -exportArchive \
+            -archivePath $RUNNER_TEMP/SonicPlayer.xcarchive \
+            -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist \
+            -exportPath $RUNNER_TEMP/Export \
+            -authenticationKeyPath "$RUNNER_TEMP/private_keys/AuthKey_${{ secrets.ASC_API_KEY_ID }}.p8" \
+            -authenticationKeyID ${{ secrets.ASC_API_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.ASC_API_ISSUER_ID }}
+
+      - name: Set What's New in TestFlight
+        if: ${{ github.event_name == 'push' || !inputs.dry_run }}
+        env:
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+        run: |
+          WHATS_NEW=$(cat $RUNNER_TEMP/whats_new.txt)
+          KEY_PATH="$RUNNER_TEMP/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
+
+          # Generate JWT
+          NOW=$(date +%s)
+          EXP=$((NOW + 1200))
+          HEADER=$(printf '{"alg":"ES256","kid":"%s","typ":"JWT"}' "$ASC_API_KEY_ID" | base64 | tr -d '=\n' | tr '/+' '_-')
+          PAYLOAD=$(printf '{"iss":"%s","exp":%d,"aud":"appstoreconnect-v1"}' "$ASC_API_ISSUER_ID" "$EXP" | base64 | tr -d '=\n' | tr '/+' '_-')
+          SIGNATURE=$(printf '%s.%s' "$HEADER" "$PAYLOAD" | openssl dgst -sha256 -sign "$KEY_PATH" | base64 | tr -d '=\n' | tr '/+' '_-')
+          JWT="$HEADER.$PAYLOAD.$SIGNATURE"
+
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" SonicPlayer/Info.plist)
+          BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" SonicPlayer/Info.plist)
+
+          # Wait for build to finish processing
+          echo "Waiting for build $VERSION ($BUILD) to finish processing..."
+          for i in $(seq 1 30); do
+            RESPONSE=$(curl -s -H "Authorization: Bearer $JWT" \
+              "https://api.appstoreconnect.apple.com/v1/builds?filter[version]=$BUILD&filter[preReleaseVersion.version]=$VERSION&filter[app]=com.hasan.sonicplayer")
+
+            STATUS=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data'][0]['attributes']['processingState'])" 2>/dev/null || echo "WAITING")
+
+            if [ "$STATUS" = "VALID" ]; then
+              BUILD_ID=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data'][0]['id'])")
+              echo "Build processed. ID: $BUILD_ID"
+              break
+            fi
+            echo "  Status: $STATUS — retrying in 30s ($i/30)"
+            sleep 30
+          done
+
+          if [ -z "${BUILD_ID:-}" ]; then
+            echo "Warning: Build not processed yet. Skipping What's New."
+            exit 0
+          fi
+
+          # Set What's New via beta build localizations
+          WHATS_NEW_JSON=$(echo "$WHATS_NEW" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))')
+
+          LOC_RESPONSE=$(curl -s -H "Authorization: Bearer $JWT" \
+            "https://api.appstoreconnect.apple.com/v1/builds/$BUILD_ID/betaBuildLocalizations")
+
+          LOC_ID=$(echo "$LOC_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data'][0]['id'])" 2>/dev/null || echo "")
+
+          if [ -n "$LOC_ID" ]; then
+            curl -s -X PATCH -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" \
+              "https://api.appstoreconnect.apple.com/v1/betaBuildLocalizations/$LOC_ID" \
+              -d "{\"data\":{\"type\":\"betaBuildLocalizations\",\"id\":\"$LOC_ID\",\"attributes\":{\"whatsNew\":$WHATS_NEW_JSON}}}"
+          else
+            curl -s -X POST -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" \
+              "https://api.appstoreconnect.apple.com/v1/betaBuildLocalizations" \
+              -d "{\"data\":{\"type\":\"betaBuildLocalizations\",\"attributes\":{\"locale\":\"en-US\",\"whatsNew\":$WHATS_NEW_JSON},\"relationships\":{\"build\":{\"data\":{\"type\":\"builds\",\"id\":\"$BUILD_ID\"}}}}}"
+          fi
+
+          echo "What's New set for build $VERSION ($BUILD)"
+
+      - name: Report dry run
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          echo "Dry run: archived and validated, nothing uploaded."
+          echo "Re-run with dry_run unchecked, or push to main, to ship."
+
+      - name: Clean up keychain
+        if: always()
+        run: security delete-keychain $RUNNER_TEMP/app-signing.keychain-db 2>/dev/null || true
