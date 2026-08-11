@@ -51,6 +51,12 @@ enum DialIcon {
         // off the rows, not off the button. Which order is current is in the accessibility label,
         // and the fill says it is not the default.
         case .sort: "arrow.up.arrow.down"
+        // `a.circle` and `z.circle` are the one pair that stays legible at the ten points a
+        // direction mark is drawn at; the two `textformat.abc` variants are indistinguishable there.
+        case .sortNewest: "clock"
+        case .sortOldest: "clock.arrow.circlepath"
+        case .sortAZ: "a.circle"
+        case .sortZA: "z.circle"
         case .newFolder: "folder.badge.plus"
         case .move: "folder"
         case .none: nil

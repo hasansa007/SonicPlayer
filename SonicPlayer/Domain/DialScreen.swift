@@ -273,6 +273,13 @@ struct DialScreen: Equatable {
         case back
         case settings
         case sort
+        // The four orders, as the stick's four ways out. Named for the order rather than for the
+        // glyph, like every other role here — `a.circle` and `z.circle` happen to be the clearest
+        // pair at ten points, and that is the view's judgement to revise.
+        case sortNewest
+        case sortOldest
+        case sortAZ
+        case sortZA
         case newFolder
         case move
         case none

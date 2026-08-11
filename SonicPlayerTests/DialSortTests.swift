@@ -34,10 +34,16 @@ struct DialSortTests {
         #expect(titles(navigator) == ["Gamma", "Alpha", "Beta"], "LibraryTree already orders these")
     }
 
-    @Test func oneChipCyclesThroughAllThreeAndBack() {
+    /// **The press still cycles, and it is the finger's gesture.** A tap on the chip has one thing
+    /// it can do; the stick has four and picks an order outright. Both exist and neither is a
+    /// fallback for the other — which is rule 3, applied to a control with two shapes.
+    @Test func oneChipCyclesThroughEveryOrderAndBack() {
         var navigator = Self.inLibrary(["Gamma", "Alpha", "Beta"])
 
         #expect(navigator.receive(.action("sort")) == [.feedback(.commit)])
+        #expect(titles(navigator) == ["Beta", "Alpha", "Gamma"], "oldest is newest reversed")
+
+        _ = navigator.receive(.action("sort"))
         #expect(titles(navigator) == ["Alpha", "Beta", "Gamma"])
 
         _ = navigator.receive(.action("sort"))
@@ -47,12 +53,57 @@ struct DialSortTests {
         #expect(titles(navigator) == ["Gamma", "Alpha", "Beta"], "and round to the host's order")
     }
 
+    // MARK: - The stick picks an order rather than stepping to it
+
+    /// **Four values and four ways out of the hub.** Cycling is what you reach for when a control
+    /// has one gesture; resting on the Sort chip leaves the stick idle, because the library's other
+    /// nudges act on a highlighted file and there is no file under the highlight on a chip.
+    @Test func theStickOffersEveryOrderWhileTheWheelRestsOnSort() {
+        var navigator = Self.inLibrary(["Gamma", "Alpha", "Beta"])
+        _ = navigator.receive(.tick(6))                     // three files, then Record, Import, New folder, Sort
+
+        #expect(navigator.highlightedChipID == "sort")
+        let directions = navigator.screen.ring.directions
+        #expect(directions?.up?.id == DialSort.newest.actionID)
+        #expect(directions?.down?.id == DialSort.oldest.actionID)
+        #expect(directions?.left?.id == DialSort.nameAscending.actionID)
+        #expect(directions?.right?.id == DialSort.nameDescending.actionID)
+        #expect(directions?.left?.label == "A–Z", "two words at most — it is drawn, not only spoken")
+    }
+
+    /// **One push, one order** — not one step along a cycle towards it.
+    @Test func aNudgeChoosesItsOrderOutright() {
+        var navigator = Self.inLibrary(["Gamma", "Alpha", "Beta"])
+
+        #expect(navigator.receive(.action(DialSort.nameDescending.actionID)) == [.feedback(.commit)])
+
+        #expect(titles(navigator) == ["Gamma", "Beta", "Alpha"], "reached in one, not in two")
+        #expect(navigator.level.sort == .nameDescending)
+    }
+
+    /// Asking for the order it is already in is a **limit**, not a silent no-op: a real push against
+    /// a real control that would not move is what `.limit` means everywhere else in the navigator.
+    @Test func pushingTowardsTheOrderItIsAlreadyInIsALimit() {
+        var navigator = Self.inLibrary(["Gamma", "Alpha", "Beta"])
+
+        #expect(navigator.receive(.action(DialSort.newest.actionID)) == [.feedback(.limit)])
+        #expect(navigator.level.sort == .newest)
+    }
+
+    /// The four ids mean the same thing on every list, so they are answered before the route table
+    /// rather than by a case per screen — and refused where there is no list to order.
+    @Test func aSortNudgeIsRefusedWhereThereIsNothingToOrder() {
+        var navigator = DialSample.whileEditing()
+
+        #expect(navigator.receive(.action(DialSort.nameAscending.actionID)) == [.feedback(.limit)])
+    }
+
     /// **The reason this exists.** Plain `<` puts `Lecture 10` before `Lecture 2`, which is the
     /// wrong answer for exactly the library that most wants sorting — a numbered series.
     @Test func digitsCompareAsNumbersNotAsText() {
         var navigator = Self.inLibrary(["Lecture 10", "Lecture 2", "Lecture 1"])
 
-        _ = navigator.receive(.action("sort"))
+        _ = navigator.receive(.action(DialSort.nameAscending.actionID))
 
         #expect(titles(navigator) == ["Lecture 1", "Lecture 2", "Lecture 10"])
     }
@@ -66,10 +117,10 @@ struct DialSortTests {
         )
         var navigator = DialNavigator(content: content, root: .recordings)
 
-        _ = navigator.receive(.action("sort"))
+        _ = navigator.receive(.action(DialSort.nameAscending.actionID))
         #expect(titles(navigator) == ["Middle", "Apple", "Zebra"])
 
-        _ = navigator.receive(.action("sort"))
+        _ = navigator.receive(.action(DialSort.nameDescending.actionID))
         #expect(titles(navigator) == ["Middle", "Zebra", "Apple"], "still first, going the other way")
     }
 
@@ -87,14 +138,14 @@ struct DialSortTests {
             ])
         ]
         var navigator = DialNavigator(content: content, root: .recordings)
-        _ = navigator.receive(.action("sort"))      // A–Z at the root
+        _ = navigator.receive(.action(DialSort.nameAscending.actionID))      // A–Z at the root
 
         _ = navigator.receive(.press)               // into the folder
 
         #expect(titles(navigator) == ["Beta", "Alpha"], "the order it was handed over in")
         #expect(navigator.level.sort == .newest)
 
-        _ = navigator.receive(.action("sort"))
+        _ = navigator.receive(.action(DialSort.nameAscending.actionID))
         #expect(titles(navigator) == ["Alpha", "Beta"], "and it sorts on its own")
     }
 
@@ -108,7 +159,7 @@ struct DialSortTests {
             DialContent.Item(id: "rec-a", title: "Apple", duration: 60)
         ]
         var navigator = DialNavigator(content: content, root: .recordings)
-        _ = navigator.receive(.action("sort"))      // A–Z
+        _ = navigator.receive(.action(DialSort.nameAscending.actionID))      // A–Z
         _ = navigator.receive(.press)               // into the folder
 
         _ = navigator.receive(.action("back"))
@@ -121,7 +172,7 @@ struct DialSortTests {
     /// rows are drawn from.
     @Test func pressingAfterSortingOpensTheRowYouCanSee() {
         var navigator = Self.inLibrary(["Gamma", "Alpha", "Beta"])
-        _ = navigator.receive(.action("sort"))      // Alpha, Beta, Gamma
+        _ = navigator.receive(.action(DialSort.nameAscending.actionID))      // Alpha, Beta, Gamma
 
         _ = navigator.receive(.tick(2))             // Gamma, now last
 
@@ -143,7 +194,7 @@ struct DialSortTests {
         #expect(byDefault?.label == "Newest first")
         #expect(byDefault?.emphasis == .plain)
 
-        _ = navigator.receive(.action("sort"))
+        _ = navigator.receive(.action(DialSort.nameAscending.actionID))
 
         let sorted = navigator.screen.actions.first { $0.id == "sort" }
         #expect(sorted?.label == "Sorted A to Z")

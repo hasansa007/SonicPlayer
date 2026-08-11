@@ -545,6 +545,14 @@ struct DialNavigator {
     /// the breadcrumb above it is itself a way back. What that costs is one universal id; what it
     /// buys is that no screen can become a trap.
     private mutating func perform(_ id: String) -> [DialEffect] {
+        // **The stick's four orders, answered before the route table.** They are only offered while
+        // the wheel rests on the Sort chip, and they mean the same thing on every list — so a case
+        // per route would be the same line written twice and a third time for the next list screen.
+        if let sort = DialSort.from(actionID: id) {
+            guard isFileList else { return [.feedback(.limit)] }
+            return applySort(sort)
+        }
+
         if id == "back" {
             guard stack.count > 1 else { return [.feedback(.limit)] }
             // **Back leaves, and asks nothing.** It used to open a Save-or-Discard gate, which made
@@ -576,10 +584,7 @@ struct DialNavigator {
         // reordering can move the row it was on past the end — and it deliberately does *not*
         // follow that row: you sorted to read the list from the top, not to keep your place in it.
         case (.recordings, "sort"), (.folder, "sort"):
-            guard currentItems.count > 1 else { return [.feedback(.limit)] }
-            stack[stack.count - 1].sort = level.sort.next
-            clampHighlight(atDepth: stack.count - 1)
-            return [.feedback(.commit)]
+            return applySort(level.sort.next)
         // **Editing is a nudge again, and it releases the player rather than merely pausing it.**
         // The mode used to let go on entry, which is what made trimming safe: the editor rewrites
         // the file, and a player still holding it holds a stale duration and position. With no
@@ -687,6 +692,30 @@ struct DialNavigator {
 
         default:
             return []
+        }
+    }
+
+    /// **Reorders and stays put**, like the settings rows: the thing that just changed is the list
+    /// you are looking at, so going anywhere would hide it.
+    ///
+    /// The highlight is re-clamped because reordering can move the row it was on past the end — and
+    /// it deliberately does *not* follow that row: you sorted to read the list from the top, not to
+    /// keep your place in it.
+    ///
+    /// Asking for the order it is already in is a limit, not a silent no-op. It is a real push
+    /// against a real control that would not move, which is exactly what `.limit` means.
+    private mutating func applySort(_ sort: DialSort) -> [DialEffect] {
+        guard currentItems.count > 1, sort != level.sort else { return [.feedback(.limit)] }
+        stack[stack.count - 1].sort = sort
+        clampHighlight(atDepth: stack.count - 1)
+        return [.feedback(.commit)]
+    }
+
+    /// Whether this screen lists files, which is the library root and every folder under it.
+    private var isFileList: Bool {
+        switch route {
+        case .recordings, .folder: true
+        default: false
         }
     }
 

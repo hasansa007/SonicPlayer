@@ -496,6 +496,18 @@ extension DialNavigator {
             return nil
 
         case .recordings, .folder:
+            // **Resting on Sort re-arms the stick.** The four nudges below act on the highlighted
+            // *file*, and on a chip there is no file — so the stick was idle at exactly the stop
+            // where a choice between four values was being made one press at a time. Each order is
+            // a push now, and the press still cycles for a finger, which has only the one gesture.
+            if highlightedChipID == "sort" {
+                return DialScreen.Directions(
+                    up: sortNudge(.newest),
+                    down: sortNudge(.oldest),
+                    left: sortNudge(.nameAscending),
+                    right: sortNudge(.nameDescending)
+                )
+            }
             guard let item = highlightedLibraryItem else { return nil }
 
             // **A folder answers two of the four.** Share takes a file URL and adding a folder to a
@@ -523,6 +535,13 @@ extension DialNavigator {
         default:
             return nil
         }
+    }
+
+    /// One order as a nudge. The order the list is already in is still offered — pushing back to
+    /// where you are is a no-op the navigator answers with a limit, which is a truer answer than
+    /// hiding one of the four and leaving the stick with a blank side.
+    private func sortNudge(_ sort: DialSort) -> DialScreen.Direction {
+        .init(id: sort.actionID, icon: sort.icon, label: sort.name)
     }
 
     /// The queue toggles, on the one screen that owns the queue.
