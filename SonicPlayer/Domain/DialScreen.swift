@@ -294,9 +294,19 @@ struct DialScreen: Equatable {
             case plain
             /// Filled — the one thing this screen most expects you to do.
             case primary
-            /// Currently active, e.g. the chosen wheel mode on Now Playing, or which trim handle
-            /// the wheel is nudging.
+            /// **The wheel is resting on this**, and nothing else means that.
+            ///
+            /// Exactly one chip per screen may carry it, because there is one cursor. It used to
+            /// mean "the wheel is here" *and* "this option is on", which are different facts that
+            /// happened to share a fill — and on the library they are both true of different chips
+            /// at once. A non-default Sort and the chip under the thumb were the same teal, so the
+            /// screen could not say which one a press would reach. See `active`.
             case selected
+            /// **This option is on**, and the wheel is somewhere else.
+            ///
+            /// Tinted rather than filled: it reports a state, where `selected` says where the one
+            /// button is pointing. A readout and a cursor must not be the same ink.
+            case active
             /// Starts something, or destroys something, that the user cannot casually undo —
             /// beginning a recording, deleting a file. Rendered in the warning colour rather than
             /// the accent, so "the one thing this screen expects" and "the one thing you cannot

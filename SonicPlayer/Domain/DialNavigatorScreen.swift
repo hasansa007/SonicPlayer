@@ -352,10 +352,12 @@ extension DialNavigator {
                 id: id,
                 label: level.sort.title,
                 icon: .sort,
-                // **Two things share this fill and they do not conflict.** A sort that is not the
-                // default is worth marking, and so is the wheel resting on it — either way the chip
-                // is the one to look at.
-                emphasis: isUnderTheWheel || level.sort != .newest ? .selected : .plain
+                // **They shared this fill and they did conflict.** The note here used to say either
+                // way the chip is the one to look at — which is true and is not the question. With
+                // the wheel resting on New folder and a non-default sort applied, two chips wore the
+                // same teal and the screen could not say which one the hub would press. The cursor
+                // keeps the fill; a state that is merely *on* is tinted.
+                emphasis: isUnderTheWheel ? .selected : (level.sort == .newest ? .plain : .active)
             )
 
         case "repeat":
@@ -366,7 +368,7 @@ extension DialNavigator {
                 // `repeat.1` is the one repeat state a bare `repeat` glyph cannot say, which is why
                 // the icon follows the mode rather than the emphasis carrying all three.
                 icon: transport.repeatMode == .one ? .repeatOne : .repeatAll,
-                emphasis: transport.repeatMode == .off ? .plain : .selected
+                emphasis: transport.repeatMode == .off ? .plain : .active
             )
 
         case "shuffle":
@@ -375,7 +377,7 @@ extension DialNavigator {
                 id: id,
                 label: "Shuffle",
                 icon: .shuffle,
-                emphasis: transport.isShuffled ? .selected : .plain
+                emphasis: transport.isShuffled ? .active : .plain
             )
 
         default:
@@ -639,6 +641,12 @@ extension DialNavigator {
         switch id {
         case "back": return "go back"
         case "settings": return "open settings"
+        // **A chip's name is not always a verb.** The fallback below lowercases the label, which
+        // gives "press to record" and "press to import" for free — and "press to new folder", which
+        // is not a sentence. The ones that need saying are said.
+        case "newFolder": return "make a folder"
+        case "record": return "start recording"
+        case "import": return "import from Files"
         case "sort": return "sort \(level.sort.next.hint)"
         case "repeat": return "change repeat"
         case "shuffle": return "toggle shuffle"

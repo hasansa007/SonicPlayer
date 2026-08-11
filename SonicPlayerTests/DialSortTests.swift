@@ -198,6 +198,33 @@ struct DialSortTests {
 
         let sorted = navigator.screen.actions.first { $0.id == "sort" }
         #expect(sorted?.label == "Sorted A to Z")
-        #expect(sorted?.emphasis == .selected, "the fill is what says it is not the default")
+        // **Tinted, not filled.** `.selected` is the wheel's cursor and nothing else may wear it:
+        // with the wheel on New folder and a non-default sort applied, two chips were the same teal
+        // and the screen could not say which one the hub would press.
+        #expect(sorted?.emphasis == .active, "on, and not where the wheel is")
+    }
+
+    /// And when the wheel *is* on it, the cursor wins — one chip per screen wears the fill.
+    @Test func theCursorOutranksTheAppliedOrderOnTheSameChip() {
+        var navigator = Self.inLibrary(["Gamma", "Alpha", "Beta"])
+        _ = navigator.receive(.action(DialSort.nameAscending.actionID))
+        _ = navigator.receive(.tick(6))                     // three files, then Record, Import, New folder, Sort
+
+        #expect(navigator.highlightedChipID == "sort")
+        #expect(navigator.screen.actions.first { $0.id == "sort" }?.emphasis == .selected)
+        #expect(
+            navigator.screen.actions.filter { $0.emphasis == .selected }.count == 1,
+            "there is one cursor"
+        )
+    }
+
+    /// The caption is built from the chip's label everywhere it can be, which reads as a verb for
+    /// Record and Import and as **"press to new folder"** for this one. A name is not always a verb.
+    @Test func theNewFolderChipsCaptionIsASentence() {
+        var navigator = Self.inLibrary(["Gamma", "Alpha", "Beta"])
+        _ = navigator.receive(.tick(5))                     // three files, then Record, Import, New folder
+
+        #expect(navigator.highlightedChipID == "newFolder")
+        #expect(navigator.screen.hint == "press to make a folder · rotate for the list")
     }
 }
