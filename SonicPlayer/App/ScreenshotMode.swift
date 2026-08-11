@@ -31,14 +31,19 @@ enum ScreenshotMode {
     /// that cannot be shown is worse than a missing one: it produces an image, and the image is of
     /// something else.
     enum Screen: String {
-        /// The fork: Listen or Record.
-        case home
-        /// The file list, in Listen mode.
+        /// The file list, which is the root — there is no screen above it.
+        ///
+        /// **`home` is gone rather than aliased to this.** It named the Listen-or-Record fork, and
+        /// the fork was deleted when the library became the root (#6). Kept as a synonym it would
+        /// have gone on producing an image of the library under a name that promises a chooser —
+        /// which is the exact defect the note above this enum records, preserved by kindness.
         case library
         case player
         case recording
-        /// The trim editor, reached the way Record mode reaches it.
+        /// The trim editor, on the highlighted recording.
         case edit
+        /// The settings list, reached by its chip the way every screen reaches it.
+        case settings
 
         // The player's three non-happy states (#6). They exist here because epic #6 requires every
         // screen to have designed empty, loading and error states — and a state nobody can put on
@@ -257,7 +262,7 @@ extension ScreenshotDemoData {
                 localized: "The file could not be read. It may have been moved or deleted."
             )
 
-        case .home, .library, .recording, .edit:
+        case .library, .recording, .edit, .settings:
             break
         }
     }
