@@ -9,7 +9,7 @@ refactors, dependency bumps and test work out.
 
 ---
 
-## 2.3.0
+## 3.0.0
 
 The app is one dial now. Everything is done with the wheel and its centre, and there are no other
 screens to learn.

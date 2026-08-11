@@ -4,7 +4,7 @@ A navigation aid, created on slice 1 of epic #6 (#47). `ARCHITECTURE.md` says *w
 shaped this way and wins on any conflict; this file says *where things are* and *what is not
 wired up*.
 
-**Version 2.3.0 (build 21) · iOS 18.0+ · zero third-party dependencies**
+**Version 3.0.0 (build 22) · iOS 18.0+ · zero third-party dependencies**
 
 ---
 
