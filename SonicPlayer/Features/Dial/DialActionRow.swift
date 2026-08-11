@@ -183,11 +183,30 @@ struct DialActionRow: View {
             .padding(.vertical, Spacing.sm)
             .foregroundColor(foreground(action.emphasis))
             .background(background(action.emphasis), in: Capsule())
+            // **An outline is what `.active` adds, not a darker ground.**
+            //
+            // Dropping `.plain` to `ControlTint.off` made room for a tinted `.active` and cost
+            // every ordinary chip half its surface: measured on the simulator, a plain capsule went
+            // from (6,15,17) to (2,8,9) against a black page — a control you have to look for.
+            // Nobody asked for that, and it is the whole row paying for one chip's state.
+            //
+            // So the ground is the same everywhere it was, and `.active` says so in accent ink and
+            // a hairline instead. Against `.selected`'s filled gradient that reads as outlined
+            // rather than filled, which is the distinction: a state is reported, a cursor is where
+            // you are.
+            .overlay(activeOutline(action.emphasis))
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(action.emphasis == .disabled)
         .accessibilityLabel(Self.spokenLabel(for: action.label))
         .accessibilityAddTraits(action.emphasis == .active ? [.isSelected] : [])
+    }
+
+    @ViewBuilder
+    private func activeOutline(_ emphasis: DialScreen.Action.Emphasis) -> some View {
+        if emphasis == .active {
+            Capsule().strokeBorder(Color.sonicPrimary, lineWidth: Sizing.hairlineTrackHeight / 2)
+        }
     }
 
     private func foreground(_ emphasis: DialScreen.Action.Emphasis) -> Color {
@@ -216,8 +235,7 @@ struct DialActionRow: View {
         // thing you cannot take back" must not be the same colour — `Record` and `Delete` are both
         // the obvious action on their screen, and only one is recoverable.
         case .destructive: AnyShapeStyle(Color.sonicOrange)
-        case .active: AnyShapeStyle(Color.sonicPrimary.opacity(ControlTint.on))
-        case .plain, .disabled: AnyShapeStyle(Color.sonicPrimary.opacity(ControlTint.off))
+        case .active, .plain, .disabled: AnyShapeStyle(Color.sonicPrimary.opacity(ControlTint.on))
         }
     }
 
