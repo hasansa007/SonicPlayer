@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   distribute:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 30
 
     steps:
@@ -32,13 +32,23 @@ jobs:
           # xcode-select succeeds and the failure surfaces later as an opaque SwiftPM manifest
           # error. That was because ComposableArchitecture and swift-sharing declared
           # swift-tools-version: 6.1, needing Swift 6.1 — Xcode 16.3 at minimum. #20 removed
-          # every package, so that specific failure is gone; 26.3 stays because it is the
-          # newest on macos-15 and the closest available to the local toolchain.
-          sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer
+          # every package, so that specific failure is gone.
+          #
+          # **26.3 replaced it and was in turn the reason 3.0.0 build 23 was thrown out.** The
+          # pin was justified as "newest on macos-15, closest to the local toolchain", and that
+          # was true and is exactly the trap: an Xcode old enough to be *rejected by the App
+          # Store* still builds, archives, signs and uploads without complaint. The rejection
+          # arrives afterwards as ITMS-90111, against a build number you can never reuse.
+          #
+          # The lesson is that this pin has two floors, not one. It must be new enough to compile
+          # the project, and new enough for Apple to accept the upload — and the second floor
+          # moves on Apple's schedule, not the project's. Both are asserted in the next step.
+          # macos-15 tops out at 26.3, so satisfying the second one meant moving the image too.
+          sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
           xcodebuild -version
           swift --version
 
-      - name: Assert the toolchain can build this project
+      - name: Assert the toolchain can build this project and ship it
         run: |
           # Fail here, with a reason, rather than minutes later inside the archive.
           #
@@ -55,6 +65,28 @@ jobs:
             exit 1
           fi
           echo "Swift $SWIFT_VERSION satisfies the $REQUIRED floor."
+
+          # **The second floor, and the only one that has actually rejected a release.** The check
+          # above asks whether the toolchain can compile this project. Apple asks a different
+          # question — whether the SDK is recent enough for the App Store to accept the upload at
+          # all — and answers it *after* the archive, the signing, the upload and the submission.
+          # 3.0.0 build 23 cleared every step of this pipeline on Xcode 26.3 and was then thrown
+          # out by automated validation with ITMS-90111, which costs a burnt build number and a
+          # round trip through App Store Connect to discover. This makes it cost ten seconds.
+          #
+          # **This number is not derived from anything in the repo — it tracks Apple.** Raise it
+          # when Apple raises the floor, which is announced at developer.apple.com/news/releases
+          # and is typically the newest stable Xcode. Bumping it may also require a newer
+          # `runs-on` image, because an image only carries so many Xcodes.
+          XCODE_VERSION=$(xcodebuild -version | head -1 | grep -oE '[0-9]+(\.[0-9]+)+')
+          REQUIRED_XCODE=26.6
+          if [ "$(printf '%s\n%s' "$REQUIRED_XCODE" "$XCODE_VERSION" | sort -V | head -1)" != "$REQUIRED_XCODE" ]; then
+            echo "::error::Xcode $XCODE_VERSION is below the $REQUIRED_XCODE the App Store currently accepts."
+            echo "::error::This builds and uploads fine, then fails validation with ITMS-90111 and burns the build number."
+            echo "::error::Raise it in the Select Xcode step — and the runs-on image, if that image has nothing newer."
+            exit 1
+          fi
+          echo "Xcode $XCODE_VERSION satisfies the $REQUIRED_XCODE App Store floor."
 
       - name: Assert the release notes belong to this release
         run: |

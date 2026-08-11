@@ -26,7 +26,12 @@ TCA shipped a macro and Xcode gates unapproved macros behind a GUI trust prompt 
 answer. No package means no macro, so the flag is gone (#20). If you see it in an older command it
 is harmless but pointless.
 
-Requires Xcode 27 — `xcode-select -p` must point at the Xcode app, not Command Line Tools.
+Requires **Xcode 26.6** — `xcode-select -p` must point at the Xcode app, not Command Line Tools.
+
+This said "Xcode 27" and no such release exists: 27 is at beta 5 as of August 2026, and the local
+toolchain is 26.6 (17F113). A requirement naming a version nobody can install reads as "you are on
+the wrong Xcode" to whoever checks. **26.6 is also the floor the App Store currently accepts** —
+see the Release section, where being below it is what got 3.0.0 build 23 rejected.
 
 No CocoaPods or Carthage. All dependencies managed via Swift Package Manager.
 
@@ -332,14 +337,25 @@ Before bumping `CFBundleShortVersionString` in `Info.plist`, add a matching sect
 `RELEASE_NOTES.md`. The workflow reads the section whose heading equals `## <version>` and ships it
 as What's New; with no matching section testers get a placeholder and a build warning.
 
-The runner pins **Xcode 26.3**, and the guard step asserts the toolchain can build the project.
+The runner is `macos-26` and pins **Xcode 26.6**. The guard step asserts **two** floors, and the
+distinction is the whole point of it: one that the toolchain can *compile* this project, and one
+that Apple will *accept the upload*.
 
-**The original reason for the pin is gone**: it was that `ComposableArchitecture` and
-`swift-sharing` declared `swift-tools-version: 6.1`, so anything below Xcode 16.3 failed during
-package resolution with an error that never mentioned Xcode. There are no packages now (#20), so
-that failure mode cannot occur. The pin stays because 26.3 is the newest available on `macos-15`
-and the closest to the local toolchain — not because of a package constraint. Do not re-derive the
-old reason from an older copy of this paragraph.
+**The Xcode pin has been wrong twice, for opposite reasons, and both are worth knowing.** First it
+was 16.2, too old to resolve `swift-tools-version: 6.1` packages — a real constraint that #20
+deleted along with the packages. It was then raised to 26.3 and justified as "newest on `macos-15`,
+closest to the local toolchain", which was accurate and still shipped a build Apple refused: 3.0.0
+build 23 archived, signed and uploaded cleanly and was rejected by automated validation with
+**ITMS-90111, unsupported SDK**.
+
+So the pin is not a free choice between versions that compile. **Apple sets a moving floor on the
+SDK, and an Xcode below it fails only after the upload**, against a build number that can never be
+reused. `macos-15` carries nothing above 26.3, which is why the image moved too. When Apple raises
+the floor again — watch `developer.apple.com/news/releases` — raise `REQUIRED_XCODE` in the guard,
+the `xcode-select` path, and the image if it has nothing newer.
+
+Do not re-derive the package-resolution reason, or the "newest available on the image" reason, from
+an older copy of this paragraph. The first is extinct and the second is what caused a rejection.
 
 To prove a pipeline change without shipping, run the workflow manually from the Actions tab with
 **dry_run** checked — it archives and exports but skips the upload.
