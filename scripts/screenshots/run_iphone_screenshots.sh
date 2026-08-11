@@ -7,7 +7,10 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # Configuration
 SCHEME="SonicPlayer"
 BUNDLE_ID="com.hasan.sonicplayer"
-DEVICE="${DEVICE:-iPhone 16 Pro Max}"
+# **Chosen for its native resolution, not its recency.** 1320x2868 is Apple's 6.9" size, so a
+# capture here needs no resize — see the note where the resize step used to be. The previous
+# default, iPhone 16 Pro Max, is also 1320x2868 but is not installed with Xcode 27.
+DEVICE="${DEVICE:-iPhone 17 Pro Max}"
 OUT_DIR="$PROJECT_DIR/artifacts/screenshots/iphone"
 DELAY="${SCREENSHOT_DELAY:-3}"
 
@@ -94,27 +97,30 @@ capture() {
 # Screenshot sequence
 # Dial routes, which is what the app has. `collections`, `editRecording` and
 # `homeWithMiniPlayer` named screens that stopped being reachable — they kept producing images,
-# of the dial, under the wrong filenames.
-capture "home"              "01_home.png"
-capture "library"           "02_library.png"
-capture "player"            "03_player.png"             1
-capture "recording"         "04_recording.png"          1
-capture "edit"              "05_edit.png"               1
+# of the dial, under the wrong filenames. `home` has now gone the same way: it named the
+# Listen-or-Record fork, and the library became the root.
+capture "library"           "01_library.png"
+capture "player"            "02_player.png"             1
+capture "recording"         "03_recording.png"          1
+capture "edit"              "04_edit.png"               1
+capture "settings"          "05_settings.png"
 
 # Terminate the app
 xcrun simctl terminate booted "$BUNDLE_ID" 2>/dev/null || true
 
-# Step 5: Resize to App Store 6.5-inch dimensions (1242 x 2688)
-echo ""
-echo "[5/5] Resizing screenshots to 6.5-inch (1242x2688)..."
-for img in "$OUT_DIR"/*.png; do
-    sips -z 2688 1242 "$img" --out "$img" >/dev/null 2>&1
-    echo "  Resized: $(basename "$img")"
-done
-
+# **There is no resize step, and its absence is the point.**
+#
+# This ended with `sips -z 2688 1242 "$img" --out "$img"`, which had three faults at once: it wrote
+# to the path it read, so the only copy was overwritten with no way back; 1242x2688 is the 6.5"
+# size, which stopped being Apple's primary; and `-z` forces exact dimensions, so every image was
+# stretched by the 0.4% its aspect ratio differed.
+#
+# The fix is not a better resize. $DEVICE is natively 1320x2868 — the 6.9" size — so a capture is
+# already an accepted asset and post-processing it can only make it worse. If the required size
+# ever changes, change the DEVICE, not the arithmetic.
 echo ""
 echo "=== iPhone screenshots complete ==="
-echo "Screenshots saved to: $OUT_DIR (1242x2688, 6.5-inch)"
+echo "Screenshots saved to: $OUT_DIR ($(sips -g pixelWidth -g pixelHeight "$OUT_DIR/01_library.png" | awk '/pixel/{printf "%s ", $2}')native, $DEVICE)"
 ls -la "$OUT_DIR"
 
 # Cleanup

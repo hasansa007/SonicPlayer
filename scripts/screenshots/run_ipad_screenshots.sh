@@ -92,12 +92,12 @@ capture() {
 }
 
 # Screenshot sequence
-# Dial routes — see the note in run_iphone_screenshots.sh.
-capture "home"              "ipad_01_home.png"
-capture "library"           "ipad_02_library.png"
-capture "player"            "ipad_03_player.png"             1
-capture "recording"         "ipad_04_recording.png"          1
-capture "edit"              "ipad_05_edit.png"               1
+# Dial routes — see the note in run_iphone_screenshots.sh, including why `home` is gone.
+capture "library"           "ipad_01_library.png"
+capture "player"            "ipad_02_player.png"             1
+capture "recording"         "ipad_03_recording.png"          1
+capture "edit"              "ipad_04_edit.png"               1
+capture "settings"          "ipad_05_settings.png"
 
 # Terminate the app
 xcrun simctl terminate booted "$BUNDLE_ID" 2>/dev/null || true
