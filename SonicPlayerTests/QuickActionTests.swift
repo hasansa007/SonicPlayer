@@ -43,12 +43,12 @@ struct QuickActionTests {
     // MARK: - The delegate hop
 
     @MainActor
-    @Test func test_theRecordShortcut_opensTheRecordingSheet() {
+    @Test func test_theRecordShortcut_opensTheDialsRecorder() {
         let app = makeApp()
 
         AppDelegate().handleShortcut(shortcut(.record), target: app)
 
-        #expect(app.isRecordingSheetPresented)
+        #expect(app.dial.screen.chrome.breadcrumb == ["LIBRARY", "RECORDING"])
         #expect(!app.isImportSheetPresented)
     }
 

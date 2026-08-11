@@ -6,80 +6,6 @@
 	objectVersion = 70;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		8629C2A72EEB94DF0052A74B /* ArtworkCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2A42EEB94DF0052A74B /* ArtworkCache.swift */; };
-		8629C2A82EEB94DF0052A74B /* ColorExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2A62EEB94DF0052A74B /* ColorExtractor.swift */; };
-		8629C2A92EEB94DF0052A74B /* AudioMetadataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2A52EEB94DF0052A74B /* AudioMetadataService.swift */; };
-		8629C2AB2EEBB9710052A74B /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2AA2EEBB9710052A74B /* Theme.swift */; };
-		8629C2AF2EEBBE9B0052A74B /* WaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8629C2AE2EEBBE9B0052A74B /* WaveformView.swift */; };
-		86662FE52EF7E7D7000577F1 /* EditRecordingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86662FE02EF7E7D7000577F1 /* EditRecordingView.swift */; };
-		86662FE62EF7E7D7000577F1 /* RecordingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86662FE22EF7E7D7000577F1 /* RecordingView.swift */; };
-		86662FEC2EF7EAC1000577F1 /* AudioRecorderClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86662FEA2EF7EAC1000577F1 /* AudioRecorderClient.swift */; };
-		86662FED2EF7EAC1000577F1 /* AudioTrimmerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86662FEB2EF7EAC1000577F1 /* AudioTrimmerClient.swift */; };
-		8690789B2EEC9F8D005620F9 /* ArtworkClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8690789A2EEC9F8D005620F9 /* ArtworkClient.swift */; };
-		8692B7E32EFC094200DFAF7C /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 8692B7E22EFC094200DFAF7C /* Localizable.xcstrings */; };
-		86A1B2042F1B3F0000A1BEEF /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A1B2032F1B3F0000A1BEEF /* ShareSheet.swift */; };
-		86A1B7012F1C500000A1BEEF /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A1B7002F1C500000A1BEEF /* EmptyStateView.swift */; };
-		A1000001000000000000001 /* SonicPlayerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000001 /* SonicPlayerApp.swift */; };
-		A1000005000000000000001 /* AppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000006000000000000001 /* AppView.swift */; };
-		A1000009000000000000001 /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010000000000000001 /* PlayerView.swift */; };
-		A1000010000000000000002 /* MiniPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010000000000000003 /* MiniPlayerView.swift */; };
-		A1000017000000000000001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000018000000000000001 /* SettingsView.swift */; };
-		A1000019000000000000001 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000020000000000000001 /* AboutView.swift */; };
-		A1000021000000000000001 /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000022000000000000001 /* HelpView.swift */; };
-		A1000023000000000000001 /* AudioPlayerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000024000000000000001 /* AudioPlayerClient.swift */; };
-		A1000025000000000000001 /* FileManagerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000026000000000000001 /* FileManagerClient.swift */; };
-		A1000027000000000000001 /* AudioFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000028000000000000001 /* AudioFile.swift */; };
-		A1000029000000000000001 /* PlaybackSpeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000030000000000000001 /* PlaybackSpeed.swift */; };
-		A1000030000000000000002 /* FileSystemItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000030000000000000003 /* FileSystemItem.swift */; };
-		A1000031000000000000001 /* ColorPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000032000000000000001 /* ColorPalette.swift */; };
-		A1000033000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000034000000000000001 /* Assets.xcassets */; };
-		A1000097000000000000001 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000096000000000000001 /* AppViewModel.swift */; };
-		A2000001000000000000001 /* CollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000002000000000000001 /* CollectionsView.swift */; };
-		A3000009000000000000001 /* CollectionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000010000000000000001 /* CollectionsSection.swift */; };
-		A4000009000000000000002 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4000010000000000000002 /* OnboardingView.swift */; };
-		A5000001000000000000001 /* ScreenshotMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5000002000000000000001 /* ScreenshotMode.swift */; };
-		A5000009000000000000001 /* AudioWaveformExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5000010000000000000001 /* AudioWaveformExtractor.swift */; };
-		A6000009000000000000001 /* SwipeToDelete.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6000010000000000000001 /* SwipeToDelete.swift */; };
-		A8000009000000000000001 /* InAppCollectionPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8000010000000000000001 /* InAppCollectionPicker.swift */; };
-		A8000099000000000000001 /* OpenInImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8000098000000000000001 /* OpenInImport.swift */; };
-		A9000001000000000000001 /* UniqueNameResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000010000000000000001 /* UniqueNameResolver.swift */; };
-		A9000002000000000000001 /* PathMatching.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000011000000000000001 /* PathMatching.swift */; };
-		A9000003000000000000001 /* QueueMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000012000000000000001 /* QueueMath.swift */; };
-		A9000004000000000000001 /* PlaybackSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000013000000000000001 /* PlaybackSession.swift */; };
-		A9000005000000000000001 /* SessionCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000014000000000000001 /* SessionCodec.swift */; };
-		A9000006000000000000001 /* SessionRestorePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000015000000000000001 /* SessionRestorePolicy.swift */; };
-		A9000007000000000000001 /* RecordingFilename.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000016000000000000001 /* RecordingFilename.swift */; };
-		A9000008000000000000001 /* ScrubClamp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000017000000000000001 /* ScrubClamp.swift */; };
-		A9000009000000000000001 /* SelectionSet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000018000000000000001 /* SelectionSet.swift */; };
-		A9000095000000000000001 /* QuickAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9000094000000000000001 /* QuickAction.swift */; };
-		AA000001000000000000001 /* SettingsDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000010000000000000001 /* SettingsDefaults.swift */; };
-		AA000002000000000000001 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000011000000000000001 /* SettingsViewModel.swift */; };
-		AA000003000000000000001 /* OnboardingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000012000000000000001 /* OnboardingViewModel.swift */; };
-		AB000001000000000000001 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000010000000000000001 /* SessionStore.swift */; };
-		AB000002000000000000001 /* PlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000011000000000000001 /* PlayerViewModel.swift */; };
-		AB000003000000000000001 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000012000000000000001 /* HomeViewModel.swift */; };
-		AB000020000000000000001 /* RecordingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000021000000000000001 /* RecordingViewModel.swift */; };
-		AB000022000000000000001 /* EditRecordingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000023000000000000001 /* EditRecordingViewModel.swift */; };
-		AB000030000000000000001 /* CollectionsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000031000000000000001 /* CollectionsViewModel.swift */; };
-		AB000032000000000000001 /* FolderImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000033000000000000001 /* FolderImport.swift */; };
-		AB000034000000000000001 /* ImportFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000035000000000000001 /* ImportFilter.swift */; };
-		AC000001000000000000001 /* SessionRestorePlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000010000000000000001 /* SessionRestorePlan.swift */; };
-		AC000002000000000000001 /* FileManaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000011000000000000001 /* FileManaging.swift */; };
-		AC000003000000000000001 /* PlaybackRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000012000000000000001 /* PlaybackRepository.swift */; };
-		AC000004000000000000001 /* AudioPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000013000000000000001 /* AudioPlaying.swift */; };
-		AC00000D000000000000001 /* CollectionLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC00001C000000000000001 /* CollectionLabel.swift */; };
-		AC00000E000000000000001 /* CollectionPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC00001D000000000000001 /* CollectionPalette.swift */; };
-		AC00000F000000000000001 /* SonicRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC00001E000000000000001 /* SonicRow.swift */; };
-		AC000005000000000000001 /* ScrubGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000014000000000000001 /* ScrubGeometry.swift */; };
-		AC000042000000000000001 /* LegacyLanguageOverride.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000043000000000000001 /* LegacyLanguageOverride.swift */; };
-		AC000006000000000000001 /* Tokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000015000000000000001 /* Tokens.swift */; };
-		AC000007000000000000001 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000016000000000000001 /* Typography.swift */; };
-		AC000008000000000000001 /* IconControlButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000017000000000000001 /* IconControlButton.swift */; };
-		AC000009000000000000001 /* ArtworkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000018000000000000001 /* ArtworkView.swift */; };
-		AC00000A000000000000001 /* SonicScrubber.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000019000000000000001 /* SonicScrubber.swift */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXContainerItemProxy section */
 		9FD073A530248C9F0007DEBD /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -91,85 +17,23 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		8629C2A42EEB94DF0052A74B /* ArtworkCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkCache.swift; sourceTree = "<group>"; };
-		8629C2A52EEB94DF0052A74B /* AudioMetadataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioMetadataService.swift; sourceTree = "<group>"; };
-		8629C2A62EEB94DF0052A74B /* ColorExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorExtractor.swift; sourceTree = "<group>"; };
-		8629C2AA2EEBB9710052A74B /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		8629C2AE2EEBBE9B0052A74B /* WaveformView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaveformView.swift; sourceTree = "<group>"; };
-		86662FE02EF7E7D7000577F1 /* EditRecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditRecordingView.swift; sourceTree = "<group>"; xcLanguageSpecificationIdentifier = xcode.lang.plist; };
-		86662FE22EF7E7D7000577F1 /* RecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingView.swift; sourceTree = "<group>"; };
-		86662FEA2EF7EAC1000577F1 /* AudioRecorderClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorderClient.swift; sourceTree = "<group>"; };
-		86662FEB2EF7EAC1000577F1 /* AudioTrimmerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioTrimmerClient.swift; sourceTree = "<group>"; };
-		8690789A2EEC9F8D005620F9 /* ArtworkClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkClient.swift; sourceTree = "<group>"; };
-		8692B7E22EFC094200DFAF7C /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
-		86A1B2032F1B3F0000A1BEEF /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
-		86A1B7002F1C500000A1BEEF /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		9FD073A130248C9F0007DEBD /* SonicPlayerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SonicPlayerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		A1000002000000000000001 /* SonicPlayerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonicPlayerApp.swift; sourceTree = "<group>"; };
-		A1000006000000000000001 /* AppView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppView.swift; sourceTree = "<group>"; };
-		A1000010000000000000001 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
-		A1000010000000000000003 /* MiniPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerView.swift; sourceTree = "<group>"; };
-		A1000018000000000000001 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		A1000020000000000000001 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
-		A1000022000000000000001 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
-		A1000024000000000000001 /* AudioPlayerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerClient.swift; sourceTree = "<group>"; };
-		A1000026000000000000001 /* FileManagerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileManagerClient.swift; sourceTree = "<group>"; };
-		A1000028000000000000001 /* AudioFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFile.swift; sourceTree = "<group>"; };
-		A1000030000000000000001 /* PlaybackSpeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackSpeed.swift; sourceTree = "<group>"; };
-		A1000030000000000000003 /* FileSystemItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileSystemItem.swift; sourceTree = "<group>"; };
-		A1000032000000000000001 /* ColorPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorPalette.swift; sourceTree = "<group>"; };
-		A1000034000000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1000037000000000000001 /* SonicPlayer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SonicPlayer.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A1000038000000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A1000039000000000000002 /* SonicPlayer.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SonicPlayer.entitlements; sourceTree = "<group>"; };
-		A1000096000000000000001 /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
-		A2000002000000000000001 /* CollectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsView.swift; sourceTree = "<group>"; };
-		A3000010000000000000001 /* CollectionsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsSection.swift; sourceTree = "<group>"; };
-		A4000010000000000000002 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
-		A5000002000000000000001 /* ScreenshotMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotMode.swift; sourceTree = "<group>"; };
-		A5000010000000000000001 /* AudioWaveformExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioWaveformExtractor.swift; sourceTree = "<group>"; };
-		A6000010000000000000001 /* SwipeToDelete.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeToDelete.swift; sourceTree = "<group>"; };
-		A8000010000000000000001 /* InAppCollectionPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InAppCollectionPicker.swift; sourceTree = "<group>"; };
-		A8000098000000000000001 /* OpenInImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenInImport.swift; sourceTree = "<group>"; };
-		A9000010000000000000001 /* UniqueNameResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UniqueNameResolver.swift; sourceTree = "<group>"; };
-		A9000011000000000000001 /* PathMatching.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathMatching.swift; sourceTree = "<group>"; };
-		A9000012000000000000001 /* QueueMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueMath.swift; sourceTree = "<group>"; };
-		A9000013000000000000001 /* PlaybackSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackSession.swift; sourceTree = "<group>"; };
-		A9000014000000000000001 /* SessionCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCodec.swift; sourceTree = "<group>"; };
-		A9000015000000000000001 /* SessionRestorePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRestorePolicy.swift; sourceTree = "<group>"; };
-		A9000016000000000000001 /* RecordingFilename.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingFilename.swift; sourceTree = "<group>"; };
-		A9000017000000000000001 /* ScrubClamp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrubClamp.swift; sourceTree = "<group>"; };
-		A9000018000000000000001 /* SelectionSet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionSet.swift; sourceTree = "<group>"; };
-		A9000094000000000000001 /* QuickAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickAction.swift; sourceTree = "<group>"; };
-		AA000010000000000000001 /* SettingsDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDefaults.swift; sourceTree = "<group>"; };
-		AA000011000000000000001 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
-		AA000012000000000000001 /* OnboardingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingViewModel.swift; sourceTree = "<group>"; };
-		AB000010000000000000001 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
-		AB000011000000000000001 /* PlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViewModel.swift; sourceTree = "<group>"; };
-		AB000012000000000000001 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
-		AB000021000000000000001 /* RecordingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingViewModel.swift; sourceTree = "<group>"; };
-		AB000023000000000000001 /* EditRecordingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditRecordingViewModel.swift; sourceTree = "<group>"; };
-		AB000031000000000000001 /* CollectionsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsViewModel.swift; sourceTree = "<group>"; };
-		AB000033000000000000001 /* FolderImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderImport.swift; sourceTree = "<group>"; };
-		AB000035000000000000001 /* ImportFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFilter.swift; sourceTree = "<group>"; };
-		AC000010000000000000001 /* SessionRestorePlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRestorePlan.swift; sourceTree = "<group>"; };
-		AC000011000000000000001 /* FileManaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileManaging.swift; sourceTree = "<group>"; };
-		AC000012000000000000001 /* PlaybackRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRepository.swift; sourceTree = "<group>"; };
-		AC000013000000000000001 /* AudioPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlaying.swift; sourceTree = "<group>"; };
-		AC00001C000000000000001 /* CollectionLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionLabel.swift; sourceTree = "<group>"; };
-		AC00001D000000000000001 /* CollectionPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionPalette.swift; sourceTree = "<group>"; };
-		AC00001E000000000000001 /* SonicRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonicRow.swift; sourceTree = "<group>"; };
-		AC000014000000000000001 /* ScrubGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrubGeometry.swift; sourceTree = "<group>"; };
-		AC000043000000000000001 /* LegacyLanguageOverride.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyLanguageOverride.swift; sourceTree = "<group>"; };
-		AC000015000000000000001 /* Tokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tokens.swift; sourceTree = "<group>"; };
-		AC000016000000000000001 /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
-		AC000017000000000000001 /* IconControlButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconControlButton.swift; sourceTree = "<group>"; };
-		AC000018000000000000001 /* ArtworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkView.swift; sourceTree = "<group>"; };
-		AC000019000000000000001 /* SonicScrubber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonicScrubber.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		AC000202000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A1000052000000000000001 /* SonicPlayer */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		9FD073A230248C9F0007DEBD /* SonicPlayerTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = SonicPlayerTests; sourceTree = "<group>"; };
+		AC000200000000000000001 /* SonicPlayer */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AC000202000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = SonicPlayer; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -190,49 +54,13 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		8629C23A2EEA25340052A74B /* Home */ = {
-			isa = PBXGroup;
-			children = (
-				AB000012000000000000001 /* HomeViewModel.swift */,
-			);
-			path = Home;
-			sourceTree = "<group>";
-		};
-		86662FE32EF7E7D7000577F1 /* Recording */ = {
-			isa = PBXGroup;
-			children = (
-				86662FE02EF7E7D7000577F1 /* EditRecordingView.swift */,
-				AB000021000000000000001 /* RecordingViewModel.swift */,
-				AB000023000000000000001 /* EditRecordingViewModel.swift */,
-				86662FE22EF7E7D7000577F1 /* RecordingView.swift */,
-			);
-			path = Recording;
-			sourceTree = "<group>";
-		};
 		A1000040000000000000001 = {
 			isa = PBXGroup;
 			children = (
-				A1000041000000000000001 /* SonicPlayer */,
+				AC000200000000000000001 /* SonicPlayer */,
 				9FD073A230248C9F0007DEBD /* SonicPlayerTests */,
 				A1000042000000000000001 /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		A1000041000000000000001 /* SonicPlayer */ = {
-			isa = PBXGroup;
-			children = (
-				A1000038000000000000001 /* Info.plist */,
-				A1000039000000000000002 /* SonicPlayer.entitlements */,
-				A1000043000000000000001 /* App */,
-				A1000044000000000000001 /* Features */,
-				A1000045000000000000001 /* Clients */,
-				A1000046000000000000001 /* Models */,
-				A9000020000000000000001 /* Domain */,
-				AC000030000000000000001 /* DesignSystem */,
-				A1000047000000000000001 /* Utilities */,
-				A1000048000000000000001 /* Resources */,
-			);
-			path = SonicPlayer;
 			sourceTree = "<group>";
 		};
 		A1000042000000000000001 /* Products */ = {
@@ -242,162 +70,6 @@
 				9FD073A130248C9F0007DEBD /* SonicPlayerTests.xctest */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		A1000043000000000000001 /* App */ = {
-			isa = PBXGroup;
-			children = (
-				A1000002000000000000001 /* SonicPlayerApp.swift */,
-				A1000006000000000000001 /* AppView.swift */,
-				A1000096000000000000001 /* AppViewModel.swift */,
-				AA000012000000000000001 /* OnboardingViewModel.swift */,
-				A4000010000000000000002 /* OnboardingView.swift */,
-				A3000010000000000000001 /* CollectionsSection.swift */,
-				A5000002000000000000001 /* ScreenshotMode.swift */,
-			);
-			path = App;
-			sourceTree = "<group>";
-		};
-		A1000044000000000000001 /* Features */ = {
-			isa = PBXGroup;
-			children = (
-				86662FE32EF7E7D7000577F1 /* Recording */,
-				A1000049000000000000001 /* Player */,
-				A1000050000000000000001 /* Files */,
-				A1000051000000000000001 /* Settings */,
-				8629C23A2EEA25340052A74B /* Home */,
-			);
-			path = Features;
-			sourceTree = "<group>";
-		};
-		A1000045000000000000001 /* Clients */ = {
-			isa = PBXGroup;
-			children = (
-				86662FEA2EF7EAC1000577F1 /* AudioRecorderClient.swift */,
-				86662FEB2EF7EAC1000577F1 /* AudioTrimmerClient.swift */,
-				8690789A2EEC9F8D005620F9 /* ArtworkClient.swift */,
-				A1000024000000000000001 /* AudioPlayerClient.swift */,
-				A1000026000000000000001 /* FileManagerClient.swift */,
-				AC000011000000000000001 /* FileManaging.swift */,
-				AC000013000000000000001 /* AudioPlaying.swift */,
-			);
-			path = Clients;
-			sourceTree = "<group>";
-		};
-		A1000046000000000000001 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				A1000028000000000000001 /* AudioFile.swift */,
-				A1000030000000000000001 /* PlaybackSpeed.swift */,
-				A1000030000000000000003 /* FileSystemItem.swift */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
-		AC000031000000000000001 /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				AC000017000000000000001 /* IconControlButton.swift */,
-				AC000018000000000000001 /* ArtworkView.swift */,
-				AC000019000000000000001 /* SonicScrubber.swift */,
-				AC00001E000000000000001 /* SonicRow.swift */,
-			);
-			path = Components;
-			sourceTree = "<group>";
-		};
-		AC000030000000000000001 /* DesignSystem */ = {
-			isa = PBXGroup;
-			children = (
-				AC000031000000000000001 /* Components */,
-				AC000015000000000000001 /* Tokens.swift */,
-				AC000016000000000000001 /* Typography.swift */,
-			);
-			path = DesignSystem;
-			sourceTree = "<group>";
-		};
-		A1000047000000000000001 /* Utilities */ = {
-			isa = PBXGroup;
-			children = (
-				86A1B2032F1B3F0000A1BEEF /* ShareSheet.swift */,
-				86A1B7002F1C500000A1BEEF /* EmptyStateView.swift */,
-				8629C2AE2EEBBE9B0052A74B /* WaveformView.swift */,
-				A6000010000000000000001 /* SwipeToDelete.swift */,
-				A5000010000000000000001 /* AudioWaveformExtractor.swift */,
-				8629C2AA2EEBB9710052A74B /* Theme.swift */,
-				8629C2A42EEB94DF0052A74B /* ArtworkCache.swift */,
-				8629C2A52EEB94DF0052A74B /* AudioMetadataService.swift */,
-				8629C2A62EEB94DF0052A74B /* ColorExtractor.swift */,
-				A1000032000000000000001 /* ColorPalette.swift */,
-			);
-			path = Utilities;
-			sourceTree = "<group>";
-		};
-		A1000048000000000000001 /* Resources */ = {
-			isa = PBXGroup;
-			children = (
-				8692B7E22EFC094200DFAF7C /* Localizable.xcstrings */,
-				A1000034000000000000001 /* Assets.xcassets */,
-			);
-			path = Resources;
-			sourceTree = "<group>";
-		};
-		A1000049000000000000001 /* Player */ = {
-			isa = PBXGroup;
-			children = (
-				AB000011000000000000001 /* PlayerViewModel.swift */,
-				AC000012000000000000001 /* PlaybackRepository.swift */,
-				A1000010000000000000001 /* PlayerView.swift */,
-				A1000010000000000000003 /* MiniPlayerView.swift */,
-			);
-			path = Player;
-			sourceTree = "<group>";
-		};
-		A1000050000000000000001 /* Files */ = {
-			isa = PBXGroup;
-			children = (
-				A8000010000000000000001 /* InAppCollectionPicker.swift */,
-				A8000098000000000000001 /* OpenInImport.swift */,
-				AB000031000000000000001 /* CollectionsViewModel.swift */,
-				AB000033000000000000001 /* FolderImport.swift */,
-				A2000002000000000000001 /* CollectionsView.swift */,
-			);
-			path = Files;
-			sourceTree = "<group>";
-		};
-		A1000051000000000000001 /* Settings */ = {
-			isa = PBXGroup;
-			children = (
-				A1000020000000000000001 /* AboutView.swift */,
-				A1000022000000000000001 /* HelpView.swift */,
-				A1000018000000000000001 /* SettingsView.swift */,
-				AA000011000000000000001 /* SettingsViewModel.swift */,
-				AA000010000000000000001 /* SettingsDefaults.swift */,
-			);
-			path = Settings;
-			sourceTree = "<group>";
-		};
-		A9000020000000000000001 /* Domain */ = {
-			isa = PBXGroup;
-			children = (
-				A9000010000000000000001 /* UniqueNameResolver.swift */,
-				AB000010000000000000001 /* SessionStore.swift */,
-				A9000016000000000000001 /* RecordingFilename.swift */,
-				A9000015000000000000001 /* SessionRestorePolicy.swift */,
-				AC000010000000000000001 /* SessionRestorePlan.swift */,
-				AC000014000000000000001 /* ScrubGeometry.swift */,
-				AC000043000000000000001 /* LegacyLanguageOverride.swift */,
-				AC00001C000000000000001 /* CollectionLabel.swift */,
-				AC00001D000000000000001 /* CollectionPalette.swift */,
-				A9000014000000000000001 /* SessionCodec.swift */,
-				A9000013000000000000001 /* PlaybackSession.swift */,
-				A9000012000000000000001 /* QueueMath.swift */,
-				AB000035000000000000001 /* ImportFilter.swift */,
-				A9000011000000000000001 /* PathMatching.swift */,
-				A9000017000000000000001 /* ScrubClamp.swift */,
-				A9000018000000000000001 /* SelectionSet.swift */,
-				A9000094000000000000001 /* QuickAction.swift */,
-			);
-			path = Domain;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -437,6 +109,9 @@
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AC000200000000000000001 /* SonicPlayer */,
 			);
 			name = SonicPlayer;
 			packageProductDependencies = (
@@ -505,8 +180,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A1000033000000000000001 /* Assets.xcassets in Resources */,
-				8692B7E32EFC094200DFAF7C /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -524,75 +197,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				8629C2AB2EEBB9710052A74B /* Theme.swift in Sources */,
-				A1000001000000000000001 /* SonicPlayerApp.swift in Sources */,
-				A1000005000000000000001 /* AppView.swift in Sources */,
-				A1000097000000000000001 /* AppViewModel.swift in Sources */,
-				A4000009000000000000002 /* OnboardingView.swift in Sources */,
-				A3000009000000000000001 /* CollectionsSection.swift in Sources */,
-				A5000001000000000000001 /* ScreenshotMode.swift in Sources */,
-				A1000009000000000000001 /* PlayerView.swift in Sources */,
-				A1000010000000000000002 /* MiniPlayerView.swift in Sources */,
-				A8000009000000000000001 /* InAppCollectionPicker.swift in Sources */,
-				A8000099000000000000001 /* OpenInImport.swift in Sources */,
-				AB000030000000000000001 /* CollectionsViewModel.swift in Sources */,
-				AB000032000000000000001 /* FolderImport.swift in Sources */,
-				A2000001000000000000001 /* CollectionsView.swift in Sources */,
-				A1000019000000000000001 /* AboutView.swift in Sources */,
-				A1000021000000000000001 /* HelpView.swift in Sources */,
-				A1000017000000000000001 /* SettingsView.swift in Sources */,
-				A1000023000000000000001 /* AudioPlayerClient.swift in Sources */,
-				8629C2A72EEB94DF0052A74B /* ArtworkCache.swift in Sources */,
-				8629C2A82EEB94DF0052A74B /* ColorExtractor.swift in Sources */,
-				8629C2A92EEB94DF0052A74B /* AudioMetadataService.swift in Sources */,
-				86A1B2042F1B3F0000A1BEEF /* ShareSheet.swift in Sources */,
-				86A1B7012F1C500000A1BEEF /* EmptyStateView.swift in Sources */,
-				A1000025000000000000001 /* FileManagerClient.swift in Sources */,
-				8629C2AF2EEBBE9B0052A74B /* WaveformView.swift in Sources */,
-				A6000009000000000000001 /* SwipeToDelete.swift in Sources */,
-				A5000009000000000000001 /* AudioWaveformExtractor.swift in Sources */,
-				AB000020000000000000001 /* RecordingViewModel.swift in Sources */,
-				AB000022000000000000001 /* EditRecordingViewModel.swift in Sources */,
-				86662FE52EF7E7D7000577F1 /* EditRecordingView.swift in Sources */,
-				86662FE62EF7E7D7000577F1 /* RecordingView.swift in Sources */,
-				A1000027000000000000001 /* AudioFile.swift in Sources */,
-				A1000029000000000000001 /* PlaybackSpeed.swift in Sources */,
-				A1000030000000000000002 /* FileSystemItem.swift in Sources */,
-				A1000031000000000000001 /* ColorPalette.swift in Sources */,
-				AB000003000000000000001 /* HomeViewModel.swift in Sources */,
-				AB000002000000000000001 /* PlayerViewModel.swift in Sources */,
-				AB000001000000000000001 /* SessionStore.swift in Sources */,
-				AA000003000000000000001 /* OnboardingViewModel.swift in Sources */,
-				AA000002000000000000001 /* SettingsViewModel.swift in Sources */,
-				AA000001000000000000001 /* SettingsDefaults.swift in Sources */,
-				A9000001000000000000001 /* UniqueNameResolver.swift in Sources */,
-				A9000007000000000000001 /* RecordingFilename.swift in Sources */,
-				A9000006000000000000001 /* SessionRestorePolicy.swift in Sources */,
-				AC000001000000000000001 /* SessionRestorePlan.swift in Sources */,
-				AC000002000000000000001 /* FileManaging.swift in Sources */,
-				AC000003000000000000001 /* PlaybackRepository.swift in Sources */,
-				AC000004000000000000001 /* AudioPlaying.swift in Sources */,
-				AC00000D000000000000001 /* CollectionLabel.swift in Sources */,
-				AC00000E000000000000001 /* CollectionPalette.swift in Sources */,
-				AC00000F000000000000001 /* SonicRow.swift in Sources */,
-				AC000005000000000000001 /* ScrubGeometry.swift in Sources */,
-				AC000042000000000000001 /* LegacyLanguageOverride.swift in Sources */,
-				AC000006000000000000001 /* Tokens.swift in Sources */,
-				AC000007000000000000001 /* Typography.swift in Sources */,
-				AC000008000000000000001 /* IconControlButton.swift in Sources */,
-				AC000009000000000000001 /* ArtworkView.swift in Sources */,
-				AC00000A000000000000001 /* SonicScrubber.swift in Sources */,
-				A9000005000000000000001 /* SessionCodec.swift in Sources */,
-				A9000004000000000000001 /* PlaybackSession.swift in Sources */,
-				A9000003000000000000001 /* QueueMath.swift in Sources */,
-				AB000034000000000000001 /* ImportFilter.swift in Sources */,
-				A9000002000000000000001 /* PathMatching.swift in Sources */,
-				A9000008000000000000001 /* ScrubClamp.swift in Sources */,
-				A9000009000000000000001 /* SelectionSet.swift in Sources */,
-				A9000095000000000000001 /* QuickAction.swift in Sources */,
-				86662FEC2EF7EAC1000577F1 /* AudioRecorderClient.swift in Sources */,
-				86662FED2EF7EAC1000577F1 /* AudioTrimmerClient.swift in Sources */,
-				8690789B2EEC9F8D005620F9 /* ArtworkClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

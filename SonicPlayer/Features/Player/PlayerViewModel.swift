@@ -43,6 +43,8 @@ final class PlayerViewModel {
     var originalQueue: [AudioFile] = []
 
     var isPlaying = false
+    /// `0...1`, this app's own gain. See `setVolume(_:)` for why it is not the system volume.
+    var volume: Double = 1
     var currentTime: TimeInterval = 0
     var duration: TimeInterval = 0
     var isLoadingTrack = false
@@ -266,6 +268,52 @@ final class PlayerViewModel {
         UserDefaults.standard.savedPlaybackSpeed = speed
         let rate = speed.rawValue
         Task { [audioPlayer] in await audioPlayer.setRate(rate) }
+    }
+
+    /// This app's output level, `0...1`. **Not the device volume** — that belongs to the hardware
+    /// buttons, and `AVPlayer.volume` is per-player gain, so the dial can turn this without the
+    /// system slider moving under anyone.
+    ///
+    /// **Driving the system level was tried and reverted, and the reason is worth keeping.** It
+    /// worked: `AVAudioSession.outputVolume` reads the device level and observing it made the
+    /// hardware buttons move the dial's arc. But the only way to *write* it is `MPVolumeView`'s
+    /// embedded slider, and an `MPVolumeView` in the window is precisely how an app suppresses the
+    /// system volume HUD. So the price of moving the system level was that the hardware buttons
+    /// stopped showing anything at all — a worse trade than two levels that disagree, because it
+    /// broke a control the app does not own.
+    ///
+    /// The dial reports this one itself, through `VolumeSlider`. There is no API to summon the
+    /// system HUD; an app can only suppress it.
+    ///
+    /// Not persisted: a level chosen for one listening session is not a preference, and coming back
+    /// to an app that is quiet with no memory of why is worse than starting at full.
+    ///
+    /// **It is seeded from the device, though** — see `adoptSystemVolume`. That is the half of
+    /// "sync with the system" that costs nothing.
+    func setVolume(_ value: Double) {
+        volume = min(max(0, value), 1)
+        let level = Float(volume)
+        Task { [audioPlayer] in
+            // **Both, and in this order.** The system level is what the user means by "volume" and
+            // what the hardware buttons and Control Centre show. The per-player gain is set to full
+            // alongside it, because a track loaded while gain was at 40% would otherwise play at
+            // 40% *of* the system level — two multipliers where the user set one number.
+            await audioPlayer.setSystemVolume(level)
+            await audioPlayer.setVolume(1)
+        }
+    }
+
+    /// **Follows the device, so the arc is never stale.**
+    ///
+    /// Seeded on the first value and updated on every hardware press, Control Centre drag and route
+    /// change. Assigns `volume` directly rather than calling `setVolume` — that would write the
+    /// level straight back to the system, which is a loop.
+    func observeSystemVolume() async {
+        for await level in await audioPlayer.systemVolumeUpdates() {
+            let value = Double(level)
+            guard value != volume else { continue }
+            volume = value
+        }
     }
 
     func setSkipDuration(_ duration: SkipDuration) {

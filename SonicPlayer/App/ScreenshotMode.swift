@@ -23,13 +23,29 @@ enum ScreenshotMode {
         return Screen(rawValue: ProcessInfo.processInfo.arguments[index + 1])
     }
 
+    /// **Named for dial routes, because that is what the app has.**
+    ///
+    /// This listed `collections`, `editRecording` and `homeWithMiniPlayer`, and by the time anyone
+    /// looked, four of the six rendered the dial regardless — the screens they named had stopped
+    /// being reachable one at a time and nothing here noticed. A screenshot target aimed at code
+    /// that cannot be shown is worse than a missing one: it produces an image, and the image is of
+    /// something else.
     enum Screen: String {
+        /// The fork: Listen or Record.
         case home
-        case collections
+        /// The file list, in Listen mode.
+        case library
         case player
         case recording
-        case editRecording = "editRecording"
-        case homeWithMiniPlayer = "homeWithMiniPlayer"
+        /// The trim editor, reached the way Record mode reaches it.
+        case edit
+
+        // The player's three non-happy states (#6). They exist here because epic #6 requires every
+        // screen to have designed empty, loading and error states — and a state nobody can put on
+        // screen is a state nobody checks. These are the only way to see them without editing code.
+        case playerEmpty = "playerEmpty"
+        case playerLoading = "playerLoading"
+        case playerError = "playerError"
     }
 }
 
@@ -81,7 +97,7 @@ enum ScreenshotDemoData {
 
     // MARK: - Audio Files
 
-    static let recentFiles: [AudioFile] = [
+    static let allFiles: [AudioFile] = [
         AudioFile(
             url: documentsURL.appendingPathComponent("Deep Focus Session.mp3"),
             title: "Deep Focus Session",
@@ -208,31 +224,40 @@ extension ScreenshotDemoData {
         filesRoot: CollectionsViewModel,
         for screen: ScreenshotMode.Screen
     ) {
-        home.recentFiles = recentFiles
-        filesRoot.seed(items: collections.map { .folder($0) } + recentFiles.prefix(5).map { .file($0) })
+        home.allFiles = allFiles
+        filesRoot.seed(items: collections.map { .folder($0) } + allFiles.prefix(5).map { .file($0) })
 
         switch screen {
-        case .homeWithMiniPlayer:
-            let track = recentFiles[0]
-            player.currentTrack = track
-            player.isPlaying = true
-            player.isExpanded = false
-            player.duration = track.duration
-            player.currentTime = 847 // ~14 min into the track
-            player.queue = [track] + Array(recentFiles.dropFirst().prefix(3))
-            player.currentIndex = 0
-
         case .player:
-            let track = recentFiles[0]
+            let track = allFiles[0]
             player.currentTrack = track
             player.isPlaying = true
             player.isExpanded = true
             player.duration = track.duration
             player.currentTime = 1234
-            player.queue = Array(recentFiles.prefix(5))
+            player.queue = Array(allFiles.prefix(5))
             player.currentIndex = 0
 
-        case .home, .collections, .recording, .editRecording:
+        // The three states, each pinned to the exact condition the view branches on.
+
+        case .playerEmpty:
+            player.isExpanded = true
+
+        case .playerLoading:
+            // "Loading" is not "no track": `loadTrack` sets both in the same breath, and the view
+            // gates on a zero duration so the state stays off screen during a track *switch*.
+            player.currentTrack = allFiles[0]
+            player.isExpanded = true
+            player.isLoadingTrack = true
+            player.duration = 0
+
+        case .playerError:
+            player.isExpanded = true
+            player.openError = String(
+                localized: "The file could not be read. It may have been moved or deleted."
+            )
+
+        case .home, .library, .recording, .edit:
             break
         }
     }

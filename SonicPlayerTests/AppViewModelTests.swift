@@ -21,13 +21,32 @@ struct AppViewModelTests {
     /// `AppDelegate` calls these from UIKit, outside any view. They are the only reason the root
     /// object is reachable statically, and the only reason it exists at all.
     @MainActor
-    @Test func test_quickActionRecord_opensTheRecordingSheet() {
+    /// **It opens the dial's recorder, not a sheet.**
+    ///
+    /// This asserted `isRecordingSheetPresented`, which raised `RecordingView` — so long-pressing
+    /// the app icon gave a different recording experience from the one the dial gives: a modal with
+    /// a navigation bar, no wheel, and no way to drop a marker. One app, two recorders, chosen by
+    /// how you happened to start it.
+    @Test func test_quickActionRecord_opensTheDialsRecorder() {
         let app = makeApp()
-        #expect(!app.isRecordingSheetPresented)
 
         app.quickActionRecord()
 
-        #expect(app.isRecordingSheetPresented)
+        #expect(app.dial.screen.chrome.breadcrumb == ["LIBRARY", "RECORDING"])
+        #expect(app.dial.screen.ring.hub == .recordDot, "arrived, not started")
+    }
+
+    /// **It resets rather than pushes.** A quick action means "start here", and stacking the
+    /// recorder on wherever the app was left would put a Back on it leading somewhere nobody chose.
+    @MainActor
+    @Test func test_quickActionRecord_startsFromTheRootWhereverYouWere() {
+        let app = makeApp()
+        app.dial.receive(.press)            // into whatever the first row is
+
+        app.quickActionRecord()
+
+        app.dial.receive(.action("back"))
+        #expect(app.dial.screen.chrome.breadcrumb == ["LIBRARY"], "one level, and no further")
     }
 
     @MainActor
@@ -75,10 +94,15 @@ struct AppViewModelTests {
     }
 
     @MainActor
-    @Test func test_homeImportTap_opensTheImportSheet() {
+    /// **Import is the dial's now, and Home's edge is gone.**
+    ///
+    /// `home.onImportTapped` was called from exactly one place — the pre-dial Home screen, which
+    /// stopped being rendered when the dial became the root. The verb did not go anywhere: it is
+    /// pinned above the library in Listen mode, and this is the path that actually runs.
+    @Test func test_theDialsImportOpensTheImportSheet() {
         let app = makeApp()
 
-        app.home.onImportTapped()
+        app.dial.receive(.action("import"))
 
         #expect(app.isImportSheetPresented)
     }

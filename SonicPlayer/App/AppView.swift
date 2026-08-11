@@ -7,7 +7,6 @@ struct AppView: View {
     @Environment(AppViewModel.self) private var app
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
-    @State private var shareItem: ShareItem?
 
     var body: some View {
         // Local `@Bindable` shadows: the documented way to get bindings out of an @Observable
@@ -18,23 +17,18 @@ struct AppView: View {
 
         return ZStack(alignment: .bottom) {
             // Main content
-            NavigationStack(path: $app.path) {
-                homeRootContent
-                    .navigationTitle("Home")
-                    .navigationBarTitleDisplayMode(.large)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button {
-                                app.isSettingsPresented = true
-                            } label: {
-                                Image(systemName: "gearshape.fill")
-                                    .foregroundColor(.sonicTextSecondary)
-                            }
-                        }
-                    }
-                    .navigationDestination(isPresented: isSettingsPresented) {
-                        SettingsView(viewModel: app.settings)
-                    }
+            // **A plain `NavigationStack` with no path and no destinations.** It held the Files
+            // browser, pushed by URL; the dial browses now and its stack is its own. What is left
+            // is the container the sheets and alerts below hang from.
+            NavigationStack {
+                // **The dial is the app** (#6, #76). There is no Home screen and no tab bar: the
+                // player is the root, and everything else — recordings, now playing, recording —
+                // is a level of the dial's own stack rather than a separate destination.
+                //
+                // **The toolbar gear is gone with the push.** Settings is a dial route now, reached
+                // from the gear in the card's own header — there were briefly two of them, one in a
+                // navigation bar the rest of the app hides.
+                dialRoot
                     .alert("Delete \(filesRoot.pendingDeleteCount) \(filesRoot.pendingDeleteCount == 1 ? "item" : "items")?",
                            isPresented: $filesRoot.isConfirmingDelete) {
                         Button("Delete", role: .destructive) { filesRoot.confirmDelete() }
@@ -48,91 +42,58 @@ struct AppView: View {
                         Button("Create") { filesRoot.confirmNameInput() }
                         Button("Cancel", role: .cancel) { filesRoot.cancelNameInput() }
                     }
+                    // Naming a folder the dial asked for. The dial has no text entry, so this is
+                    // where a `createFolder` effect turns into a folder.
+                    .alert("New Folder", isPresented: $app.isNamingNewFolder) {
+                        TextField("Name", text: $app.newFolderName)
+                        Button("Create") { app.confirmNewFolder(named: app.newFolderName) }
+                        Button("Cancel", role: .cancel) { app.isNamingNewFolder = false }
+                    }
                     .alert("Rename", isPresented: isRenaming) {
                         TextField("Name", text: $filesRoot.inputText)
                         Button("Rename") { filesRoot.confirmNameInput() }
                         Button("Cancel", role: .cancel) { filesRoot.cancelNameInput() }
                     }
-                    .sheet(item: $filesRoot.audioToEdit) { file in
-                        EditRecordingView(recording: file) {
-                            filesRoot.audioToEdit = nil
-                            filesRoot.refreshFiles()
-                        }
-                    }
-                    .sheet(isPresented: isCollectionPickerPresented) {
-                        InAppCollectionPicker(
-                            collections: filesRoot.availableCollections,
-                            onPick: { filesRoot.moveToDestination($0) },
-                            onCancel: { filesRoot.cancelMove() }
-                        )
-                    }
-                    .sheet(item: $shareItem) { item in
+                    .sheet(item: $app.shareItem) { item in
                         ActivityView(items: [item.url])
                     }
                     .onAppear {
                         if !ScreenshotMode.isEnabled {
                             filesRoot.onAppear()
-                            home.loadRecentFiles()
+                            home.loadAllFiles()
                         }
-                    }
-                    .navigationDestination(for: URL.self) { folderURL in
-                        CollectionsView(
-                            directory: folderURL,
-                            onCollectionTapped: { app.path.append($0.url) },
-                            onPlay: { file, queue, source in
-                                player.loadTrack(file, queue: queue, source: source)
-                            },
-                            onWillRemoveItems: { items in
-                                player.clearSessionIfAffected(by: items.map(\.url))
-                            }
-                        )
-                        .navigationTitle(folderURL.lastPathComponent)
-                        .navigationBarTitleDisplayMode(.large)
                     }
             }
             .preferredColorScheme(app.settings.colorScheme.colorScheme)
 
-            // Mini Player (full-width bottom bar)
-            if player.shouldShowMiniPlayer {
-                VStack(spacing: 0) {
-                    Spacer()
-                    MiniPlayerView(player: player)
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .zIndex(1)
-            }
+            // The mini-player is gone with Home. It existed to get you *back* to the player from
+            // somewhere else, and there is no longer a somewhere else — the player is the root.
 
-            // Record FAB (home screen only, not on empty state)
-            if !app.isSettingsPresented && app.path.isEmpty && !(filesRoot.items.isEmpty && home.recentFiles.isEmpty) {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        recordFAB
-                    }
-                }
-                .padding(.trailing, 20)
-                .padding(.bottom, player.shouldShowMiniPlayer ? 72 : 20)
-                .zIndex(2)
-            }
+            // The record FAB is gone too. The dial carries Record as a section, and a floating
+            // button over it would be a second door to the same room.
         }
-        // Global sheets
-        .sheet(isPresented: $player.isExpanded) {
-            PlayerView(player: player)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: isRecordingSheetPresented) {
-            RecordingView(viewModel: app.recording)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .interactiveDismissDisabled(true)
-        }
+        // **There is no recording sheet.** The dial's recorder is the only one, reached by its own
+        // Record route and by the Home-screen quick action, which used to raise a second one here.
         .sheet(isPresented: isImportSheetPresented) {
             DocumentPicker { urls in
                 app.isImportSheetPresented = false
-                filesRoot.importFiles(urls)
+                app.importPickedFiles(urls)
             }
+        }
+        // **About and Help outlived the screen that presented them.** They were pushed from inside
+        // `SettingsView`; Settings is a dial screen now, so they are presented from here — over the
+        // dial rather than inside a navigation stack that no longer exists.
+        .sheet(isPresented: Binding(
+            get: { app.settings.showAbout },
+            set: { if !$0 { app.settings.dismissAbout() } }
+        )) {
+            NavigationStack { AboutView(viewModel: app.settings) }
+        }
+        .sheet(isPresented: Binding(
+            get: { app.settings.showHelp },
+            set: { if !$0 { app.settings.dismissHelp() } }
+        )) {
+            NavigationStack { HelpView(viewModel: app.settings) }
         }
         .onChange(of: scenePhase) { _, newPhase in
             app.scenePhaseChanged(newPhase)
@@ -177,31 +138,10 @@ extension AppView {
 
 private extension AppView {
 
-    var isRecordingSheetPresented: Binding<Bool> {
-        Binding(
-            get: { app.isRecordingSheetPresented },
-            set: { if !$0 { app.dismissRecordingSheet() } }
-        )
-    }
-
     var isRenaming: Binding<Bool> {
         Binding(
             get: { filesRoot.renamingItem != nil },
             set: { if !$0 { filesRoot.cancelNameInput() } }
-        )
-    }
-
-    var isCollectionPickerPresented: Binding<Bool> {
-        Binding(
-            get: { filesRoot.isShowingCollectionPicker },
-            set: { if !$0 { filesRoot.cancelMove() } }
-        )
-    }
-
-    var isSettingsPresented: Binding<Bool> {
-        Binding(
-            get: { app.isSettingsPresented },
-            set: { if !$0 { app.isSettingsPresented = false } }
         )
     }
 
@@ -218,183 +158,58 @@ private extension AppView {
     // MARK: - Home Root Content
 
     @ViewBuilder
-    var homeRootContent: some View {
-        ZStack {
-            Color.sonicBackground.ignoresSafeArea()
-
-            if filesRoot.isLoading && filesRoot.items.isEmpty {
-                ProgressView()
-                    .tint(.sonicPrimary)
-            } else if filesRoot.items.isEmpty && home.recentFiles.isEmpty {
-                // Empty state
-                VStack(spacing: 20) {
-                    Spacer()
-
-                    Image(systemName: "waveform.circle")
-                        .font(.system(size: 72))
-                        .foregroundStyle(LinearGradient.sonicGradient)
-                        .opacity(0.6)
-
-                    Text("Welcome to SonicPlayer")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.sonicTextPrimary)
-
-                    Text("Record audio, import files, or open media\nfrom other apps to get started.")
-                        .font(.subheadline)
-                        .foregroundColor(.sonicTextSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
-
-                    HStack(spacing: 12) {
-                        Button {
-                            app.isRecordingSheetPresented = true
-                        } label: {
-                            Label("Record", systemImage: "mic.fill")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .background(Color.red, in: Capsule())
-                        }
-
-                        Button {
-                            home.onImportTapped()
-                        } label: {
-                            Label("Import", systemImage: "square.and.arrow.down")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(.sonicPrimary)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .background(Color.sonicPrimary.opacity(0.12), in: Capsule())
-                        }
-                    }
-                    .padding(.top, 4)
-
-                    Spacer()
-                }
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        // 1. Collections
-                        collectionsSection
-
-                        // 2. Recent Files
-                        recentFilesSection
-                    }
-                    .padding(.vertical)
-                    .padding(.bottom, player.shouldShowMiniPlayer ? 80 : 40)
-                }
-                .refreshable {
-                    filesRoot.refreshFiles()
-                    home.loadRecentFiles()
-                }
+    /// The dial, fed from the app whenever anything it renders moves.
+    ///
+    /// The navigator holds a *snapshot* rather than reaching back into the view models, so every
+    /// source it draws from has to push. That is the cost of the contract being a plain value, and
+    /// it is the same cost that makes the whole navigator testable without a view.
+    var dialRoot: some View {
+        DialScreenView(screen: app.dial.screen) { app.dial.receive($0) }
+            .onAppear { app.refreshDial() }
+            // **The dial's volume is the phone's volume.** This stream seeds it on the first
+            // value — so the ring opens at the device's level rather than at a default of full —
+            // and then keeps it there through every hardware press and Control Centre drag. It runs
+            // for the lifetime of the view, which is the lifetime of the app.
+            .task { await app.player.observeSystemVolume() }
+            .onChange(of: app.player.volume) { _, _ in app.refreshDial() }
+            .onChange(of: app.player.currentTime) { _, _ in app.refreshDial() }
+            .onChange(of: app.player.isPlaying) { _, _ in app.refreshDial() }
+            .onChange(of: app.player.currentTrack) { _, track in
+                app.refreshDial()
+                // Session restore is asynchronous, so a cold launch reaches the library first and
+                // the track lands a moment later. This is where that arrival is noticed.
+                if track != nil { app.dial.showNowPlayingIfIdle() }
             }
-        }
-    }
-
-    // MARK: - Section: Recent Files
-
-    @ViewBuilder
-    var recentFilesSection: some View {
-        if !home.recentFiles.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Recent Media")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                    Spacer()
-                    HStack(spacing: 3) {
-                        Image(systemName: "hand.draw")
-                            .font(.caption2)
-                        Text("Swipe for actions")
-                            .font(.caption2)
-                    }
-                    .foregroundColor(.sonicTextMuted)
-                }
-                .padding(.horizontal)
-
-                List {
-                    ForEach(home.recentFiles) { file in
-                        recentFileRow(file: file)
-                            .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
-                            .listRowBackground(Color.clear)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    home.onDeleteFile(file)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                                Button {
-                                    home.onRenameFile(file)
-                                } label: {
-                                    Label("Rename", systemImage: "pencil")
-                                }
-                                .tint(.sonicPrimary)
-                            }
-                            .swipeActions(edge: .leading) {
-                                Button {
-                                    home.onEditFile(file)
-                                } label: {
-                                    Label("Edit", systemImage: "waveform.and.magnifyingglass")
-                                }
-                                .tint(.blue)
-                                Button {
-                                    shareItem = ShareItem(url: file.url)
-                                } label: {
-                                    Label("Share", systemImage: "square.and.arrow.up")
-                                }
-                                .tint(.gray)
-                            }
-                    }
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .scrollDisabled(true)
-                .frame(height: CGFloat(home.recentFiles.count) * Sizing.rowHeight)
+            .onChange(of: app.home.allFiles) { _, _ in app.refreshDial() }
+            .onChange(of: app.recording.isRecording) { _, _ in app.refreshDial() }
+            // **The clock, not the microphone.** This watched `peakLevel`, and the meter loop sets
+            // the time, the peak and the waveform sample in one 100ms tick — so any of them looks
+            // like it would do. It does not: in a quiet room consecutive peak readings are
+            // *identical*, `onChange` does not fire on an equal value, and the running timer
+            // stopped for as long as the room stayed the same. It advanced when you made a noise,
+            // which is a clock that appears to stall and then catch up.
+            //
+            // `recordingTime` changes on every tick by construction, and it is the value on screen.
+            // Watching it covers the meter and the waveform too, since they arrive together.
+            .onChange(of: app.recording.recordingTime) { _, _ in app.refreshDial() }
+            // Pausing stops the meter, so `recordingTime` stops changing — without this the screen
+            // would keep the running state it had at the moment the take was paused (#75).
+            .onChange(of: app.recording.isPaused) { _, _ in app.refreshDial() }
+            // A marker must appear under the thumb, not up to a meter interval later.
+            .onChange(of: app.recording.markers) { _, _ in app.refreshDial() }
+            .alert(
+                "Action Failed",
+                isPresented: Binding(
+                    get: { app.dial.operationError != nil },
+                    set: { if !$0 { app.dial.operationError = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) { app.dial.operationError = nil }
+            } message: {
+                Text(app.dial.operationError ?? "")
             }
-        }
+            .toolbar(.hidden, for: .navigationBar)
     }
 
-    /// Second consumer of the shared Row (#48). Home is the one place that shows *which*
-    /// collection a file came from — the browser is already inside one.
-    func recentFileRow(file: AudioFile) -> some View {
-        SonicRow(
-            leading: .tile(image: nil, side: Sizing.thumbnail, fallbackSystemImage: "waveform"),
-            title: file.title,
-            secondary: .durationDateAndCollection(
-                file.durationFormatted,
-                file.creationDate.formatted(date: .abbreviated, time: .omitted),
-                CollectionLabel.name(for: file.url, documentsURL: home.documentsURL)
-            )
-        )
-        .onTapGesture { home.fileTapped(file) }
-    }
 
-    // MARK: - Record FAB
-
-    var recordFAB: some View {
-        Button {
-            app.isRecordingSheetPresented = true
-        } label: {
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.red.opacity(0.85), Color.red],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 56, height: 56)
-                    .shadow(color: Color.red.opacity(0.3), radius: 12, x: 0, y: 6)
-
-                Image(systemName: "mic.fill")
-                    .font(.title3)
-                    .foregroundColor(.white)
-            }
-        }
-    }
 }

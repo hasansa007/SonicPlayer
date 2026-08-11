@@ -23,7 +23,7 @@ final class HomeViewModel {
     /// replaces the mirror.
     let player: PlayerViewModel
 
-    var recentFiles: [AudioFile] = []
+    var allFiles: [AudioFile] = []
 
     // Formerly `.none // Handled by parent` cases in HomeFeature.
     var onFileTapped: (AudioFile) -> Void = { _ in }
@@ -42,24 +42,43 @@ final class HomeViewModel {
     /// `MediaFileRowView` used to do from inside its own `body` (#48).
     var documentsURL: URL { fileManager.documentsDirectory() }
 
+    /// The same library, nested. The dial browses this; the flat `allFiles` still feeds the queue,
+    /// the editor and the Library card's count.
+    var libraryTree: [DialContent.Item] = []
+
+    /// Raised once both lists have landed. Wired at the composition root, like every other
+    /// cross-feature edge — this feature does not know the dial exists.
+    var onFilesLoaded: (() -> Void)?
+
     init(player: PlayerViewModel, fileManager: FileManagerClient = .live) {
         self.player = player
         self.fileManager = fileManager
     }
 
-    func loadRecentFiles() {
+    func loadAllFiles() {
         // Screenshot mode seeds demo data; loading real files would wipe it.
-        if ScreenshotMode.isEnabled && !recentFiles.isEmpty { return }
+        if ScreenshotMode.isEnabled && !allFiles.isEmpty { return }
 
         Task { [weak self, fileManager] in
-            guard let files = try? await Self.recentFiles(fileManager: fileManager) else { return }
-            await MainActor.run { self?.recentFiles = files }
+            guard let files = try? await Self.allAudioFiles(fileManager: fileManager) else { return }
+            // The dial browses the nested shape; everything else still wants the flat one. Loaded
+            // together so a refresh cannot show a folder that the flat list disagrees about.
+            let tree = (try? await LibraryTree.load(fileManager: fileManager)) ?? []
+            await MainActor.run {
+                self?.allFiles = files
+                self?.libraryTree = tree
+                // **The load has to announce itself.** The dial holds a snapshot rather than
+                // reading back, so a reload that nobody reports leaves it showing the library as it
+                // was — which is why a new recording never appeared. It used to appear by accident,
+                // on the next tick of the player's clock, and after a recording nothing is playing.
+                self?.onFilesLoaded?()
+            }
         }
     }
 
     /// Tapping a recent file plays it, with the recents list as the queue.
     func fileTapped(_ file: AudioFile) {
-        player.loadTrack(file, queue: recentFiles, source: .singleFile)
+        player.loadTrack(file, queue: allFiles, source: .singleFile)
         onFileTapped(file)
     }
 
@@ -81,36 +100,44 @@ final class HomeViewModel {
 
 private extension HomeViewModel {
 
-    /// Unchanged from `HomeFeature.swift`, where it was already a free function taking the client
-    /// as a plain parameter rather than through `@Dependency`.
-    static func recentFiles(fileManager: FileManagerClient) async throws -> [AudioFile] {
+    /// **Every audio file, newest first — the `prefix(3)` that used to end this is gone.**
+    ///
+    /// That cap was right when this fed a "Recently added" strip on a Home screen: three rows on a
+    /// dashboard is a preview, and a preview is what it was. Home is now the dial, and the same
+    /// property became the dial's entire library, the count on the Library card, and the queue a
+    /// track is played into. None of those wanted three.
+    ///
+    /// So the library screen showed at most three recordings however many existed, the card's
+    /// number was pinned at 3, and playing anything gave you a two-track queue. One property whose
+    /// meaning did not survive the move it was carried through, and nothing failed — it just quietly
+    /// answered a smaller question than it was being asked.
+    static func allAudioFiles(fileManager: FileManagerClient) async throws -> [AudioFile] {
         var allFiles: [AudioFile] = []
-        var seenNames: Set<String> = []
-        try await collect(from: nil, into: &allFiles, seenNames: &seenNames, fileManager: fileManager)
+        try await collect(from: nil, into: &allFiles, fileManager: fileManager)
         allFiles.sort { $0.creationDate > $1.creationDate }
-        return Array(allFiles.prefix(3))
+        return allFiles
     }
 
-    /// Deduplicates by filename, so the same recording surfaced in two collections appears once.
+    /// **The filename deduplication is gone, and folders are why.**
+    ///
+    /// It folded two recordings with the same name into one, on the reasoning that the same file
+    /// surfaced from two collections should appear once. That was defensible while this list was a
+    /// flat strip with nowhere to say where a file came from. Now the dial browses the folders
+    /// themselves, so two files called `Lecture 1.m4a` in two folders are two files — and dropping
+    /// one made its folder look emptier than it is and made the survivor unresolvable by URL,
+    /// which is how the dial turns a pressed row back into something to play.
     static func collect(
         from directory: URL?,
         into files: inout [AudioFile],
-        seenNames: inout Set<String>,
         fileManager: FileManagerClient
     ) async throws {
         let items = try await fileManager.listItems(directory)
         for item in items {
             switch item {
             case let .file(audioFile):
-                let name = audioFile.url.lastPathComponent
-                if !seenNames.contains(name) {
-                    seenNames.insert(name)
-                    files.append(audioFile)
-                }
+                files.append(audioFile)
             case let .folder(folder):
-                try await collect(
-                    from: folder.url, into: &files, seenNames: &seenNames, fileManager: fileManager
-                )
+                try await collect(from: folder.url, into: &files, fileManager: fileManager)
             }
         }
     }

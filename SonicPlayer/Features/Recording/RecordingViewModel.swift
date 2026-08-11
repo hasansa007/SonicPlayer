@@ -21,14 +21,48 @@ final class RecordingViewModel {
     /// not, and does not need to be.
     static let meterInterval: Duration = .milliseconds(100)
 
+    /// How many samples the scrolling waveform keeps — five seconds at `meterInterval`, and the
+    /// same bar count `RecordingWaveformView` has always drawn.
+    static let levelWindow = 50
+
     // MARK: - Recording
 
     var isRecording = false
+    /// A capture that is still open but not writing. `isRecording` stays true throughout: it means
+    /// *a take is in progress*, which is what `stopRecordingTapped` and `addMarker` both need to
+    /// know, and only stopping ends it.
+    var isPaused = false
     var recordingTime: TimeInterval = 0
     var currentRecordingURL: URL?
     var peakLevel: Float = 0
     var hasPermission = false
     var showPermissionAlert = false
+
+    /// The scrolling waveform, newest last, already normalised through `MeterLevel` — `peakLevel`
+    /// stays as it was for the existing recorder view, which reads a single value rather than a
+    /// history.
+    private(set) var levels: [Double] = []
+
+    /// **Raised the moment a take is written to disk**, before any naming or trimming.
+    ///
+    /// Distinct from `onFinished`, which means *the save flow completed* — and the save flow is
+    /// rendered only by `RecordingView`, which the dial never presents. So from the dial nothing
+    /// reloaded the library after a take: the file was on disk and the screen said the folder was
+    /// empty, until an unrelated import happened to force a refresh.
+    ///
+    /// A separate edge rather than reusing `onFinished`, because these are different facts and one
+    /// of them will be true in flows where the other never is.
+    var onTakeLanded: ((URL) -> Void)?
+
+    /// Timestamps dropped during this take (#75). Cleared when a take starts, and handed to the
+    /// registry under the name the file lands as.
+    private(set) var markers = RecordingMarkers()
+
+    // MARK: - Input gain
+
+    /// `0...1`. Only meaningful while `isGainSettable`, which is false on every built-in iPhone mic.
+    private(set) var gain: Double = 1
+    private(set) var isGainSettable = false
 
     // MARK: - Save flow
 
@@ -44,6 +78,11 @@ final class RecordingViewModel {
     /// Formerly `AppFeature` observing `.recording(.recordingSaved)` / `.discardRecording` to
     /// dismiss the sheet and refresh the file list.
     var onFinished: () -> Void = {}
+
+    /// The URL a take actually landed as — which is not knowable before the save, because
+    /// `UniqueNameResolver` may have renamed it. Fired only when the file is really there, so
+    /// markers are never filed under a name that does not exist (#75).
+    var onSaved: (URL) -> Void = { _ in }
 
     var recordingsCollection: URL? {
         guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
@@ -98,21 +137,56 @@ final class RecordingViewModel {
 
     // MARK: - Recording
 
-    func startRecordingTapped() {
+    /// **The first press asks and then records; it used to only ask.**
+    ///
+    /// This was `guard hasPermission else { requestPermissions(); return }` — so on a fresh install
+    /// the first press raised the system prompt, returned, and did nothing after you granted.
+    /// Pressing again worked, which is why it read as "recording does not work the first time"
+    /// rather than as a permission problem.
+    ///
+    /// The dial made it certain rather than likely. `hasPermission` was seeded by
+    /// `checkPermissions()`, called from `RecordingView.onAppear` — and the dial drives this type
+    /// directly without ever presenting that view, so the flag was *always* false on the first
+    /// press however many times the app had recorded before.
+    ///
+    /// Requesting is cheap when the answer is already yes: the system returns the stored grant
+    /// without prompting, so this path costs one await rather than a dialog.
+    /// `destination` is the folder the take should land in. **`nil` keeps the old behaviour** — the
+    /// app's `Recordings` folder — which is what the library root, the quick action and the
+    /// recording screen's own button all mean.
+    func startRecordingTapped(into destination: URL? = nil) {
         guard hasPermission else {
-            requestPermissions()
+            workTask = Task { [weak self, audioRecorder] in
+                let granted = await audioRecorder.requestPermissions()
+                self?.hasPermission = granted
+                self?.showPermissionAlert = !granted
+                guard granted else { return }
+                self?.beginTake(into: destination)
+            }
             return
         }
-        guard let recordingsCollection else { return }
+        beginTake(into: destination)
+    }
 
-        try? FileManager.default.createDirectory(at: recordingsCollection, withIntermediateDirectories: true)
+    /// **A take lands where you were standing, not in one fixed folder.** Recording from inside a
+    /// folder used to write to `Recordings` regardless, so the take you had just made was the one
+    /// thing not in the list you made it from — and filing it was a separate job you had to
+    /// remember. The folder is on the breadcrumb while the recorder is open, so where it will land
+    /// is answerable before the take rather than discovered after it.
+    private func beginTake(into destination: URL? = nil) {
+        guard let folder = destination ?? recordingsCollection else { return }
 
-        let recordingURL = recordingsCollection
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+        let recordingURL = folder
             .appendingPathComponent(RecordingFilename.make(at: Date()))
 
         currentRecordingURL = recordingURL
         recordingTime = 0
         peakLevel = 0
+        levels = []
+        markers = RecordingMarkers()
+        isPaused = false
 
         workTask = Task { [weak self, audioRecorder] in
             do {
@@ -128,11 +202,13 @@ final class RecordingViewModel {
         isRecording = true
         currentRecordingURL = url
         startMeterTimer()
+        readInputGain()
     }
 
     func stopRecordingTapped() {
         guard isRecording else { return }
         isRecording = false
+        isPaused = false
 
         Task { [weak self, audioRecorder] in
             do {
@@ -154,6 +230,8 @@ final class RecordingViewModel {
         currentRecordingURL = url
         saveFileName = url.deletingPathExtension().lastPathComponent
         isSaveFlowPresented = true
+        // The file exists from here on, whatever happens to the save flow above it.
+        onTakeLanded?(url)
 
         // Copy to a temp file so the inline editor is non-destructive from the first frame.
         let tempEditURL = EditRecordingViewModel.tempEditURL(pathExtension: "m4a")
@@ -175,8 +253,69 @@ final class RecordingViewModel {
 
     private func recordingFailed(_ error: Error) {
         isRecording = false
+        isPaused = false
         currentRecordingURL = nil
         print("Recording failed: \(error.localizedDescription)")
+    }
+
+    // MARK: - Pause
+    //
+    // Pausing keeps the file open — only `stopRecording()` closes it — so a resumed take continues
+    // into the same recording instead of producing a second one. The meter loop stays alive and
+    // skips its body rather than being cancelled and restarted: restarting it would put the
+    // teardown ordering this type's header warns about back in play, and buy nothing.
+
+    func togglePauseTapped() {
+        guard isRecording else { return }
+        if isPaused { resumeTapped() } else { pauseTapped() }
+    }
+
+    func pauseTapped() {
+        guard isRecording, !isPaused else { return }
+        isPaused = true
+        Task { [audioRecorder] in await audioRecorder.pauseRecording() }
+    }
+
+    /// Clears the flag only once the recorder confirms it took the file back. A resume that
+    /// silently failed would leave a running clock over a dead file, which is the one outcome worse
+    /// than a stuck pause button.
+    func resumeTapped() {
+        guard isRecording, isPaused else { return }
+        Task { [weak self, audioRecorder] in
+            guard await audioRecorder.resumeRecording() else { return }
+            self?.isPaused = false
+        }
+    }
+
+    // MARK: - Markers
+
+    /// Whether the marker landed. Refused when nothing is being captured, and when one is already
+    /// within `RecordingMarkers.minimumSeparation` — which is what a paused clock produces, since
+    /// every tap while paused reports the same elapsed time.
+    @discardableResult
+    func addMarker() -> Bool {
+        guard isRecording else { return false }
+        return markers.add(at: recordingTime)
+    }
+
+    // MARK: - Input gain
+
+    private func readInputGain() {
+        Task { [weak self, audioRecorder] in
+            let settable = await audioRecorder.isInputGainSettable()
+            let current = await audioRecorder.inputGain()
+            self?.isGainSettable = settable
+            self?.gain = Double(min(max(0, current), 1))
+        }
+    }
+
+    /// `0...1`. A no-op on hardware with no settable gain — which is why `isGainSettable` is
+    /// published: the dial refuses the axis rather than turning against nothing.
+    func setGain(_ value: Double) {
+        let clamped = min(max(0, value), 1)
+        guard clamped != gain, isGainSettable else { return }
+        gain = clamped
+        Task { [audioRecorder] in _ = await audioRecorder.setInputGain(Float(clamped)) }
     }
 
     // MARK: - Level meter
@@ -189,12 +328,26 @@ final class RecordingViewModel {
                 // first sample lands 100ms in rather than immediately.
                 try? await Task.sleep(for: Self.meterInterval)
                 guard !Task.isCancelled else { return }
+                // A paused take reports a frozen clock and a dead meter. Sampling it would scroll
+                // a flat line across the waveform and say the recording was silent rather than
+                // stopped.
+                guard self?.isPaused == false else { continue }
                 let time = await audioRecorder.currentTime()
                 let peak = await audioRecorder.peakPower()
                 guard !Task.isCancelled else { return }
                 self?.recordingTime = time
                 self?.peakLevel = peak
+                self?.appendLevel(peak)
             }
+        }
+    }
+
+    /// Newest last, oldest dropped. The window is what makes it a *scrolling* waveform rather than
+    /// an ever-growing array behind a view that can only show the last five seconds anyway.
+    private func appendLevel(_ peak: Float) {
+        levels.append(MeterLevel.fraction(ofPeak: peak))
+        if levels.count > Self.levelWindow {
+            levels.removeFirst(levels.count - Self.levelWindow)
         }
     }
 
@@ -229,6 +382,7 @@ final class RecordingViewModel {
 
         Task { [weak self, audioPlayer] in
             await audioPlayer.stop()
+            var landed = false
             do {
                 if let originalURL, originalURL != finalTargetURL {
                     try? FileManager.default.removeItem(at: originalURL)
@@ -237,12 +391,21 @@ final class RecordingViewModel {
                     try? FileManager.default.removeItem(at: finalTargetURL)
                 }
                 try FileManager.default.moveItem(at: editedURL, to: finalTargetURL)
+                landed = true
             } catch {
                 print("Failed to save recording: \(error.localizedDescription)")
             }
-            // Reached on both branches, exactly as `.recordingSaved` was sent from both.
+            // `onSaved` fires only on the branch that produced a file — unlike `onFinished`, which
+            // is reached on both, exactly as `.recordingSaved` was sent from both.
+            if landed { self?.reportSaved(finalTargetURL) }
             self?.recordingSaved()
         }
+    }
+
+    /// Announces the name the take landed as, while `markers` still holds this session's drops —
+    /// `resetSaveFlow()` clears them a moment later.
+    private func reportSaved(_ url: URL) {
+        onSaved(url)
     }
 
     private func recordingSaved() {
@@ -276,5 +439,8 @@ final class RecordingViewModel {
         saveDestination = nil
         isSaveFlowPresented = false
         inlineEdit = nil
+        markers = RecordingMarkers()
+        levels = []
+        isPaused = false
     }
 }

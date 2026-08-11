@@ -9,9 +9,14 @@ import Foundation
 ///
 /// Behaviour is preserved exactly, including the quiet ones:
 /// - a non-audio file is skipped, not reported
-/// - importing loose files **into the root** creates a new collection to hold them, but importing
-///   a folder does not
 /// - a per-file failure is counted and the import continues
+///
+/// **One behaviour is deliberately not preserved.** Importing loose files into the root used to
+/// create a collection to hold them, named uniquely from "New Collection" — so every import made
+/// another one, and a library that had been imported into five times held five numbered folders
+/// nobody chose. Nothing asserted it: `.test` returns the documents directory for
+/// `createCollectionForImport`, so no test could tell the difference. Files land where they are
+/// sent now, and filing them is `Add to playlist`'s job.
 enum FolderImport {
 
     struct Result: Equatable {
@@ -27,18 +32,18 @@ enum FolderImport {
     ) async -> Result {
         var result = Result()
 
-        let containsFolder = urls.contains { url in
-            let accessing = url.startAccessingSecurityScopedResource()
-            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-            return (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-        }
-
-        // Loose files dropped on the root get a collection to live in; an imported folder already
-        // brings its own, so it is left alone.
-        var targetDirectory = directory
-        if directory == nil, !containsFolder {
-            targetDirectory = try? await fileManager.createCollectionForImport()
-        }
+        // **Loose files land in the root, not in a collection minted for them.**
+        //
+        // This used to call `createCollectionForImport()`, which resolves a *unique* name from
+        // "New Collection" and creates it — so every import made a fresh folder. Import twice and
+        // the library holds `New Collection` and `New Collection 2`; import ten times and it holds
+        // ten, each with whatever happened to be selected that minute. Nothing was duplicated but
+        // the folders, and the files scattered across numbered boxes nobody chose.
+        //
+        // An imported *folder* still brings its own, which is why `containsFolder` mattered and no
+        // longer needs to: neither branch invents a directory now. Filing is `Add to playlist`'s
+        // job, done deliberately and once, rather than a side effect of every import.
+        let targetDirectory = directory
 
         for url in urls {
             let accessing = url.startAccessingSecurityScopedResource()
@@ -71,11 +76,26 @@ enum FolderImport {
         let needsAccess = folderURL.startAccessingSecurityScopedResource()
         defer { if needsAccess { folderURL.stopAccessingSecurityScopedResource() } }
 
+        // **A folder of the same name is the same folder, and is merged into.**
+        //
+        // This resolved a *unique* name, so importing `Recordings` beside an existing `Recordings`
+        // produced `Recordings 2` — every time, for ever. The library filled with numbered copies
+        // of one shelf, and the recording that had just been made was in whichever of them the app
+        // last wrote to.
+        //
+        // Merging is safe because the dedupe is a file-level decision and already made one level
+        // down: `FileManagerClient.importFile` refuses a file whose name *and* byte size already
+        // match a sibling, and renames the ones that differ. So re-importing the same folder adds
+        // nothing, and importing a changed one adds only what changed — which is what a second
+        // import of the same folder means every time anyone does it deliberately.
+        //
+        // `withIntermediateDirectories: true` is what makes it a merge rather than a throw: `false`
+        // fails outright on an existing directory, which is why the unique name was there at all.
         let parent = destinationDirectory ?? fileManager.documentsDirectory()
-        let destinationRoot = UniqueNameResolver.resolve(
-            baseName: folderURL.lastPathComponent, in: parent
+        let destinationRoot = parent.appendingPathComponent(
+            folderURL.lastPathComponent, isDirectory: true
         )
-        try FileManager.default.createDirectory(at: destinationRoot, withIntermediateDirectories: false)
+        try FileManager.default.createDirectory(at: destinationRoot, withIntermediateDirectories: true)
 
         var result = Result()
         let enumerator = FileManager.default.enumerator(

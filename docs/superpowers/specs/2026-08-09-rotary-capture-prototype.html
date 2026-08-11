@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rotary capture prototype — full screen vs wheel</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:38px 26px 70px;background:#0B0D10;color:#D6DCE2;
+  font:14px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;}
+.page{max-width:1000px;margin:0 auto}
+h2{font-size:23px;margin:0 0 6px;color:#F2F5F8;letter-spacing:-.01em}
+h3{font-size:15px;margin:0 0 6px;color:#E6EAEE}
+h4{color:#E6EAEE}
+.subtitle{color:#8B949D;font-size:13px;margin:0 0 18px;max-width:760px}
+.label{font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#5F6870}
+.section{margin-bottom:26px}
+code{font-family:ui-monospace,Menlo,monospace;font-size:.9em;color:#2DD4BF}
+.cards{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;margin:16px 0}
+.card{flex:1;min-width:290px;background:#13161A;border:1px solid rgba(255,255,255,.09);
+  border-radius:14px;overflow:hidden;cursor:pointer;transition:border-color .15s}
+.card:hover{border-color:rgba(45,212,191,.4)}
+.card.selected{border-color:#2DD4BF;box-shadow:0 0 0 1px #2DD4BF}
+.card-image{padding:20px 14px;background:#0E1114;display:flex;justify-content:center}
+.card-body{padding:15px 17px}
+.card-body p{color:#98A2AC;font-size:12.5px;margin:6px 0 0}
+.options{display:flex;flex-direction:column;gap:11px;margin:14px 0}
+.option{display:flex;gap:14px;padding:15px 17px;background:#13161A;cursor:pointer;
+  border:1px solid rgba(255,255,255,.09);border-radius:12px;transition:border-color .15s}
+.option:hover{border-color:rgba(45,212,191,.4)}
+.option.selected{border-color:#2DD4BF;box-shadow:0 0 0 1px #2DD4BF}
+.letter{width:26px;height:26px;flex:none;border-radius:7px;background:#22272E;color:#2DD4BF;
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px}
+.option .content p{color:#98A2AC;font-size:12.5px;margin:5px 0 0}
+.note{max-width:760px;margin:0 auto 26px;padding:13px 16px;border-radius:10px;
+  background:rgba(45,212,191,.07);border:1px solid rgba(45,212,191,.22);
+  color:#9BE8DD;font-size:12.5px}
+</style></head><body><div class="page">
+<div class="note"><strong>Prototype from the 2026-08-09 rotary-shell brainstorm.</strong>
+Preserved as the tuning surface for <code>RotaryTracker</code> — the constants in
+<code>2026-08-09-rotary-shell-design.md</code> §5 came from driving this. Selection highlighting
+is inert here; it drove the live brainstorm session.</div>
+<style>
+.cp-stage { display:flex; gap:28px; justify-content:center; flex-wrap:wrap; margin:16px 0 4px; }
+.cp-col { width:280px; }
+.cp-cap { font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; color:#7C868F;
+          text-align:center; margin-bottom:9px; }
+.cp-ph { width:280px; height:520px; border-radius:32px; position:relative; overflow:hidden;
+         background:linear-gradient(#15181C,#0A0C0F);
+         box-shadow:0 18px 42px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.07);
+         touch-action:none; user-select:none; }
+.cp-strip { position:absolute; top:0; left:0; right:0; height:32px; display:flex; z-index:6;
+            align-items:center; justify-content:space-between; padding:0 18px;
+            font-size:9px; letter-spacing:.16em; text-transform:uppercase;
+            font-family:ui-monospace,Menlo,monospace; color:#5F6870; }
+.cp-strip .rec { color:#F87171; }
+
+.cp-body { position:absolute; top:32px; left:0; right:0; padding:0 18px; box-sizing:border-box;
+           display:flex; flex-direction:column; align-items:center; justify-content:center;
+           cursor:pointer; }
+.cp-body.full { bottom:0; }
+.cp-body.above { bottom:200px; }
+
+.cp-wf { display:flex; align-items:center; gap:1.5px; width:100%; }
+.cp-wf i { flex:1; border-radius:1px; background:#F87171; opacity:.85; min-height:2px; }
+.cp-time { font-weight:700; font-family:ui-monospace,Menlo,monospace; color:#F87171;
+           letter-spacing:-.02em; }
+.cp-lab { font-size:8.5px; letter-spacing:.2em; text-transform:uppercase; color:#5F6870; }
+.cp-marks { display:flex; gap:5px; justify-content:center; flex-wrap:wrap; max-width:200px; }
+.cp-marks i { width:5px; height:5px; border-radius:50%; background:#F0B429; }
+.cp-marks i.fresh { box-shadow:0 0 12px #F0B429; transform:scale(1.6); }
+
+.cp-stop { width:82px; height:82px; border-radius:50%; background:#F87171;
+           display:flex; align-items:center; justify-content:center; color:#1A0A0A; font-size:19px;
+           box-shadow:0 8px 22px rgba(248,113,113,.42); }
+.cp-aux { display:flex; gap:10px; }
+.cp-aux div { width:46px; height:34px; border-radius:8px; background:#22272E; color:#98A2AC;
+              border:1px solid rgba(255,255,255,.08); display:flex; align-items:center;
+              justify-content:center; font-size:11px; }
+
+.cp-zone { position:absolute; left:0; right:0; bottom:0; height:200px; z-index:5; }
+.cp-zone::before { content:''; position:absolute; inset:0; pointer-events:none;
+                   background:linear-gradient(rgba(10,12,15,0), rgba(10,12,15,.94) 24%); }
+.cp-wheel { position:absolute; left:50%; bottom:20px; width:164px; height:164px; margin-left:-82px; }
+.cp-ring { position:absolute; inset:0; border-radius:50%; border:2px solid rgba(248,113,113,.24); }
+.cp-hub { position:absolute; left:50%; top:50%; width:70px; height:70px; margin:-35px 0 0 -35px;
+          border-radius:50%; background:#F87171; color:#1A0A0A; cursor:pointer;
+          display:flex; align-items:center; justify-content:center; font-size:16px;
+          box-shadow:0 6px 18px rgba(248,113,113,.45); }
+.cp-hub:active { transform:scale(.96); }
+.cp-mark { position:absolute; left:50%; top:6px; transform:translateX(-50%); cursor:pointer;
+           font-size:8.5px; letter-spacing:.14em; color:#F0B429; padding:5px 12px;
+           border-radius:99px; border:1px solid rgba(240,180,41,.32); background:rgba(240,180,41,.08); }
+.cp-mark:active { background:rgba(240,180,41,.22); }
+.cp-lb { position:absolute; color:#4A535B; font-size:9px; letter-spacing:.1em; }
+.cp-lb.w { left:10px; top:50%; transform:translateY(-50%); }
+.cp-lb.e { right:10px; top:50%; transform:translateY(-50%); }
+.cp-lb.s { bottom:8px; left:50%; transform:translateX(-50%); }
+
+/* thumb reach overlay */
+.cp-reach { position:absolute; left:50%; bottom:-96px; width:392px; height:392px; margin-left:-196px;
+            border-radius:50%; border:1px dashed rgba(45,212,191,.5);
+            background:radial-gradient(circle, rgba(45,212,191,.07), transparent 70%);
+            pointer-events:none; display:none; z-index:7; }
+.cp-reach.on { display:block; }
+.cp-reach span { position:absolute; top:12px; left:50%; transform:translateX(-50%);
+                 font-size:8px; letter-spacing:.16em; text-transform:uppercase; color:#2DD4BF; }
+
+.cp-tools { display:flex; gap:8px; justify-content:center; margin:18px 0 4px; flex-wrap:wrap; }
+.cp-btn { padding:8px 16px; border-radius:99px; font-size:11.5px; cursor:pointer; user-select:none;
+          border:1px solid rgba(255,255,255,.14); background:#1B1F25; color:#98A2AC; }
+.cp-btn.on { background:#2DD4BF; color:#04070A; border-color:transparent; font-weight:700; }
+.cp-ledger { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:20px; }
+.cp-ledger h4 { margin:0 0 8px; font-size:12.5px; color:#E6EAEE; }
+.cp-ledger .st { display:flex; justify-content:space-between; padding:6px 0; font-size:11.5px;
+                 color:#98A2AC; border-bottom:1px solid rgba(255,255,255,.07); }
+.cp-ledger .st b { font-family:ui-monospace,Menlo,monospace; color:#2DD4BF; font-weight:600; }
+.cp-ledger .st b.warn { color:#F0B429; }
+</style>
+
+<h2>Capture, both ways, live</h2>
+<p class="subtitle">Both are recording. <strong>Tap the left phone anywhere</strong> to drop a marker; on the right, tap MARK. Proportions are honest — the right-hand stage really is what's left after the wheel takes its 200pt.</p>
+
+<div class="cp-tools">
+  <div class="cp-btn" id="cpReachBtn">show thumb reach</div>
+  <div class="cp-btn" id="cpAxBtn">accessibility text size</div>
+</div>
+
+<div class="cp-stage">
+
+  <div class="cp-col">
+    <div class="cp-cap">A — Full screen, wheel hidden</div>
+    <div class="cp-ph">
+      <div class="cp-strip"><span>Record</span><span class="rec">● REC</span></div>
+      <div class="cp-body full" id="cpBodyA" style="gap:22px">
+        <div class="cp-wf" id="cpWfA" style="height:120px"></div>
+        <div>
+          <div class="cp-time" id="cpTA" style="font-size:44px">08:14</div>
+          <div class="cp-lab" style="text-align:center;margin-top:4px">recording</div>
+        </div>
+        <div class="cp-marks" id="cpMA"></div>
+        <div class="cp-stop">■</div>
+        <div class="cp-aux"><div>❙❙</div><div>✕</div></div>
+        <div class="cp-lab">tap anywhere to mark</div>
+      </div>
+      <div class="cp-reach" id="cpReachA"><span>thumb</span></div>
+    </div>
+  </div>
+
+  <div class="cp-col">
+    <div class="cp-cap">B — Wheel stays, hub is STOP</div>
+    <div class="cp-ph">
+      <div class="cp-strip"><span>Record</span><span class="rec">● REC</span></div>
+      <div class="cp-body above" id="cpBodyB" style="gap:14px">
+        <div class="cp-wf" id="cpWfB" style="height:74px"></div>
+        <div>
+          <div class="cp-time" id="cpTB" style="font-size:32px">08:14</div>
+          <div class="cp-lab" style="text-align:center;margin-top:3px">recording</div>
+        </div>
+        <div class="cp-marks" id="cpMB"></div>
+      </div>
+      <div class="cp-zone">
+        <div class="cp-wheel">
+          <div class="cp-ring"></div>
+          <div class="cp-mark" id="cpMarkBtn">MARK</div>
+          <div class="cp-lb w">◀◀</div><div class="cp-lb e">▶▶</div>
+          <div class="cp-lb s">‹ BACK</div>
+          <div class="cp-hub">■</div>
+        </div>
+      </div>
+      <div class="cp-reach" id="cpReachB"><span>thumb</span></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="cp-ledger">
+  <div>
+    <h4>A — Full screen</h4>
+    <div class="st"><span>Stage height</span><b>488 pt</b></div>
+    <div class="st"><span>Waveform height</span><b>120 pt</b></div>
+    <div class="st"><span>Stop target</span><b>82 pt</b></div>
+    <div class="st"><span>Marker gesture</span><b>tap anywhere</b></div>
+    <div class="st"><span>RecordingView.swift</span><b>largely survives</b></div>
+    <div class="st"><span>Furniture rule</span><b class="warn">one exception</b></div>
+  </div>
+  <div>
+    <h4>B — Wheel stays</h4>
+    <div class="st"><span>Stage height</span><b class="warn">288 pt</b></div>
+    <div class="st"><span>Waveform height</span><b class="warn">74 pt</b></div>
+    <div class="st"><span>Stop target</span><b>70 pt hub</b></div>
+    <div class="st"><span>Marker gesture</span><b>one small target</b></div>
+    <div class="st"><span>RecordingView.swift</span><b class="warn">551 lines rewritten</b></div>
+    <div class="st"><span>Furniture rule</span><b>holds everywhere</b></div>
+  </div>
+</div>
+
+<h3 style="margin-top:30px">Which one?</h3>
+<div class="options">
+  <div class="option" data-choice="capture-full" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content"><h3>Full screen, wheel hidden</h3>
+      <p>Capture is a mode, not a screen. Big waveform, big stop, tap anywhere to mark. One stated exception to the furniture rule.</p></div>
+  </div>
+  <div class="option" data-choice="capture-wheel" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content"><h3>Wheel stays, hub is STOP</h3>
+      <p>No exceptions anywhere in the app. Costs 200pt of stage and a real rewrite of the capture screen.</p></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const N = 54;
+  let ampsA = [], ampsB = [], t = 494, marksA = [], marksB = [], ax = false;
+  const $ = id => document.getElementById(id);
+
+  for (let i=0;i<N;i++){ ampsA.push(rand(i)); ampsB.push(rand(i+7)); }
+  function rand(i){ return 8 + Math.abs(Math.sin(i*1.7)*Math.cos(i*0.41)) * 84; }
+
+  let seed = 11;
+  function next(){ seed = (seed*1103515245 + 12345) % 2147483648; return seed/2147483648; }
+
+  function draw(el, amps){
+    el.innerHTML = amps.map(a => '<i style="height:'+a.toFixed(1)+'%"></i>').join('');
+  }
+  function fmt(s){
+    const m = Math.floor(s/60), r = s%60;
+    return m + ':' + (r<10?'0':'') + r;
+  }
+  function pips(el, arr){
+    el.innerHTML = arr.map((m,i) => '<i class="'+(i===arr.length-1?'fresh':'')+'"></i>').join('');
+  }
+
+  draw($('cpWfA'), ampsA); draw($('cpWfB'), ampsB);
+
+  setInterval(() => {
+    const v = 8 + next()*86, w = 8 + next()*86;
+    ampsA.shift(); ampsA.push(v); draw($('cpWfA'), ampsA);
+    ampsB.shift(); ampsB.push(w); draw($('cpWfB'), ampsB);
+  }, 95);
+
+  setInterval(() => {
+    t++;
+    $('cpTA').textContent = fmt(t);
+    $('cpTB').textContent = fmt(t);
+  }, 1000);
+
+  $('cpBodyA').addEventListener('click', () => {
+    marksA.push(t); pips($('cpMA'), marksA);
+  });
+  $('cpMarkBtn').addEventListener('click', e => {
+    e.stopPropagation(); marksB.push(t); pips($('cpMB'), marksB);
+  });
+
+  $('cpReachBtn').addEventListener('click', () => {
+    const on = $('cpReachA').classList.toggle('on');
+    $('cpReachB').classList.toggle('on', on);
+    $('cpReachBtn').classList.toggle('on', on);
+  });
+
+  $('cpAxBtn').addEventListener('click', () => {
+    ax = !ax;
+    $('cpAxBtn').classList.toggle('on', ax);
+    $('cpTA').style.fontSize = ax ? '64px' : '44px';
+    $('cpTB').style.fontSize = ax ? '64px' : '32px';
+    document.querySelectorAll('.cp-lab').forEach(l => l.style.fontSize = ax ? '13px' : '');
+    $('cpWfA').style.height = ax ? '92px' : '120px';
+    $('cpWfB').style.height = ax ? '34px' : '74px';
+  });
+})();
+</script>
+
+</div>
+<script>function toggleSelect(el){
+  var g = el.parentElement;
+  if (!g.hasAttribute('data-multiselect'))
+    Array.prototype.forEach.call(g.children, function(c){ if(c!==el) c.classList.remove('selected'); });
+  el.classList.toggle('selected');
+}</script>
+</body></html>

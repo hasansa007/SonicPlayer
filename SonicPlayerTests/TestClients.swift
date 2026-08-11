@@ -53,6 +53,13 @@ extension AudioPlayerClient {
 // was never producing unimplemented behaviour for them.
 
 extension AudioRecorderClient {
+    /// The one client whose closures stay silent rather than reporting. That is inherited: it
+    /// stubbed every closure explicitly under the macro too, so reporting here would be a new
+    /// behaviour rather than a restored one.
+    ///
+    /// `isInputGainSettable` answers **false**, which is what the simulator and every built-in
+    /// iPhone mic answer. A suite exercising the gain axis has to say so — which is the point, since
+    /// that axis exists only where the hardware has gain to give.
     static let test = Self(
         checkPermissions: { true },
         requestPermissions: { true },
@@ -60,7 +67,12 @@ extension AudioRecorderClient {
         stopRecording: { nil },
         currentTime: { 0 },
         peakPower: { 0 },
-        isRecording: { false }
+        isRecording: { false },
+        pauseRecording: {},
+        resumeRecording: { true },
+        isInputGainSettable: { false },
+        inputGain: { 1 },
+        setInputGain: { _ in false }
     )
 }
 
@@ -103,4 +115,18 @@ extension FileManagerClient {
         drainStagingDirectory: {},
         documentsDirectory: { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
     )
+}
+
+extension HapticsClient {
+    /// `fire` reports, so a test that reaches the wheel's feedback path without meaning to says so.
+    /// `prepare` and `stop` are lifecycle no-ops that every path calls — reporting those would only
+    /// ever produce noise, which is the failure mode the comment at the top of this file describes
+    /// from the other direction.
+    static var test: Self {
+        Self(
+            prepare: {},
+            fire: { _ in Issue.record("HapticsClient.fire is unimplemented") },
+            stop: {}
+        )
+    }
 }

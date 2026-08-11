@@ -100,14 +100,40 @@ five clients use its `@DependencyClient` macro; #20 removes it.
 - **Models/** - Plain data types (`AudioFile`, `FileSystemItem`, `PlaybackSpeed`)
 - **Domain/** - Pure decision logic, Foundation only. Extracted from reducers so its tests survived the migration unchanged (#11). Add logic here rather than inlining it in a view model.
 - **Utilities/** - Shared UI components and helpers
-- **App/** - `AppViewModel` is the composition root: it owns every view model and wires every cross-feature edge in its `init`. `AppView` takes it from the environment and owns nothing but its own share sheet. Single screen, no tab bar — player, recording and import are **sheets** over Home; settings is **pushed** via `.navigationDestination`
+- **App/** - `AppViewModel` is the composition root: it owns every view model and wires every cross-feature edge in its `init`. `AppView` takes it from the environment and owns nothing but its own share sheet
+
+### The dial is the app (#6)
+
+**There are no screens beside the dial.** Player, Files, Settings, Recording and Edit each had a
+view, and each was reachable only from a shell the dial replaced — so all five were deleted along
+with the sheets and pushes that presented them. What is left is one view rendering one value:
+
+```
+DialCommand  ->  DialNavigator (pure state machine)  ->  DialScreen (a value)  ->  DialScreenView
+                        |
+                    DialEffect  ->  DialViewModel  ->  the feature view models below
+```
+
+`DialScreen` is what makes the eight screens *data*: adding a ninth is a value, not a file, and the
+navigator is built and tested with no SwiftUI in sight. Anything the user can do is a `DialCommand`
+— a turn, a press, a hold, a nudge, or an `action(id:)` from a chip — and anything the app must
+*do* about it leaves as a `DialEffect`, which is where the view models below are still reached.
+
+**Every control drawn on the card is a stop on the wheel.** `DialNavigator.chipIDs` is the one list
+the ring walks and the projection draws, so a control cannot be added to the row and be unreachable
+by the only input surface the app has. That defect shipped three times before the list was unified.
 
 ### Feature modules
 
+The view models survive as the layer that touches AVFoundation and the filesystem. **Their views do
+not** — the dial presents none of them, so state that lived only in a deleted view was silently
+dead until it was moved.
+
 | Feature | View model | Purpose |
 |---------|------------|---------|
-| Home | `HomeViewModel` (#16) | Folder suggestions, recently added |
-| Files | `CollectionsViewModel` (#18) | File/folder browser, one model per depth |
+| Dial | `DialViewModel` (#6) | Holds the navigator, applies its effects, and is the only view model with a view |
+| Home | `HomeViewModel` (#16) | The library the dial lists — `allFiles` and the folder tree |
+| Files | `CollectionsViewModel` (#18) | Rename, delete, create and move, reached through `AppViewModel` |
 | Player | `PlayerViewModel` (#15) | Playback engine, queue, session persistence, open-from-Files |
 | Recording | `RecordingViewModel` (#17) | Audio capture, and the editor via `EditRecordingViewModel` |
 | Settings | `SettingsViewModel` (#13) | Preferences via UserDefaults |
@@ -185,11 +211,16 @@ needs a package, check `ARCHITECTURE.md` first.
 ```
 SonicPlayer/
   App/           # Entry point, AppViewModel (composition root), AppView, quickstart
-  Features/      # Home/, Player/, Files/, Recording/, Settings/
+  Features/      # Dial/ — the only one with a view. Home/, Player/, Files/, Recording/, Settings/
   Clients/       # AudioPlayerClient, AudioRecorderClient, FileManagerClient, ArtworkClient, AudioTrimmerClient
                  #   + AudioPlaying / FileManaging — protocols the first two conform to (#44)
   Models/        # AudioFile, FileSystemItem, PlaybackSpeed
-  Domain/        # QueueMath, PathMatching, UniqueNameResolver, SessionCodec, SessionRestorePolicy, SessionRestorePlan, RecordingFilename, PlaybackSession, ScrubClamp, SelectionSet, ImportFilter, QuickAction
+  DesignSystem/  # Tokens (Spacing, Radius, Sizing, Elevation, Motion), DialRing, LiveHues
+  Domain/        # The dial: DialNavigator + DialNavigatorScreen, DialScreen, DialCommand, DialEffect,
+                 #   DialRoute, DialSort, DialContent, MoveDestinations, DialTrimRange
+                 # And the rest: QueueMath, PathMatching, UniqueNameResolver, SessionCodec,
+                 #   SessionRestorePolicy, SessionRestorePlan, RecordingFilename, PlaybackSession,
+                 #   ScrubClamp, SelectionSet, ImportFilter, QuickAction
   Utilities/     # ColorPalette, Theme, WaveformView, EmptyStateView, ShareSheet, etc.
   Resources/     # Assets.xcassets, Localizable.xcstrings, Quickstart.json, Info.plist
 ```
@@ -254,6 +285,27 @@ Three differences from XCTest that bite when writing new tests:
 - **`Testing` does not re-export Foundation.** Add `import Foundation` for `URL`, `Date`, `UUID`.
 - **`#expect`'s message is `Comment?`, not `String`.** A literal or `"\(interpolation)"` works; a
   bare `String` variable does not.
+
+## App Store compliance — binding on the UI and on every word that ships
+
+The dial is a rotary control, and rotary controls on a music player invite one comparison in
+particular. App Store Review Guideline 5.2.5 prohibits an app that "appears confusingly similar to
+an existing Apple product, interface…", and *Rewound* was removed in 2020 for exactly that. Two
+standing rules follow, and **`docs/superpowers/specs/2026-08-09-rotary-shell-design.md` §3 is the
+authority** — it holds the full table of what is kept and what is deliberately changed.
+
+- **No skeuomorphic mimicry of Apple hardware.** Flat and matte, the app's dark palette and its
+  gradients. Never a white or grey plastic wheel, a chrome bevel, brushed metal or gloss.
+- **Five words never appear** in the UI, store copy, `RELEASE_NOTES.md`, App Store keyword metadata,
+  screenshots, type names or commit messages: *iPod*, *Click Wheel*, *Classic Player*, *Retro*,
+  *Nostalgia*. The first two are Apple trademarks; the other three are refused because they are the
+  words that argue an app is trading on a resemblance, which is evidence for the reading 5.2.5
+  turns on.
+- **Positioning is affirmative:** *precision dial navigation* and *gesture-based scrubbing*, for
+  modern use. A claim about what the control does, not about what it recalls.
+
+`RELEASE_NOTES.md` is the surface most likely to slip, because a version's What's New is written in
+a hurry and ships straight to testers.
 
 ## Release
 

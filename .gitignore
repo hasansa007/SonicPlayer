@@ -7,3 +7,6 @@ xcschememanagement.plist
 # Xcode per-user state — never shared
 xcuserdata/
 *.xcuserstate
+
+# Superpowers brainstorming scratch
+.superpowers/

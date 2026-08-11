@@ -28,4 +28,18 @@ enum ScrubClamp {
     static func backward(from currentTime: TimeInterval) -> TimeInterval {
         max(currentTime - interval, 0)
     }
+
+    /// An arbitrary position, held inside the recording (#6).
+    ///
+    /// The two functions above step by a fixed `interval`; this one takes a position the caller has
+    /// already computed — the wheel's detent seek, whose step is 0.1s and comes from `WheelRouter`.
+    /// It lives here so the bounds of a scrub position have exactly one answer in this codebase.
+    ///
+    /// A non-positive duration means the asset has not loaded, and the answer is the start rather
+    /// than a negative time: this feeds `seek(to:)`, and an `AVPlayer` seeked to a bad value does
+    /// not recover.
+    static func position(_ time: TimeInterval, duration: TimeInterval) -> TimeInterval {
+        guard duration > 0 else { return 0 }
+        return min(max(0, time), duration)
+    }
 }
