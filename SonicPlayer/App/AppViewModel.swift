@@ -178,23 +178,31 @@ final class AppViewModel {
     /// the image changes and someone sees it.
     private func showScreenshotScreen(_ screen: ScreenshotMode.Screen) {
         switch screen {
-        case .home, .playerEmpty, .playerLoading, .playerError:
-            break                                   // the fork is the root; the player states are seeded
+        // The library is the root, so arriving is the whole journey. The player's three states are
+        // seeded onto the view model rather than navigated to.
+        case .library, .playerEmpty, .playerLoading, .playerError:
+            break
 
-        case .library:
-            dial.receive(.press)                    // Listen → the library
-
+        // **`nowPlaying`, not two presses.** A press *starts* the highlighted recording, which
+        // resets the position `seedViewModels` just set — so the old sequence arrived at a player
+        // reading 00:00 against a full duration, and every player screenshot showed a track that
+        // had not begun. This is the chip the chrome's status bar sends, and it moves without
+        // touching playback, so the seeded 20:34 survives the trip.
         case .player:
-            dial.receive(.press)
-            dial.receive(.press)                    // and the first recording plays
+            dial.receive(.action("nowPlaying"))
 
         case .recording:
             dial.openRecorder()
 
+        // The chip the row carries, on the highlighted recording — which is row 0, a file, because
+        // the dial lists `home.allFiles`. The old sequence turned one detent and pressed twice,
+        // steps that only made sense while a Listen/Record fork sat above the library; after the
+        // collapse they played the *second* recording and photographed that.
         case .edit:
-            dial.receive(.tick(1))                  // home → Record
-            dial.receive(.press)                    // → the library
-            dial.receive(.press)                    // → the editor, on the first recording
+            dial.receive(.action("edit"))
+
+        case .settings:
+            dial.receive(.action("settings"))
         }
     }
 
