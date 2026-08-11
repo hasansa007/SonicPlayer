@@ -187,7 +187,7 @@ struct DialActionRow: View {
         .buttonStyle(ScaleButtonStyle())
         .disabled(action.emphasis == .disabled)
         .accessibilityLabel(Self.spokenLabel(for: action.label))
-        .accessibilityAddTraits(action.emphasis == .selected ? [.isSelected] : [])
+        .accessibilityAddTraits(action.emphasis == .active ? [.isSelected] : [])
     }
 
     private func foreground(_ emphasis: DialScreen.Action.Emphasis) -> Color {
@@ -198,6 +198,10 @@ struct DialActionRow: View {
         // Destructive keeps a light label for the same reason: it sits on a filled surface too,
         // just an orange one.
         case .destructive: .white
+        // **The accent as ink, not as fill.** An option that is on is worth marking and is not
+        // where the wheel is; giving it the glyph in teal on the ordinary surface says so without
+        // borrowing the cursor's look.
+        case .active: .sonicPrimary
         case .plain: .sonicTextPrimary
         case .disabled: .sonicTextMuted
         }
@@ -212,7 +216,8 @@ struct DialActionRow: View {
         // thing you cannot take back" must not be the same colour — `Record` and `Delete` are both
         // the obvious action on their screen, and only one is recoverable.
         case .destructive: AnyShapeStyle(Color.sonicOrange)
-        case .plain, .disabled: AnyShapeStyle(Color.sonicPrimary.opacity(ControlTint.on))
+        case .active: AnyShapeStyle(Color.sonicPrimary.opacity(ControlTint.on))
+        case .plain, .disabled: AnyShapeStyle(Color.sonicPrimary.opacity(ControlTint.off))
         }
     }
 
