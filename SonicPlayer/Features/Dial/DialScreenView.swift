@@ -220,6 +220,13 @@ struct DialScreenView: View {
         .ignoresSafeArea()
     }
 
+    /// Which row the wheel is resting on, when the content is a list. `nil` for every other screen,
+    /// which is what keeps the scroll-follow above inert on Now Playing, the recorder and the editor.
+    private var highlightedRow: Int? {
+        if case .list(let list) = screen.content { return list.highlighted }
+        return nil
+    }
+
     /// The card. Everything above the action row lives inside it, which is what makes the dial read
     /// as the device and the content as what is on the device.
     private var stage: some View {
@@ -239,7 +246,27 @@ struct DialScreenView: View {
             // pushed the dial off the bottom rather than squeezing the list.
             ViewThatFits(in: .vertical) {
                 content
-                ScrollView { content }
+                // **The scroll view that actually scrolls, so the reader belongs here (#91).**
+                //
+                // `DialListView` used to carry its own, with the `scrollTo` on it. Once the rows
+                // overran the card this branch was chosen, the inner view was handed unbounded
+                // height, and it therefore always fitted — so its `scrollTo` was a no-op while the
+                // clipping happened out here. Turning the wheel moved a highlight nobody could see.
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        content
+                    }
+                    .onChange(of: highlightedRow) { _, index in
+                        guard let index else { return }
+                        withAnimation(Motion.settle) { proxy.scrollTo(index, anchor: .center) }
+                    }
+                    // `onChange` cannot fire for a screen that ARRIVES with its highlight already
+                    // deep in the list — a restored session, or Settings reached with About selected.
+                    .task(id: highlightedRow) {
+                        guard let index = highlightedRow else { return }
+                        proxy.scrollTo(index, anchor: .center)
+                    }
+                }
             }
         }
         .padding(Spacing.lg)
