@@ -19,22 +19,11 @@ cd "$(dirname "$0")/.." || exit 2
 # Screens that have been through the epic. Each slice appends its files here as it lands, so the
 # gate tightens one screen at a time instead of failing on four screens nobody has touched yet.
 MIGRATED=(
-  "SonicPlayer/Features/Player/PlayerView.swift"
-  "SonicPlayer/Features/Player/MiniPlayerView.swift"
-  "SonicPlayer/DesignSystem/Components/IconControlButton.swift"
-  "SonicPlayer/DesignSystem/Components/ArtworkView.swift"
-  "SonicPlayer/DesignSystem/Components/SonicScrubber.swift"
-  "SonicPlayer/DesignSystem/Components/SonicRow.swift"
-  "SonicPlayer/Features/Files/CollectionsView.swift"
-  "SonicPlayer/Features/Shell/ShellView.swift"
-  "SonicPlayer/DesignSystem/Components/RotaryWheel.swift"
-  "SonicPlayer/DesignSystem/Components/WheelHUD.swift"
   "SonicPlayer/DesignSystem/Components/DialRing.swift"
   "SonicPlayer/Features/Dial/DialScreenView.swift"
   "SonicPlayer/Features/Dial/DialChrome.swift"
   "SonicPlayer/Features/Dial/DialActionRow.swift"
   "SonicPlayer/Features/Dial/DialListView.swift"
-  "SonicPlayer/DesignSystem/Components/LiveBorder.swift"
   "SonicPlayer/Features/Dial/DialNowPlayingView.swift"
   "SonicPlayer/Features/Dial/DialRecordingView.swift"
   "SonicPlayer/Features/Dial/DialEditView.swift"
@@ -43,6 +32,7 @@ MIGRATED=(
   "SonicPlayer/Features/Dial/DialIcon.swift"
   "SonicPlayer/Features/Dial/DialFraction.swift"
   "SonicPlayer/Features/Dial/DialPreviewData.swift"
+  "SonicPlayer/App/OnboardingView.swift"
 )
 
 if [[ "${1:-}" == "--all" ]]; then
@@ -57,6 +47,21 @@ fi
 
 total=0
 status=0
+
+# **A missing MIGRATED entry is an error, not a skip.** This loop read `[[ -f ]] || continue`,
+# so when #76 deleted ten of the screens listed above, the gate went on printing
+# "No un-tokenised layout literals in 24 file(s)" while opening 14 of them. A gate that counts
+# files it never read is worse than no gate: it reports a clean run over work it did not do.
+# Only the curated list is checked this way — `--all` is a live find and cannot go stale.
+if [[ "${1:-}" != "--all" ]]; then
+  for file in "${TARGETS[@]}"; do
+    if [[ ! -f "$file" ]]; then
+      echo "✗ MIGRATED lists a file that does not exist: $file"
+      echo "  Remove it from the list, or restore the file. Do not leave it to be skipped."
+      exit 2
+    fi
+  done
+fi
 
 for file in "${TARGETS[@]}"; do
   [[ -f "$file" ]] || continue
