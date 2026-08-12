@@ -290,7 +290,14 @@ struct DialScreenView: View {
         // whatever was left, so a three-row library was a third of a screen of nothing under three
         // rows. The stack below still gives it every point the dial does not want, so a long list
         // grows exactly as far as it can — it just no longer *claims* the space when empty.
-        .frame(maxWidth: .infinity)
+        // **maxHeight belongs HERE, before the background.** Applied to `stage` from outside it
+        // stretched the layout slot and left the drawn card at its content height, centred in a
+        // taller invisible frame — which looks exactly like no change at all. The background is
+        // attached on the next line, so whatever this frame reports is the card you see.
+        //
+        // `alignment: .top` so a short list stays at the top of the card rather than floating in
+        // the middle of it.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color.sonicSurface, in: RoundedRectangle(cornerRadius: Radius.stage))
         // **The card's border no longer cycles while audio moves.** It was the wheel's, moved here,
         // and it was the one thing on the screen animating forever — which is what made a rotation
