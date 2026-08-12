@@ -124,12 +124,47 @@ jobs:
       - name: Write App Store Connect API key
         env:
           ASC_API_KEY: ${{ secrets.ASC_API_KEY }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
         run: |
           # **Before the archive, not after.** It used to sit between `Archive` and `Export`, which
           # was fine while the archive signed itself from an imported certificate. Signing assets
           # are now fetched with this key, so the archive needs it too.
+          #
+          # **Everything below the write is here because the silent version cost two runs.**
+          # `base64 --decode` of an empty secret writes an empty file and exits 0, so this step goes
+          # green on a secret that does not exist. The failure then lands in `Archive` as
+          #
+          #   xcodebuild: error: Invalid authentication key credential specified
+          #   (CryptoKit.CryptoKitASN1Error.invalidPEMDocument).
+          #
+          # which names neither the secret, nor this step, nor the fact that a file is empty. That
+          # is the whole defect: a write that cannot fail, feeding a reader that cannot explain.
+          # These checks cost about a second and name the thing that is actually wrong.
+          for var in ASC_API_KEY ASC_API_KEY_ID ASC_API_ISSUER_ID; do
+            if [ -z "${!var}" ]; then
+              echo "::error::$var is empty or unset."
+              echo "::error::Set it under Settings → Secrets and variables → Actions."
+              exit 1
+            fi
+          done
+
+          # `ASC_API_KEY_ID` is interpolated into the filename that `Archive` and `Export` read back
+          # by the same expression. Empty, it yields `AuthKey_.p8` on both sides — consistent, so
+          # nothing notices until Apple rejects the credential.
           mkdir -p $RUNNER_TEMP/private_keys
-          echo -n "$ASC_API_KEY" | base64 --decode -o "$RUNNER_TEMP/private_keys/AuthKey_${{ secrets.ASC_API_KEY_ID }}.p8"
+          KEY_PATH="$RUNNER_TEMP/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
+          echo -n "$ASC_API_KEY" | base64 --decode -o "$KEY_PATH"
+
+          # Parses the decoded bytes as a private key rather than merely checking the file is
+          # non-empty — base64 of the wrong file decodes perfectly and is still not a key.
+          if ! openssl pkey -in "$KEY_PATH" -noout 2>/dev/null; then
+            echo "::error::ASC_API_KEY did not decode to a private key."
+            echo "::error::It must be the base64 of the .p8 issued by App Store Connect:"
+            echo "::error::  base64 -i AuthKey_${ASC_API_KEY_ID}.p8 | gh secret set ASC_API_KEY"
+            exit 1
+          fi
+          echo "Key $ASC_API_KEY_ID decoded and parsed as a private key."
 
       # `Resolve packages` stood here and is gone with #20. `Package.resolved` pins zero packages,
       # so the step resolved nothing — and a resolution step in a release pipeline is a standing
