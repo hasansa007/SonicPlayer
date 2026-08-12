@@ -109,13 +109,19 @@ struct DialScreenView: View {
         // reaches for in turn — at `lg` the chip column touched both its neighbours and read as
         // part of whichever it was nearer.
         HStack(spacing: Spacing.xxxl) {
-            // **As tall as the wheel and as wide as what is left.** Its height is content-driven in
-            // portrait, where the list is the long axis; here the long axis is across, so a card
-            // that grows past the dial makes the two halves of the screen disagree about where the
-            // middle is. Squaring it against the dial is what lets the eye read them as one object.
+            // **As tall as the CHIP COLUMN, not as tall as the wheel.**
+            //
+            // This was `height: Sizing.dialDiameter`, squared against the dial so the two halves
+            // agreed about where the middle was. What that actually produced was a card floating in
+            // the vertical centre while the chips beside it ran the full height — Back above its top
+            // edge, Settings below its bottom one, and a band of nothing at each end.
+            //
+            // The column is what the eye reads the card against, because it is immediately beside
+            // it. Filling the same height puts the card's top edge on Back's and its bottom edge on
+            // Settings', which is the alignment that was being asked for by pinning to the dial and
+            // not delivered.
             stage
-                .frame(maxWidth: .infinity)
-                .frame(height: Sizing.dialDiameter)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             // **The controls turn from a column into a row, and the wheel keeps its size.** Stacked,
             // the chips, the dial and the caption come to about 370 points against roughly 340 of
@@ -147,13 +153,16 @@ struct DialScreenView: View {
             .frame(width: Sizing.dialDiameter)
         }
         .environment(\.layoutDirection, .leftToRight)
-        // **20 on three edges; the trailing one keeps its 24.**
+        // **No leading padding, 20 vertical, and the trailing keeps its 24.**
         //
-        // Landscape had 24 horizontal and 16 vertical, and the card is pinned to the wheel's height
-        // — so every point the frame did not use showed up as a band of nothing around a card that
-        // cannot grow into it. Tightening the leading edge and both verticals to a single 20 closes
-        // that without moving the wheel, which keeps its own inset on the trailing side.
-        .padding(.leading, Spacing.xl)
+        // Measured on a landscape capture, the card sat 83pt from the leading edge against 21 at the
+        // top — and only 20 of that 83 was padding. The other 63 is the safe area for the sensor
+        // housing, which in landscape runs the full leading edge.
+        //
+        // So the padding is dropped there and the gap is 63pt: as close to matching the top as this
+        // edge can get. Closing it further means drawing the list under the housing, and the row
+        // text starts 16pt inside the card — nowhere near enough to clear it. The asymmetry that is
+        // left belongs to the device, not to this layout, and it swaps sides with the rotation.
         .padding(.trailing, Spacing.xxl)
         .padding(.vertical, Spacing.xl)
         // **After the padding, deliberately.** The chip column pushes Back and Settings to the ends
