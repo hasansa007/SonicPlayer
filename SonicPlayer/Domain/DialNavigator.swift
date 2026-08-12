@@ -437,25 +437,25 @@ struct DialNavigator {
         case .move(let itemID):
             let rows = MoveDestinations.rows(in: content.recordings, excluding: itemID)
             guard let row = rows[safe: level.highlighted] else { return [.feedback(.limit)] }
-            pop()
+            let leaving = pop()
             switch row {
             // **Naming is the host's and filing follows it**, which is why this is one effect and
             // not `createFolder` plus a move the user has to make again. A folder needs a name
             // before it exists and the dial has no keyboard; what the dial can say is what the
             // folder is *for*.
             case .newFolder:
-                return [.createFolderForMove(itemID: itemID), .feedback(.commit)]
+                return leaving + [.createFolderForMove(itemID: itemID), .feedback(.commit)]
             case .existing(let destination):
-                return [.moveItem(itemID: itemID, toFolderID: destination.id), .feedback(.commit)]
+                return leaving + [.moveItem(itemID: itemID, toFolderID: destination.id), .feedback(.commit)]
             }
 
         case .confirmDelete(let itemID):
             let choices = DialRoute.DeleteChoice.allCases
             let choice = choices[min(level.highlighted, choices.count - 1)]
-            pop()
+            let leaving = pop()
             switch choice {
-            case .cancel: return [.feedback(.commit)]
-            case .delete: return [.item(.delete, itemID: itemID), .feedback(.commit)]
+            case .cancel: return leaving + [.feedback(.commit)]
+            case .delete: return leaving + [.item(.delete, itemID: itemID), .feedback(.commit)]
             }
 
         }
@@ -559,8 +559,7 @@ struct DialNavigator {
             // sense while the hub did not write — but the nudges then started committing on the
             // spot, so the gate offered to save something already on disk. `DONE` writes and
             // nothing else does, which leaves `Back` with nothing to guard.
-            pop()
-            return [.feedback(.commit)]
+            return pop() + [.feedback(.commit)]
         }
 
         // Selecting a mode needs no per-screen code, which is what keeps a new mode from being a
@@ -813,9 +812,18 @@ struct DialNavigator {
         clampHighlight(atDepth: stack.count - 1)
     }
 
-    private mutating func pop() {
-        guard stack.count > 1 else { return }
-        stack.removeLast()
+    /// **Returns what leaving the level costs**, so no exit can forget it.
+    ///
+    /// The trim preview used to be stopped only where an edit was written. Every other way out of
+    /// the editor — Back, cancelling a move, cancelling a delete — left it playing. Putting it here
+    /// means the three callers cannot diverge: there is one place a level is removed, so there is
+    /// one place to say what removing it releases.
+    @discardableResult
+    private mutating func pop() -> [DialEffect] {
+        guard stack.count > 1 else { return [] }
+        let leaving = stack.removeLast()
+        if case .edit = leaving.route { return [.stopPreview] }
+        return []
     }
 
     // MARK: - Rows

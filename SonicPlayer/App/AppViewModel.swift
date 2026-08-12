@@ -359,6 +359,7 @@ final class AppViewModel {
         // resets the transport and persists an empty session — so a trim cannot rewrite a file that
         // something is still holding a duration and a position for.
         dial.onReleasePlayer = { [player] in player.clearSession() }
+        dial.onStopPreview = { [trimPreview] in trimPreview.stop() }
         dial.onSetVolume = { [player] value in player.setVolume(value) }
         // **The picker lands where you are standing.** Import used to exist only at the library
         // root, so there was one destination and no need to say which. A folder is somewhere you

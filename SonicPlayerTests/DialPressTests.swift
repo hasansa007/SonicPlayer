@@ -162,13 +162,19 @@ struct DialPressTests {
     }
 
     /// **Back leaves and asks nothing**, because nothing has been written to save or discard.
-    @Test func leavingTheEditorAppliesNothing() {
+    ///
+    /// It does stop the preview. That is not an edit being applied — it is audio being released, and
+    /// leaving with it still playing was a real bug: the preview ran on over the library and over
+    /// the next recording, because nothing in the leave path knew about it. `pop()` says so now.
+    @Test func leavingTheEditorAppliesNothingButReleasesThePreview() {
         var navigator = DialSample.whileEditing()
         _ = navigator.receive(.tick(10))
 
         let effects = navigator.receive(.action("back"))
 
-        #expect(effects == [.feedback(.commit)])
+        #expect(effects == [.stopPreview, .feedback(.commit)])
+        #expect(!effects.contains { if case .commitTrim = $0 { return true } else { return false } },
+                "leaving must still write nothing")
         #expect(navigator.route == .recordings)
     }
 
