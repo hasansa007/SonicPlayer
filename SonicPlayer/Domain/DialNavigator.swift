@@ -379,9 +379,28 @@ struct DialNavigator {
             guard let setting = DialSetting.allCases[safe: level.highlighted] else {
                 return [.feedback(.limit)]
             }
+            // **About and How it works are screens now, not sheets** (#50). They were the last two
+            // things the dial presented by raising a UIKit-era modal over itself; everything else it
+            // does is a level of its own stack.
+            switch setting {
+            case .about: return open(.about)
+            case .help: return open(.help)
+            default: break
+            }
             // Cycling rows stay put: the value is on the row under the highlight, so leaving would
             // hide the thing that just changed.
             return [.setting(setting), .feedback(setting.cycles ? .detent : .commit)]
+
+        // **A row opens its own screen; the screen's hub is Back** (#50). The paragraph the dial is
+        // supposedly poor at gets the whole card here, which is the difference between prose in a
+        // row and prose on a screen.
+        case .about, .help:
+            let entries = route == .help ? InfoContent.help : InfoContent.about
+            guard let entry = entries[safe: level.highlighted] else { return [.feedback(.limit)] }
+            return open(.infoDetail(id: entry.id, inHelp: route == .help))
+
+        case .infoDetail:
+            return pop() + [.feedback(.commit)]
 
         case .recordings, .folder:
             // **Every row is a file or a folder.** Import and New folder were rows once, and the
@@ -980,8 +999,19 @@ struct DialNavigator {
         switch id {
         case "back": return canGoBack(atDepth: depth)
         case "settings":
-            if case .settings = stack[depth].route { return false }
-            return true
+            // **Anywhere inside the settings path, not only on the settings screen itself.**
+            //
+            // This asked whether the CURRENT route was `.settings`, which was the whole rule while
+            // Settings was a leaf. Once About and How it works became screens pushed on top of it
+            // (#50), the chip came back to life one level down — so from About you could press
+            // Settings and stack a second Settings on top of the one you were already inside.
+            //
+            // Asking about the path rather than the tip means any screen added under Settings later
+            // is covered without anyone remembering this line exists.
+            return !stack.prefix(depth + 1).contains { level in
+                if case .settings = level.route { return true }
+                return false
+            }
         default: return true
         }
     }
@@ -1054,6 +1084,9 @@ struct DialNavigator {
         case .recordings, .folder: return items.count
         case .confirmDelete: return DialRoute.DeleteChoice.allCases.count
         case .confirmEdit: return DialRoute.EditChoice.allCases.count
+        case .about: return InfoContent.about.count
+        case .help: return InfoContent.help.count
+        case .infoDetail: return 0
         case .move(let itemID): return MoveDestinations.rows(in: content.recordings, excluding: itemID).count
         case .nowPlaying, .recording, .edit: return 0
         }

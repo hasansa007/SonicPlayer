@@ -462,10 +462,9 @@ final class AppViewModel {
                 )
             case .language:
                 settings.openSystemLanguageSettings()
-            case .about:
-                settings.showAboutTapped()
-            case .help:
-                settings.showHelpTapped()
+            // `.about` and `.help` never reach here — the navigator opens a route (#50).
+            case .about, .help:
+                break
             }
             refreshDial()
         }

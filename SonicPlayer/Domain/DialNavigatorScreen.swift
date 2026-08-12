@@ -50,6 +50,10 @@ extension DialNavigator {
         switch route {
         case .nowPlaying, .recording, .edit:
             return nil
+        // **About states what it is about.** Everywhere else this line reports playback, which is
+        // the right default; here the version is the fact the screen exists to carry.
+        case .about:
+            return InfoContent.version
         default:
             guard let playback = content.playback else { return nil }
             let state = playback.isPlaying ? "playing" : "paused"
@@ -152,6 +156,28 @@ extension DialNavigator {
         // being filed is a list of folders.
         case .move(let itemID):
             return .list(list(rows: moveRows(for: itemID), subject: subject(for: itemID)))
+
+        // **The two info lists, and the screen a row opens** (#50). Rows without a subtitle on the
+        // help list, because there the question IS the row.
+        case .about, .help:
+            let entries = route == .help ? InfoContent.help : InfoContent.about
+            return .list(.init(
+                rows: entries.map {
+                    .init(id: $0.id, icon: $0.icon, title: $0.title,
+                          subtitle: $0.subtitle, opensSomewhere: true)
+                },
+                highlighted: level.highlighted
+            ))
+
+        case .infoDetail(let id, let inHelp):
+            let entries = inHelp ? InfoContent.help : InfoContent.about
+            guard let entry = InfoContent.entry(id, in: entries) else {
+                // A route the content cannot answer. Reachable only if an id is renamed without its
+                // route, which is what saying so on screen is for.
+                return .message(.init(icon: .none, title: "Nothing here",
+                                      body: String(localized: "This page could not be found.")))
+            }
+            return .message(.init(icon: entry.icon, title: entry.title, body: entry.body))
 
         case .confirmDelete(let itemID):
             return .list(list(
@@ -643,6 +669,10 @@ extension DialNavigator {
         // committed, and stopped existing when they went back to arming.
         case .edit:
             return .label("DONE")
+        case .about, .help:
+            return .label("READ")
+        case .infoDetail:
+            return .label("BACK")
         case .confirmDelete, .confirmEdit:
             return .label("CONFIRM")
         case .move:
@@ -721,6 +751,10 @@ extension DialNavigator {
 
         // Says what the press will do rather than how to press. This is the one screen where the
         // wrong answer cannot be taken back, so the caption names the outcome.
+        case .about, .help:
+            return "rotate to scroll · press to read"
+        case .infoDetail:
+            return "press to go back"
         case .confirmDelete:
             return "deleting cannot be undone · rotate to choose · press to confirm"
         // Same reason as the line above it: this rewrites the recording on disk and there is no
