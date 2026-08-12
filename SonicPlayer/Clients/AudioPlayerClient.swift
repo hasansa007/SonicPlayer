@@ -212,7 +212,7 @@ private final class AudioPlayerManager: NSObject, ObservableObject {
 
         while attempts < maxAttempts {
             if currentItem.status == .failed {
-                throw currentItem.error ?? NSError(domain: "AudioPlayer", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to load audio"])
+                throw PlaybackError.cannotLoad((currentItem.asset as? AVURLAsset)?.url)
             }
 
             // Check if both status is ready and duration is valid

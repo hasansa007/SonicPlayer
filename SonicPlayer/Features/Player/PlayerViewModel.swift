@@ -481,7 +481,7 @@ final class PlayerViewModel {
                 let file = try await fileManager.getMetadata(imported)
                 self?.loadTrack(file, queue: [file], source: .singleFile)
             } catch {
-                self?.openError = error.localizedDescription
+                self?.openError = userMessage(error)
             }
         }
     }

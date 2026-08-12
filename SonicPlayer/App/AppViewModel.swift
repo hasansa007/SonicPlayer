@@ -429,7 +429,7 @@ final class AppViewModel {
                 do {
                     try await fileManager.deleteItem(url)
                 } catch {
-                    self.dial.operationError = error.localizedDescription
+                    self.dial.operationError = userMessage(error)
                     return
                 }
                 self.home.loadAllFiles()
@@ -566,7 +566,7 @@ final class AppViewModel {
             do {
                 _ = try await audioTrimmer.deleteAudioRange(url, start, end)
             } catch {
-                print("Failed to cut range: \(error.localizedDescription)")
+                print("Failed to cut range: \(userMessage(error))")
             }
             markers.forget(url)
             dial.forgetWaveform(for: url)
@@ -584,7 +584,7 @@ final class AppViewModel {
                     url: url, start: start, end: end, trimmer: audioTrimmer
                 )
             } catch {
-                print("Failed to commit trim: \(error.localizedDescription)")
+                print("Failed to commit trim: \(userMessage(error))")
                 return
             }
             dial.forgetWaveform(for: url)
@@ -635,7 +635,7 @@ final class AppViewModel {
                 try await fileManager.moveItem(file.url, destination)
             } catch {
                 await MainActor.run { [weak self] in
-                    self?.dial.operationError = error.localizedDescription
+                    self?.dial.operationError = userMessage(error)
                 }
                 return
             }
