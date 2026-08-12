@@ -52,8 +52,9 @@ enum Radius {
 
 /// Control and artwork dimensions.
 ///
-/// `tapTarget` is 44 because that is Apple's documented minimum — several buttons in the old
-/// player were smaller than it, which `IconControlButton` now makes impossible.
+/// `tapTarget` is 44 because that is Apple's documented minimum — several buttons in the deleted
+/// player were smaller than it. `IconControlButton` used to enforce this and went with them (#76);
+/// the dial's chips carry `Sizing.compactControl` plus padding to clear the same floor.
 enum Sizing {
     /// 44 × 44 — the smallest a control may be.
     static let tapTarget: CGFloat = 44
@@ -102,8 +103,10 @@ enum Sizing {
     /// 130 — a collection card. Fixed so a grid row stays level whether a folder's name wraps to
     /// one line or two.
     static let collectionCard: CGFloat = 130
-    /// 64 — one `SonicRow`. Home reserves this per row because its list is inside a fixed-height
-    /// frame with scrolling disabled, so it has to know the height in advance.
+    /// 64 — the height one row was given when `SonicRow` drew it for Home's recents. Both are gone
+    /// (#6, #76). Kept because the dial's list still reserves a per-row height, and because the
+    /// reason it was ever needed is worth remembering: a fixed height against text that scales is
+    /// what made Home overlap itself at AX5 (#57).
     static let rowHeight: CGFloat = 64
 
     // The rotary wheel. **None of these scale with Dynamic Type**, and that is the point: the wheel
@@ -233,6 +236,14 @@ enum Motion {
     /// rather than as an alarm, which matters because it is on screen for the whole recording.
     static let recordPulse: Animation = .easeInOut(duration: 0.7).repeatForever(autoreverses: true)
 
+    /// A first-run page arriving — its art scaling up and its copy sliding into place.
+    static let onboardingEnter: Animation = .easeOut(duration: 0.6)
+    /// The glow behind a first-run illustration, breathing. Deliberately far slower than
+    /// `recordPulse`: nothing is happening, so it must not read as a status.
+    static let onboardingBreathe: Animation = .easeInOut(duration: 2).repeatForever(autoreverses: true)
+    /// A first-run illustration's own loop — the bouncing arrow, the pulsing disc, the sliding file.
+    static let onboardingLoop: Animation = .easeInOut(duration: 1.2).repeatForever(autoreverses: true)
+
     /// The playing-waveform bars. `index` staggers them so they do not pulse in unison.
     ///
     /// A fixed table rather than `Double.random(in: 0.3...0.6)`, which the old
@@ -246,9 +257,49 @@ enum Motion {
     }
 }
 
+/// The five first-run illustrations (#102).
+///
+/// **These are drawing dimensions, not layout and not type.** Each page shows a small scene — a
+/// glow, a glyph, a level meter — and the numbers only have to agree with *each other*, or the
+/// carousel jumps as you page through it. They already had drifted: four pages drew a 180pt glow
+/// and one drew 200, which is visible as a twitch on the fourth swipe and which nobody chose.
+///
+/// They therefore do **not** go through `@ScaledMetric`, unlike `DialFont`. A glyph here is a
+/// picture of a microphone, not a word — growing it at accessibility sizes pushes the copy beside
+/// it off the card, and the copy is the part that has to stay readable.
+enum OnboardingArt {
+    /// The radial glow every page sits its glyph inside, and the radius its colour fades over.
+    static let glow: CGFloat = 180
+    static let glowFade: CGFloat = 80
+
+    /// The waveform on the welcome page, and one of its bars.
+    static let waveform = CGSize(width: 120, height: 60)
+    static let waveBar: CGFloat = 8
+    /// What a bar collapses to before the animation starts — never zero, or the row vanishes.
+    static let waveBarRest: CGFloat = 12
+
+    /// The mic and play discs, which are the same size so pages 3 and 4 do not jump.
+    static let disc: CGFloat = 56
+    /// The level meter under the mic: nine bars, and the height the row reserves for them.
+    static let levelBar: CGFloat = 4
+    static let levelRow: CGFloat = 30
+    static let levelPeak: CGFloat = 28
+
+    /// A row in the miniature library the dial page draws, and a chip in the row under it.
+    static let listRow = CGSize(width: 104, height: 16)
+    static let chip: CGFloat = 26
+
+    /// How a page enters: the art scales up from here, the copy slides up by this much.
+    static let enterScale: CGFloat = 0.9
+    static let enterOffset: CGFloat = 12
+    /// Body copy on a first-run page is set looser than body copy anywhere else — it is read once,
+    /// slowly, by someone who has not decided to trust the app yet.
+    static let bodyLineSpacing: CGFloat = 5
+}
+
 /// Point sizes the dial navigator draws numerals at, plus the one tracking value its chrome needs.
 ///
-/// These exist for the same reason `DisplayFont` does — **a `.system(size:)` is the same number of
+/// These exist for the same reason `DisplayFont` did — **a `.system(size:)` is the same number of
 /// points at every accessibility setting** — and carry the same obligation: read each one through
 /// `@ScaledMetric`, never inline.
 ///
@@ -256,7 +307,8 @@ enum Motion {
 /// @ScaledMetric(relativeTo: .largeTitle) private var elapsed = DialFont.elapsed
 /// ```
 ///
-/// They are here rather than beside `DisplayFont` in `Typography.swift` only because the dial's UI
+/// They are here rather than in `Typography.swift`, where `DisplayFont` held its pair until #76
+/// deleted it for want of a consumer, only because the dial's UI
 /// half was built on a branch that owns `Tokens.swift` and not that file. They are the same idea
 /// and should be folded in when the two land together.
 ///
@@ -277,4 +329,49 @@ enum DialFont {
     static let fraction: CGFloat = 26
     /// 1.5 — letter spacing on a breadcrumb. Set in caps at caption size, it needs the air.
     static let breadcrumbTracking: CGFloat = 1.5
+}
+
+/// The two background tints a tinted surface may have.
+///
+/// Named because the old code used *three* values for two states: repeat and shuffle painted
+/// `0.05` when off and `0.1` when on, while the queue toggle used `0.1` and `0.15` — so "off"
+/// and "on" looked different depending on which control you were looking at.
+///
+/// **Moved here from `IconControlButton.swift` in #76**, which was deleted with the player chrome.
+/// It had thirteen callers across the dial and none in the file that housed it — a token living
+/// inside a component is a token that disappears when the component does, which is exactly what
+/// happened: the build broke on `DialActionRow`, four files away from anything the deletion named.
+enum ControlTint {
+    static let off: Double = 0.05
+    static let on: Double = 0.1
+}
+
+/// **The card the dial draws its content on** (#102).
+///
+/// Extracted from `DialScreenView.stage`, where it was five modifiers inline. Onboarding needed the
+/// same surface — the point of driving it with the wheel is that the first run looks like the app,
+/// and a card of its own invention would have been a fourth version of "a rounded rectangle in this
+/// app's colours".
+///
+/// One definition, so a change to the corner radius or the border cannot land on one screen and miss
+/// the other. This is the lesson `ControlTint` taught the hard way in #76: a shared value living
+/// inside one component disappears when that component does.
+struct DialCard: ViewModifier {
+    /// Content sits at the top and the card takes the height it is given — a short list leaves an
+    /// empty surface rather than a shorter card, so the wheel below never moves.
+    func body(content: Content) -> some View {
+        content
+            .padding(Spacing.lg)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(Color.sonicSurface, in: RoundedRectangle(cornerRadius: Radius.stage))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radius.stage)
+                    .strokeBorder(Color.sonicBorder, lineWidth: Sizing.hairlineTrackHeight / 2)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radius.stage))
+    }
+}
+
+extension View {
+    func dialCard() -> some View { modifier(DialCard()) }
 }

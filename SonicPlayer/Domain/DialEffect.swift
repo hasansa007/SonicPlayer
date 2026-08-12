@@ -6,7 +6,7 @@ import Foundation
 /// assert intent instead of observing side effects, and so a pure `Domain/` type can ask for
 /// playback and recording without importing either.
 ///
-/// **Positions are absolute, not deltas.** `ShellEffect.seekBy` hands the shell a delta and lets it
+/// **Positions are absolute, not deltas.** `ShellEffect.seekBy` handed the shell a delta and let it
 /// do the clamping, which means the bounds of a seek live wherever the effect is applied. Here the
 /// navigator already holds the position and the duration, so it clamps once with `ScrubClamp` and
 /// says where to land. An effect that has already been bounded cannot be applied wrongly.
@@ -47,6 +47,13 @@ enum DialEffect: Equatable {
     /// restore both against bytes that no longer match. Entering Record mode releases it, which is
     /// what makes editing a loaded file impossible rather than merely discouraged. See `DialActivity`.
     case releasePlayer
+    /// Stop the trim editor's preview.
+    ///
+    /// **Emitted by leaving the editor, not by any button.** `TrimPreview` was stopped only by
+    /// `commitTrim` and `cutRange` — the two ways an edit is *written*. Backing out with a preview
+    /// playing left it running over the library, over Now Playing, and over the next recording,
+    /// because nothing in the leave path knew about it (#6).
+    case stopPreview
     /// Absolute, already inside `0...duration`.
     case seek(to: TimeInterval)
     /// Absolute, already inside `0...1`.

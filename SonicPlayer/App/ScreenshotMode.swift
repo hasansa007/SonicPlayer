@@ -7,9 +7,14 @@ import SwiftUI
 /// directly to a target screen with stable demo data.
 ///
 /// Launch arguments:
-///   -screenshotMode YES
-///   -screenshotScreen <screenName>
-///   -screenshotUseDemoData YES
+///   -screenshotMode                    presence is the switch; any value is ignored
+///   -screenshotScreen <screenName>     one of `Screen` below
+///   -screenshotPage <n>                onboarding only — which page to land on
+///
+/// **`-screenshotUseDemoData` is gone from here because nothing ever read it.** Both capture
+/// scripts passed it and this list promised it worked; the seeding is unconditional in
+/// `seedViewModels`. An argument documented as a switch that is not one is worse than an
+/// undocumented one, because the next person turns it off and nothing changes.
 enum ScreenshotMode {
     static var isEnabled: Bool {
         ProcessInfo.processInfo.arguments.contains("-screenshotMode")
@@ -21,6 +26,15 @@ enum ScreenshotMode {
               index + 1 < ProcessInfo.processInfo.arguments.count
         else { return nil }
         return Screen(rawValue: ProcessInfo.processInfo.arguments[index + 1])
+    }
+
+    /// Which onboarding page to land on, for `-screenshotScreen onboarding`. Defaults to the first.
+    static var page: Int {
+        guard isEnabled,
+              let index = ProcessInfo.processInfo.arguments.firstIndex(of: "-screenshotPage"),
+              index + 1 < ProcessInfo.processInfo.arguments.count
+        else { return 0 }
+        return Int(ProcessInfo.processInfo.arguments[index + 1]) ?? 0
     }
 
     /// **Named for dial routes, because that is what the app has.**
@@ -44,6 +58,14 @@ enum ScreenshotMode {
         case edit
         /// The settings list, reached by its chip the way every screen reaches it.
         case settings
+
+        /// **The first run, which every other target deliberately skips** (#102).
+        ///
+        /// Onboarding is the one screen that cannot be reached twice: `ifNeeded` returns `nil` for
+        /// good the moment it is completed, so seeing page 4 meant deleting the app or editing code
+        /// — and during #102 it meant a temporary launch argument that had to be remembered out
+        /// again before committing. Pair it with `-screenshotPage` to land on one page.
+        case onboarding
 
         // The player's three non-happy states (#6). They exist here because epic #6 requires every
         // screen to have designed empty, loading and error states — and a state nobody can put on
@@ -206,6 +228,51 @@ enum ScreenshotDemoData {
         ),
     ]
 
+
+    // MARK: - The demo library, as a tree
+
+    /// **What the dial actually browses** (#64).
+    ///
+    /// `seedViewModels` set `home.allFiles` and `filesRoot`, and never `home.libraryTree` — while
+    /// `refreshDial` hands the dial BOTH `allFiles` and `libraryTree`. So the four demo collections
+    /// went into a view model the dial does not read, the demo library was a flat list of seven
+    /// recordings, and **no screenshot could show a folder** — one of 3.0.0's headline features, and
+    /// with it the Move screen and every folder-scoped Record or Import shot.
+    ///
+    /// The original bug reported that opening a demo collection failed because no such directory
+    /// exists on disk. It does not need to: a folder carries its children, so the navigator descends
+    /// inside this snapshot and never asks the filesystem for a level it has just pushed. Creating
+    /// the directories would be solving a problem the tree shape already removed.
+    ///
+    /// Ids are `url.absoluteString`, matching `LibraryTree` — one id space for files and folders, so
+    /// a route holding one resolves without knowing which kind it is.
+    static var libraryTree: [DialContent.Item] {
+        func file(_ audio: AudioFile) -> DialContent.Item {
+            DialContent.Item(
+                id: audio.url.absoluteString, title: audio.title,
+                duration: audio.duration, subtitle: nil, children: nil
+            )
+        }
+        func folder(_ name: String, _ contents: [AudioFile]) -> DialContent.Item {
+            let url = documentsURL.appendingPathComponent(name)
+            let total = contents.reduce(0) { $0 + $1.duration }
+            return DialContent.Item(
+                id: url.absoluteString,
+                title: name,
+                duration: 0,
+                // **The count has to match what is inside.** A folder claiming twelve recordings and
+                // holding five is one more thing a screenshot states falsely.
+                subtitle: "\(contents.count) recordings · \(DialTimeFormat.clock(total))",
+                children: contents.map(file)
+            )
+        }
+        return [
+            folder("Podcasts", Array(collectionFiles.prefix(5))),
+            folder("Lectures", Array(allFiles.suffix(2))),
+            folder("Voice Memos", Array(allFiles.dropFirst(3).prefix(2)))
+        ] + allFiles.prefix(4).map(file)
+    }
+
     // MARK: - State Builders
     //
     // `buildAppState` is gone with #18: `AppFeature.State` is three sheet flags now, and every
@@ -230,6 +297,8 @@ extension ScreenshotDemoData {
         for screen: ScreenshotMode.Screen
     ) {
         home.allFiles = allFiles
+        // The dial browses the tree, not the flat list — see `libraryTree` above (#64).
+        home.libraryTree = libraryTree
         filesRoot.seed(items: collections.map { .folder($0) } + allFiles.prefix(5).map { .file($0) })
 
         switch screen {
@@ -262,7 +331,7 @@ extension ScreenshotDemoData {
                 localized: "The file could not be read. It may have been moved or deleted."
             )
 
-        case .library, .recording, .edit, .settings:
+        case .library, .recording, .edit, .settings, .onboarding:
             break
         }
     }

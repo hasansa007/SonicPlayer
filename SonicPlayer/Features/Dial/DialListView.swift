@@ -78,10 +78,14 @@ struct DialListView: View {
     /// With six recordings the stack simply overflowed the card, so turning the wheel walked the
     /// highlight off the bottom edge and the screen stopped agreeing with the ring.
     ///
-    /// A `ScrollView` with scrolling **disabled** is what squares that with "it does not scroll":
-    /// the point of the rule was never that content cannot move, it was that a drag must not become
-    /// a second way to change the selection. Here the wheel remains the only thing that moves the
-    /// highlight, and the view merely keeps it in sight.
+    /// **The card scrolls; this view does not** (#91). `DialScreenView.stage` owns the scroll view
+    /// and the `ScrollViewReader` that follows `highlighted`, because that is the view the rows
+    /// actually overflow. A `ScrollView` lived here instead, with scrolling disabled, and it never
+    /// moved anything — nested inside the card's own, it was always handed enough height to fit.
+    ///
+    /// What the rule was ever protecting still holds: a drag must not become a second way to change
+    /// the selection. The wheel remains the only thing that moves the highlight; the card merely
+    /// keeps it in sight.
     var body: some View {
         if isProminent { cards } else { rows }
     }
@@ -111,30 +115,40 @@ struct DialListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
+    /// **A plain stack. The card owns the scrolling.**
+    ///
+    /// This held its own `ScrollView` plus a `ScrollViewReader` that scrolled to the highlight — and
+    /// it never worked, because it was not the view that scrolls. `DialScreenView.stage` wraps this
+    /// in `ViewThatFits { content; ScrollView { content } }`, so once the rows overrun the card the
+    /// OUTER scroll view is the one with an offset, and a `scrollTo` on the inner proxy moves a view
+    /// that already fits. Two nested scroll views, and the reader was attached to the wrong one.
+    ///
+    /// The `.id(index)` stays: `ScrollViewReader` resolves ids anywhere below it, so the card's
+    /// proxy finds these rows (#91).
     private var rows: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.vertical) {
-                VStack(spacing: Spacing.xxs) {
-                    if let subject = list.subject {
-                        subjectHeader(subject)
-                    }
-
-                    ForEach(Array(list.rows.enumerated()), id: \.element.id) { index, row in
-                        rowButton(row, at: index)
-                            .id(index)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .top)
+        VStack(spacing: Spacing.xxs) {
+            // **Above the subject, because it is the sentence the screen exists to say.** The guard
+            // drew the recording's name and two rows reading Cancel and Delete, and asked nothing —
+            // leaving the user to infer the question from the answers (#97).
+            if let question = list.question {
+                Text(question)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.sonicTextPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, Spacing.sm)
             }
-            .scrollDisabled(true)
-            // Bounded, so there is something to scroll within. Sized to its content, a `ScrollView`
-            // is just a `VStack` that overflows — which is how the highlight walked off the bottom.
-            .frame(maxHeight: .infinity)
-            .scrollBounceBehavior(.basedOnSize)
-            .onChange(of: list.highlighted) { _, index in
-                withAnimation(Motion.settle) { proxy.scrollTo(index, anchor: .center) }
+
+            if let subject = list.subject {
+                subjectHeader(subject)
+            }
+
+            ForEach(Array(list.rows.enumerated()), id: \.element.id) { index, row in
+                rowButton(row, at: index)
+                    .id(index)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .top)
     }
 
     private func rowButton(_ row: DialScreen.List.Row, at index: Int) -> some View {
@@ -246,7 +260,7 @@ private struct DialRowView: View {
             icon
 
             VStack(alignment: .leading, spacing: Spacing.xxs) {
-                // Two lines and tail truncation, **not** the middle truncation `SonicRow` uses.
+                // Two lines and tail truncation, **not** the middle truncation `SonicRow` used.
                 // That mode is right for a filename, where the extension is the informative end;
                 // here it turned "Recordings" into "R…gs" at AX5. A second line costs nothing at
                 // ordinary sizes, where these titles are one line anyway.

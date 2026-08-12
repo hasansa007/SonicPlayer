@@ -18,7 +18,7 @@ struct RecordingMarkers: Equatable {
     /// `DialTrimRange.minimumLength`, which happens to hold the same number today: one is "the
     /// shortest audio worth keeping" and the other is "closer than this was one tap, not two".
     /// Tuning either on a device must not silently move the other — the same reasoning that keeps
-    /// `DialNavigator.gainPerDetent` separate from `WheelRouter.volumePerDetent`.
+    /// `DialNavigator.gainPerDetent` separate from `WheelMetrics.volumePerDetent`.
     static let minimumSeparation: TimeInterval = 0.5
 
     private(set) var times: [TimeInterval]

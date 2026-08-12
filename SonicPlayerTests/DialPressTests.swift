@@ -102,10 +102,20 @@ struct DialPressTests {
 
     /// **`DONE` is the only thing that writes**, and it applies whichever operation the nudges
     /// armed. Trim is armed by default, so a press with no nudge keeps the selection.
-    @Test func pressingOnTheEditorAppliesTheArmedOperation() {
+    /// **DONE asks; the answer applies** (#97). The hub used to write on the spot — the two least
+    /// recoverable actions in the app were the only two with no gate.
+    @Test func pressingOnTheEditorAsksBeforeApplying() {
         var navigator = DialSample.whileEditing()
         _ = navigator.receive(.tick(10))       // nudge the start handle a second in
 
+        let asking = navigator.receive(.press)
+
+        #expect(asking.allSatisfy { if case .feedback = $0 { return true } else { return false } },
+                "opening the guard writes nothing")
+        #expect(navigator.route == .confirmEdit(itemID: "rec-0", operation: .keep))
+
+        // Row 0 is Cancel, so confirming means turning to row 1 first.
+        _ = navigator.receive(.tick(1))
         let effects = navigator.receive(.press)
 
         #expect(effects == [.commitTrim(itemID: "rec-0", start: 1, end: 600), .feedback(.commit)])
@@ -113,13 +123,29 @@ struct DialPressTests {
         #expect(navigator.route == .edit(itemID: "rec-0"))
     }
 
+    /// The other answer, and the one that has to write nothing at all.
+    @Test func cancellingTheGuardLeavesTheRecordingAlone() {
+        var navigator = DialSample.whileEditing()
+        _ = navigator.receive(.tick(10))
+        _ = navigator.receive(.press)          // → the guard, resting on Cancel
+
+        let effects = navigator.receive(.press)
+
+        #expect(effects == [.feedback(.commit)], "cancel writes nothing")
+        #expect(navigator.route == .edit(itemID: "rec-0"), "and returns to the editor")
+    }
+
     /// **A second press cannot re-cut the old region.** The file underneath has been rewritten, so
     /// the handles are cleared and re-seeded from whatever the next refresh reports.
     @Test func applyingClearsTheSelectionSoItCannotBeAppliedTwice() {
         var navigator = DialSample.whileEditing()
         _ = navigator.receive(.tick(10))
-        _ = navigator.receive(.press)
+        _ = navigator.receive(.press)          // → guard
+        _ = navigator.receive(.tick(1))        // → the confirming row
+        _ = navigator.receive(.press)          // applied
 
+        _ = navigator.receive(.press)          // → guard again
+        _ = navigator.receive(.tick(1))
         let again = navigator.receive(.press)
 
         #expect(again == [.commitTrim(itemID: "rec-0", start: 0, end: 600), .feedback(.commit)])
@@ -130,8 +156,12 @@ struct DialPressTests {
     @Test func applyingADeleteDisarmsIt() {
         var navigator = DialSample.whileEditing()
         _ = navigator.receive(.action("cut"))
-        _ = navigator.receive(.press)
+        _ = navigator.receive(.press)          // → guard
+        _ = navigator.receive(.tick(1))
+        _ = navigator.receive(.press)          // the cut is applied and disarms
 
+        _ = navigator.receive(.press)          // → guard, now armed to keep again
+        _ = navigator.receive(.tick(1))
         let again = navigator.receive(.press)
 
         #expect(again == [.commitTrim(itemID: "rec-0", start: 0, end: 600), .feedback(.commit)])
@@ -155,6 +185,10 @@ struct DialPressTests {
         #expect(navigator.receive(.action("cut")) == [.feedback(.commit)], "arming writes nothing")
         #expect(navigator.route == .edit(itemID: "rec-0"), "and goes nowhere")
 
+        _ = navigator.receive(.press)          // → guard, wording follows the armed operation
+        #expect(navigator.route == .confirmEdit(itemID: "rec-0", operation: .remove))
+
+        _ = navigator.receive(.tick(1))
         let effects = navigator.receive(.press)
 
         #expect(effects == [.commitCut(itemID: "rec-0", start: 1, end: 600), .feedback(.commit)])
@@ -162,13 +196,19 @@ struct DialPressTests {
     }
 
     /// **Back leaves and asks nothing**, because nothing has been written to save or discard.
-    @Test func leavingTheEditorAppliesNothing() {
+    ///
+    /// It does stop the preview. That is not an edit being applied — it is audio being released, and
+    /// leaving with it still playing was a real bug: the preview ran on over the library and over
+    /// the next recording, because nothing in the leave path knew about it. `pop()` says so now.
+    @Test func leavingTheEditorAppliesNothingButReleasesThePreview() {
         var navigator = DialSample.whileEditing()
         _ = navigator.receive(.tick(10))
 
         let effects = navigator.receive(.action("back"))
 
-        #expect(effects == [.feedback(.commit)])
+        #expect(effects == [.stopPreview, .feedback(.commit)])
+        #expect(!effects.contains { if case .commitTrim = $0 { return true } else { return false } },
+                "leaving must still write nothing")
         #expect(navigator.route == .recordings)
     }
 

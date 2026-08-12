@@ -53,7 +53,7 @@ struct DialNavigator {
         var trimOperation: DialScreen.TrimOperation = .keep
     }
 
-    /// One detent of input gain. Fifty detents end to end, matching `WheelRouter.volumePerDetent` —
+    /// One detent of input gain. Fifty detents end to end, matching `WheelMetrics.volumePerDetent` —
     /// separate from it because gain and volume are different quantities and tuning one on a device
     /// must not silently move the other.
     static let gainPerDetent: Double = 0.02
@@ -86,7 +86,7 @@ struct DialNavigator {
         case .tick(let detents): tick(detents)
         case .volumeTick(let detents):
             // The small wheel has one job, so it bypasses the axis entirely.
-            setVolume(by: Double(detents) * WheelRouter.volumePerDetent)
+            setVolume(by: Double(detents) * WheelMetrics.volumePerDetent)
         case .press: press()
         case .doublePress: doublePress()
         case .hold: hold()
@@ -137,11 +137,11 @@ struct DialNavigator {
 
         switch axis {
         case .highlight: return moveHighlight(by: detents)
-        case .seek: return seek(by: Double(detents) * WheelRouter.secondsPerDetent)
-        case .volume: return setVolume(by: Double(detents) * WheelRouter.volumePerDetent)
+        case .seek: return seek(by: Double(detents) * WheelMetrics.secondsPerDetent)
+        case .volume: return setVolume(by: Double(detents) * WheelMetrics.volumePerDetent)
         case .queue: return stepQueue(by: detents)
         case .gain: return setGain(by: Double(detents) * Self.gainPerDetent)
-        case .trimStart, .trimEnd: return nudgeTrim(by: Double(detents) * WheelRouter.secondsPerDetent)
+        case .trimStart, .trimEnd: return nudgeTrim(by: Double(detents) * WheelMetrics.secondsPerDetent)
         }
     }
 
@@ -309,7 +309,7 @@ struct DialNavigator {
             markers: content.editing?.markers ?? [],
             // One detent, per §5 — the wheel's half of "tolerance scales with the input". The
             // finger's half is wider and arrives with the waveform that can measure it in points.
-            tolerance: WheelRouter.secondsPerDetent
+            tolerance: WheelMetrics.secondsPerDetent
         ) else { return false }
 
         if isStart {
@@ -332,6 +332,20 @@ struct DialNavigator {
     /// for rendering, which is what made the bug so quiet — the picture moved and the value did not.
     private var currentTrim: DialTrimRange? {
         if let trim = level.trim { return trim }
+        guard let editing = content.editing else { return nil }
+        return DialTrimRange(start: 0, end: editing.duration, duration: editing.duration)
+    }
+
+    /// The selection being confirmed, read from the **edit level under the guard**.
+    ///
+    /// `currentTrim` reads `level`, which inside the guard is the guard itself — it has no trim and
+    /// would fall back to the whole file, so confirming a two-second cut would have removed the
+    /// entire recording. The guard is always pushed directly onto the editor, so the level below is
+    /// the one holding the handles (#97).
+    private var trimAtEditDepth: DialTrimRange? {
+        guard stack.count >= 2 else { return nil }
+        let editLevel = stack[stack.count - 2]
+        if let trim = editLevel.trim { return trim }
         guard let editing = content.editing else { return nil }
         return DialTrimRange(start: 0, end: editing.duration, duration: editing.duration)
     }
@@ -365,9 +379,28 @@ struct DialNavigator {
             guard let setting = DialSetting.allCases[safe: level.highlighted] else {
                 return [.feedback(.limit)]
             }
+            // **About and How it works are screens now, not sheets** (#50). They were the last two
+            // things the dial presented by raising a UIKit-era modal over itself; everything else it
+            // does is a level of its own stack.
+            switch setting {
+            case .about: return open(.about)
+            case .help: return open(.help)
+            default: break
+            }
             // Cycling rows stay put: the value is on the row under the highlight, so leaving would
             // hide the thing that just changed.
             return [.setting(setting), .feedback(setting.cycles ? .detent : .commit)]
+
+        // **A row opens its own screen; the screen's hub is Back** (#50). The paragraph the dial is
+        // supposedly poor at gets the whole card here, which is the difference between prose in a
+        // row and prose on a screen.
+        case .about, .help:
+            let entries = route == .help ? InfoContent.help : InfoContent.about
+            guard let entry = entries[safe: level.highlighted] else { return [.feedback(.limit)] }
+            return open(.infoDetail(id: entry.id, inHelp: route == .help))
+
+        case .infoDetail:
+            return pop() + [.feedback(.commit)]
 
         case .recordings, .folder:
             // **Every row is a file or a folder.** Import and New folder were rows once, and the
@@ -424,38 +457,57 @@ struct DialNavigator {
             // `content.editing`, so the next refresh — carrying the new duration — seeds the
             // handles across the new file. Disarming to `.keep` for the same reason: the delete
             // has happened, and leaving it armed points a second one at the wrong region.
+            // **The hub asks now; it does not write** (#97). Trimming and cutting were the two
+            // least recoverable things in the app and the only two with no gate — while deleting a
+            // whole recording, which at least leaves the rest of the library alone, had one.
+            //
+            // The trim is NOT cleared here any more. It has to survive the guard so the answer can
+            // act on it, and so cancelling returns to the selection the user made rather than to the
+            // whole file. It is cleared where the write actually happens, below.
+            return open(.confirmEdit(itemID: itemID, operation: operation))
+
+        // The answer. `pop()` first, so the effects land with the editor already back on top.
+        case .confirmEdit(let itemID, let operation):
+            guard let trim = trimAtEditDepth else { return pop() + [.feedback(.limit)] }
+            let choices = DialRoute.EditChoice.allCases
+            let choice = choices[min(level.highlighted, choices.count - 1)]
+            let leaving = pop()
+            guard choice == .confirm else { return leaving + [.feedback(.commit)] }
+
+            // Cleared only now, for the reason the old comment gave: the recording underneath has
+            // just been rewritten, so the old start and end describe a file that no longer exists.
             stack[stack.count - 1].trim = nil
             stack[stack.count - 1].trimOperation = .keep
 
             switch operation {
             case .keep:
-                return [.commitTrim(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
+                return leaving + [.commitTrim(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
             case .remove:
-                return [.commitCut(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
+                return leaving + [.commitCut(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
             }
 
         case .move(let itemID):
             let rows = MoveDestinations.rows(in: content.recordings, excluding: itemID)
             guard let row = rows[safe: level.highlighted] else { return [.feedback(.limit)] }
-            pop()
+            let leaving = pop()
             switch row {
             // **Naming is the host's and filing follows it**, which is why this is one effect and
             // not `createFolder` plus a move the user has to make again. A folder needs a name
             // before it exists and the dial has no keyboard; what the dial can say is what the
             // folder is *for*.
             case .newFolder:
-                return [.createFolderForMove(itemID: itemID), .feedback(.commit)]
+                return leaving + [.createFolderForMove(itemID: itemID), .feedback(.commit)]
             case .existing(let destination):
-                return [.moveItem(itemID: itemID, toFolderID: destination.id), .feedback(.commit)]
+                return leaving + [.moveItem(itemID: itemID, toFolderID: destination.id), .feedback(.commit)]
             }
 
         case .confirmDelete(let itemID):
             let choices = DialRoute.DeleteChoice.allCases
             let choice = choices[min(level.highlighted, choices.count - 1)]
-            pop()
+            let leaving = pop()
             switch choice {
-            case .cancel: return [.feedback(.commit)]
-            case .delete: return [.item(.delete, itemID: itemID), .feedback(.commit)]
+            case .cancel: return leaving + [.feedback(.commit)]
+            case .delete: return leaving + [.item(.delete, itemID: itemID), .feedback(.commit)]
             }
 
         }
@@ -559,8 +611,7 @@ struct DialNavigator {
             // sense while the hub did not write — but the nudges then started committing on the
             // spot, so the gate offered to save something already on disk. `DONE` writes and
             // nothing else does, which leaves `Back` with nothing to guard.
-            pop()
-            return [.feedback(.commit)]
+            return pop() + [.feedback(.commit)]
         }
 
         // Selecting a mode needs no per-screen code, which is what keeps a new mode from being a
@@ -675,9 +726,9 @@ struct DialNavigator {
             return [.toggleShuffle, .feedback(.commit)]
 
         case (.nowPlaying, "volumeUp"):
-            return setVolume(by: WheelRouter.volumePerNudge)
+            return setVolume(by: WheelMetrics.volumePerNudge)
         case (.nowPlaying, "volumeDown"):
-            return setVolume(by: -WheelRouter.volumePerNudge)
+            return setVolume(by: -WheelMetrics.volumePerNudge)
 
         case (.nowPlaying, "previous"):
             return stepQueue(by: -1)
@@ -813,9 +864,18 @@ struct DialNavigator {
         clampHighlight(atDepth: stack.count - 1)
     }
 
-    private mutating func pop() {
-        guard stack.count > 1 else { return }
-        stack.removeLast()
+    /// **Returns what leaving the level costs**, so no exit can forget it.
+    ///
+    /// The trim preview used to be stopped only where an edit was written. Every other way out of
+    /// the editor — Back, cancelling a move, cancelling a delete — left it playing. Putting it here
+    /// means the three callers cannot diverge: there is one place a level is removed, so there is
+    /// one place to say what removing it releases.
+    @discardableResult
+    private mutating func pop() -> [DialEffect] {
+        guard stack.count > 1 else { return [] }
+        let leaving = stack.removeLast()
+        if case .edit = leaving.route { return [.stopPreview] }
+        return []
     }
 
     // MARK: - Rows
@@ -939,8 +999,19 @@ struct DialNavigator {
         switch id {
         case "back": return canGoBack(atDepth: depth)
         case "settings":
-            if case .settings = stack[depth].route { return false }
-            return true
+            // **Anywhere inside the settings path, not only on the settings screen itself.**
+            //
+            // This asked whether the CURRENT route was `.settings`, which was the whole rule while
+            // Settings was a leaf. Once About and How it works became screens pushed on top of it
+            // (#50), the chip came back to life one level down — so from About you could press
+            // Settings and stack a second Settings on top of the one you were already inside.
+            //
+            // Asking about the path rather than the tip means any screen added under Settings later
+            // is covered without anyone remembering this line exists.
+            return !stack.prefix(depth + 1).contains { level in
+                if case .settings = level.route { return true }
+                return false
+            }
         default: return true
         }
     }
@@ -1012,6 +1083,10 @@ struct DialNavigator {
         case .settings: return DialSetting.allCases.count
         case .recordings, .folder: return items.count
         case .confirmDelete: return DialRoute.DeleteChoice.allCases.count
+        case .confirmEdit: return DialRoute.EditChoice.allCases.count
+        case .about: return InfoContent.about.count
+        case .help: return InfoContent.help.count
+        case .infoDetail: return 0
         case .move(let itemID): return MoveDestinations.rows(in: content.recordings, excluding: itemID).count
         case .nowPlaying, .recording, .edit: return 0
         }

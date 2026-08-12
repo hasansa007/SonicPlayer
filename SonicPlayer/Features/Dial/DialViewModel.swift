@@ -60,6 +60,8 @@ final class DialViewModel {
     /// see change.
     var onNeedsRefresh: (() -> Void)?
     var onReleasePlayer: (() -> Void)?
+    /// Leaving the trim editor. Stops the preview, which nothing else does.
+    var onStopPreview: (() -> Void)?
     var onCycleRepeat: (() -> Void)?
     var onToggleShuffle: (() -> Void)?
 
@@ -304,6 +306,8 @@ final class DialViewModel {
             onTogglePlayPause?()
         case .releasePlayer:
             onReleasePlayer?()
+        case .stopPreview:
+            onStopPreview?()
 
         case .pausePlayback:
             onPausePlayback?()

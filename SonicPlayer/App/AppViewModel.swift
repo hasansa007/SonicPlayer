@@ -53,12 +53,12 @@ final class AppViewModel {
     let settings: SettingsViewModel
     let filesRoot: CollectionsViewModel
 
-    /// Holds the *same* player instance, for the same reason `home` does: the shell is a second
-    /// face on one playback engine, not a second engine (#6).
-    let shell: ShellViewModel
-
-    /// The dial navigator (#6). Replaces `shell` as the presented player; `shell` stays only until
-    /// the landscape design lands, since it is still what compact height falls back to.
+    /// The dial navigator (#6), and the only presented player there is.
+    ///
+    /// `shell: ShellViewModel` stood above this, kept "only until the landscape design lands, since
+    /// it is still what compact height falls back to". Landscape landed — the card moves beside the
+    /// wheel — so the fallback stopped being reachable, and it is gone with the rest of the chrome
+    /// the dial replaced (#76).
     let dial: DialViewModel
 
     /// Which markers belong to which recording (#75). Owned here for the same reason `fileManager`
@@ -123,9 +123,6 @@ final class AppViewModel {
         // playback properties be deleted rather than ported (#16), so it cannot be defaulted
         // independently of `player`.
         self.home = HomeViewModel(player: player)
-        // Same reasoning as `home`: built from `player` rather than defaulted independently, so a
-        // caller substituting the player gets a shell driving that substitute.
-        self.shell = ShellViewModel(player: player, haptics: haptics)
         self.dial = DialViewModel(haptics: haptics)
         wire()
     }
@@ -181,6 +178,11 @@ final class AppViewModel {
         // The library is the root, so arriving is the whole journey. The player's three states are
         // seeded onto the view model rather than navigated to.
         case .library, .playerEmpty, .playerLoading, .playerError:
+            break
+
+        // Onboarding is presented over the dial by `OnboardingViewModel.ifNeeded`, so there is no
+        // route to drive to and the dial behind it is irrelevant.
+        case .onboarding:
             break
 
         // **`nowPlaying`, not two presses.** A press *starts* the highlighted recording, which
@@ -328,22 +330,10 @@ final class AppViewModel {
         // Any reload of the root browser refreshes Home's recents, which are drawn from it.
         filesRoot.onItemsLoaded = { [home] in home.loadAllFiles() }
 
-        // The shell's out-edges (#6). Closures rather than direct calls for the reason every other
-        // edge here is one: it makes the edge reachable from a test without rendering a view.
-        shell.onSeek = { [player] time in player.seek(to: time) }
-        shell.onPlayPause = { [player] in player.playPauseTapped() }
-        shell.onNextTrack = { [player] in player.nextTrack() }
-        shell.onPreviousTrack = { [player] in player.previousTrack() }
-        shell.onSpeedBy = { [player] steps in
-            let all = PlaybackSpeed.allCases
-            guard let index = all.firstIndex(of: player.playbackSpeed) else { return }
-            player.setPlaybackSpeed(all[min(max(0, index + steps), all.count - 1)])
-        }
-        // **`onVolumeBy` is the shell's, and it is now wired** — the note that used to sit here said
-        // volume belongs to `MPVolumeView` and had no setter worth having, which was true of the
-        // *system* volume and became an argument for having no volume control at all. `AVPlayer`
-        // has per-player gain; nothing here touches the hardware buttons.
-        shell.onVolumeBy = { [player] delta in player.setVolume(player.volume + delta) }
+        // The shell's six out-edges stood here — seek, play/pause, next, previous, speed and volume,
+        // each a closure onto `player`. Every one of them has a counterpart below, because the dial
+        // took over the same job; keeping both meant two objects wired to one playback engine and
+        // only one of them reachable (#76).
 
         // The dial's out-edges (#6). It navigates on its own; these are the moments it needs
         // something that owns hardware.
@@ -374,6 +364,7 @@ final class AppViewModel {
         // resets the transport and persists an empty session — so a trim cannot rewrite a file that
         // something is still holding a duration and a position for.
         dial.onReleasePlayer = { [player] in player.clearSession() }
+        dial.onStopPreview = { [trimPreview] in trimPreview.stop() }
         dial.onSetVolume = { [player] value in player.setVolume(value) }
         // **The picker lands where you are standing.** Import used to exist only at the library
         // root, so there was one destination and no need to say which. A folder is somewhere you
@@ -443,7 +434,7 @@ final class AppViewModel {
                 do {
                     try await fileManager.deleteItem(url)
                 } catch {
-                    self.dial.operationError = error.localizedDescription
+                    self.dial.operationError = userMessage(error)
                     return
                 }
                 self.home.loadAllFiles()
@@ -476,10 +467,9 @@ final class AppViewModel {
                 )
             case .language:
                 settings.openSystemLanguageSettings()
-            case .about:
-                settings.showAboutTapped()
-            case .help:
-                settings.showHelpTapped()
+            // `.about` and `.help` never reach here — the navigator opens a route (#50).
+            case .about, .help:
+                break
             }
             refreshDial()
         }
@@ -581,7 +571,7 @@ final class AppViewModel {
             do {
                 _ = try await audioTrimmer.deleteAudioRange(url, start, end)
             } catch {
-                print("Failed to cut range: \(error.localizedDescription)")
+                print("Failed to cut range: \(userMessage(error))")
             }
             markers.forget(url)
             dial.forgetWaveform(for: url)
@@ -599,7 +589,7 @@ final class AppViewModel {
                     url: url, start: start, end: end, trimmer: audioTrimmer
                 )
             } catch {
-                print("Failed to commit trim: \(error.localizedDescription)")
+                print("Failed to commit trim: \(userMessage(error))")
                 return
             }
             dial.forgetWaveform(for: url)
@@ -650,7 +640,7 @@ final class AppViewModel {
                 try await fileManager.moveItem(file.url, destination)
             } catch {
                 await MainActor.run { [weak self] in
-                    self?.dial.operationError = error.localizedDescription
+                    self?.dial.operationError = userMessage(error)
                 }
                 return
             }

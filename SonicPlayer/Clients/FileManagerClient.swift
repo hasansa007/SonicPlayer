@@ -83,7 +83,7 @@ extension FileManagerClient {
                 
                 // Security check to ensure we don't go above documents
                 guard targetPath.path.hasPrefix(rootPath.path) else {
-                    throw NSError(domain: "FileManagerClient", code: 1, userInfo: [NSLocalizedDescriptionKey: "Access Denied: \(targetPath.path) is not in \(rootPath.path)"])
+                    throw FileError.outsideLibrary(attempted: targetPath, root: rootPath)
                 }
 
                 let audioExtensions = ["mp3", "m4a", "wav", "aac", "flac", "aiff", "m4b", "mp4", "opus", "ogg"]
@@ -202,7 +202,7 @@ extension FileManagerClient {
 
                 // Verify source file is readable
                 guard FileManager.default.isReadableFile(atPath: sourceURL.path) else {
-                    throw NSError(domain: "FileManagerClient", code: 3, userInfo: [NSLocalizedDescriptionKey: "Source file not readable: \(sourceURL.lastPathComponent)"])
+                    throw FileError.unreadableSource(sourceURL)
                 }
 
                 let fileName = sourceURL.lastPathComponent
@@ -240,7 +240,7 @@ extension FileManagerClient {
                     let fileData = try Data(contentsOf: sourceURL)
                     try fileData.write(to: destinationURL, options: .atomic)
                 } catch {
-                    throw NSError(domain: "FileManagerClient", code: 4, userInfo: [NSLocalizedDescriptionKey: "Failed to import \(fileName): \(error.localizedDescription)"])
+                    throw FileError.importFailed(name: fileName, underlying: error)
                 }
 
                 // Validate the imported file can be read as audio
@@ -249,7 +249,7 @@ extension FileManagerClient {
                 } catch {
                     // File is corrupted, delete it and throw error
                     try? FileManager.default.removeItem(at: destinationURL)
-                    throw NSError(domain: "FileManagerClient", code: 5, userInfo: [NSLocalizedDescriptionKey: "Imported file is corrupted or invalid: \(fileName)"])
+                    throw FileError.corruptImport(name: fileName)
                 }
             },
             getMetadata: getMetadata,

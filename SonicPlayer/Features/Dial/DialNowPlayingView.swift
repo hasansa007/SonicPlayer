@@ -4,8 +4,10 @@ import SwiftUI
 ///
 /// **The bar under the time is a readout, not a control.** The ring is what seeks here — its ticks
 /// fill proportionally, so the dial and the bar say the same thing and the finger only has one
-/// place to say it. That is why this draws a plain capsule rather than reaching for
-/// `SonicScrubber`, which exists to be dragged.
+/// place to say it. That is why this draws a plain capsule rather than a draggable track.
+///
+/// `SonicScrubber` was that draggable track. It is deleted (#76) — its only callers were the player
+/// views — so anything that wants dragging back here builds it or recovers it from git.
 struct DialNowPlayingView: View {
 
     let nowPlaying: DialScreen.NowPlaying

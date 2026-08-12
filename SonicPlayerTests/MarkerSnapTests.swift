@@ -7,7 +7,7 @@ import Testing
 @Suite
 struct MarkerSnapTests {
 
-    private let detent = WheelRouter.secondsPerDetent
+    private let detent = WheelMetrics.secondsPerDetent
     private let markers: [TimeInterval] = [30, 60, 90]
 
     @Test func arrivingInsideAMarkersZoneSnapsToIt() {

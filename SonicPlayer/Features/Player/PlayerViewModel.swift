@@ -481,7 +481,7 @@ final class PlayerViewModel {
                 let file = try await fileManager.getMetadata(imported)
                 self?.loadTrack(file, queue: [file], source: .singleFile)
             } catch {
-                self?.openError = error.localizedDescription
+                self?.openError = userMessage(error)
             }
         }
     }
@@ -664,7 +664,7 @@ final class PlayerViewModel {
         currentTime = 0
         duration = 0
         isLoadingTrack = false
-        isExpanded = false // dismisses PlayerView
+        isExpanded = false // dismissed PlayerView, deleted in #76; nothing renders on this now
     }
 
     // MARK: -

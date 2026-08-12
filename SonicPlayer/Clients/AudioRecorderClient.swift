@@ -122,7 +122,7 @@ private actor RecorderActor {
         recorder.prepareToRecord()
 
         guard recorder.record() else {
-            throw NSError(domain: "AudioRecorderClient", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to start recording"])
+            throw RecordingError.cannotStart
         }
 
         self.audioRecorder = recorder

@@ -63,10 +63,19 @@ struct DialScreenView: View {
     /// — and it is shorter now precisely so that there is less of it to lose.
     private var stacked: some View {
         VStack(spacing: Spacing.lg) {
+            // **One card height on every screen** (#6). It was content-sized with a `Spacer`
+            // taking the slack, so a folder holding one recording drew a card two rows tall and a
+            // full library drew one eight rows tall — and the wheel moved with them. The wheel's
+            // position is the one thing on this layout the thumb learns without looking, so a card
+            // that resizes per screen costs more than the empty space it saves.
+            //
+            // The empty space is the known trade, and it is why this was reverted once: a short
+            // list leaves a surface with nothing on it. That is the better of the two, because the
+            // alternative puts the same emptiness *between* the card and the controls, where it
+            // reads as a gap rather than as a card.
             stage
+                .frame(maxHeight: .infinity)
                 .layoutPriority(0)
-
-            Spacer(minLength: 0)
 
             controls
                 .layoutPriority(1)
@@ -100,13 +109,19 @@ struct DialScreenView: View {
         // reaches for in turn — at `lg` the chip column touched both its neighbours and read as
         // part of whichever it was nearer.
         HStack(spacing: Spacing.xxxl) {
-            // **As tall as the wheel and as wide as what is left.** Its height is content-driven in
-            // portrait, where the list is the long axis; here the long axis is across, so a card
-            // that grows past the dial makes the two halves of the screen disagree about where the
-            // middle is. Squaring it against the dial is what lets the eye read them as one object.
+            // **As tall as the CHIP COLUMN, not as tall as the wheel.**
+            //
+            // This was `height: Sizing.dialDiameter`, squared against the dial so the two halves
+            // agreed about where the middle was. What that actually produced was a card floating in
+            // the vertical centre while the chips beside it ran the full height — Back above its top
+            // edge, Settings below its bottom one, and a band of nothing at each end.
+            //
+            // The column is what the eye reads the card against, because it is immediately beside
+            // it. Filling the same height puts the card's top edge on Back's and its bottom edge on
+            // Settings', which is the alignment that was being asked for by pinning to the dial and
+            // not delivered.
             stage
-                .frame(maxWidth: .infinity)
-                .frame(height: Sizing.dialDiameter)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             // **The controls turn from a column into a row, and the wheel keeps its size.** Stacked,
             // the chips, the dial and the caption come to about 370 points against roughly 340 of
@@ -138,8 +153,18 @@ struct DialScreenView: View {
             .frame(width: Sizing.dialDiameter)
         }
         .environment(\.layoutDirection, .leftToRight)
-        .padding(.horizontal, Spacing.xxl)
-        .padding(.vertical, Spacing.lg)
+        // **No leading padding, 20 vertical, and the trailing keeps its 24.**
+        //
+        // Measured on a landscape capture, the card sat 83pt from the leading edge against 21 at the
+        // top — and only 20 of that 83 was padding. The other 63 is the safe area for the sensor
+        // housing, which in landscape runs the full leading edge.
+        //
+        // So the padding is dropped there and the gap is 63pt: as close to matching the top as this
+        // edge can get. Closing it further means drawing the list under the housing, and the row
+        // text starts 16pt inside the card — nowhere near enough to clear it. The asymmetry that is
+        // left belongs to the device, not to this layout, and it swaps sides with the rotation.
+        .padding(.trailing, Spacing.xxl)
+        .padding(.vertical, Spacing.xl)
         // **After the padding, deliberately.** The chip column pushes Back and Settings to the ends
         // of whatever height it is given, so the height has to be the screen's rather than the
         // tallest sibling's — otherwise the two controls that never move would move by however much
@@ -220,6 +245,13 @@ struct DialScreenView: View {
         .ignoresSafeArea()
     }
 
+    /// Which row the wheel is resting on, when the content is a list. `nil` for every other screen,
+    /// which is what keeps the scroll-follow above inert on Now Playing, the recorder and the editor.
+    private var highlightedRow: Int? {
+        if case .list(let list) = screen.content { return list.highlighted }
+        return nil
+    }
+
     /// The card. Everything above the action row lives inside it, which is what makes the dial read
     /// as the device and the content as what is on the device.
     private var stage: some View {
@@ -239,7 +271,27 @@ struct DialScreenView: View {
             // pushed the dial off the bottom rather than squeezing the list.
             ViewThatFits(in: .vertical) {
                 content
-                ScrollView { content }
+                // **The scroll view that actually scrolls, so the reader belongs here (#91).**
+                //
+                // `DialListView` used to carry its own, with the `scrollTo` on it. Once the rows
+                // overran the card this branch was chosen, the inner view was handed unbounded
+                // height, and it therefore always fitted — so its `scrollTo` was a no-op while the
+                // clipping happened out here. Turning the wheel moved a highlight nobody could see.
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        content
+                    }
+                    .onChange(of: highlightedRow) { _, index in
+                        guard let index else { return }
+                        withAnimation(Motion.settle) { proxy.scrollTo(index, anchor: .center) }
+                    }
+                    // `onChange` cannot fire for a screen that ARRIVES with its highlight already
+                    // deep in the list — a restored session, or Settings reached with About selected.
+                    .task(id: highlightedRow) {
+                        guard let index = highlightedRow else { return }
+                        proxy.scrollTo(index, anchor: .center)
+                    }
+                }
             }
         }
         .padding(Spacing.lg)
@@ -247,7 +299,14 @@ struct DialScreenView: View {
         // whatever was left, so a three-row library was a third of a screen of nothing under three
         // rows. The stack below still gives it every point the dial does not want, so a long list
         // grows exactly as far as it can — it just no longer *claims* the space when empty.
-        .frame(maxWidth: .infinity)
+        // **maxHeight belongs HERE, before the background.** Applied to `stage` from outside it
+        // stretched the layout slot and left the drawn card at its content height, centred in a
+        // taller invisible frame — which looks exactly like no change at all. The background is
+        // attached on the next line, so whatever this frame reports is the card you see.
+        //
+        // `alignment: .top` so a short list stays at the top of the card rather than floating in
+        // the middle of it.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color.sonicSurface, in: RoundedRectangle(cornerRadius: Radius.stage))
         // **The card's border no longer cycles while audio moves.** It was the wheel's, moved here,
         // and it was the one thing on the screen animating forever — which is what made a rotation

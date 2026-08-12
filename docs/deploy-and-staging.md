@@ -43,12 +43,50 @@ Write for testers, not for the changelog: what changed for someone using the app
 dependency bumps and test work out. **What ships is plain text** — `**bold**` arrives as literal
 asterisks, and blank lines are stripped, so read the extracted output rather than the Markdown.
 
+## Signing — three secrets, and no certificates to manage
+
+The workflow signs with an **App Store Connect API key** plus `-allowProvisioningUpdates`. The
+runner fetches or creates its own signing assets, which is what Xcode does locally under automatic
+signing.
+
+| Secret | From |
+|---|---|
+| `ASC_API_KEY` | the `.p8`, base64-encoded — App Store Connect → Users and Access → Integrations |
+| `ASC_API_KEY_ID` | shown beside the key |
+| `ASC_API_ISSUER_ID` | shown above the key list |
+
+The key needs the **App Manager** role; a weaker role authenticates but cannot create signing
+assets, and the failure arrives at export as a provisioning error that does not mention the role.
+
+```bash
+gh secret set ASC_API_KEY < AuthKey_XXXXXXXX.p8    # never paste a key into a chat or a commit
+gh secret set ASC_API_KEY_ID
+gh secret set ASC_API_ISSUER_ID
+```
+
+**There is deliberately no `TEAM_ID` secret.** The team id is not a credential — it is committed in
+`project.pbxproj`, and that is what the app is signed with. The export step reads it from there, so
+it cannot drift from the build.
+
+**This replaced four secrets** — `CERTIFICATE_P12`, `CERTIFICATE_PASSWORD`, `PROVISIONING_PROFILE`
+and `TEAM_ID` — and the two steps that consumed them. That path required exporting a distribution
+`.p12` by hand and re-exporting it whenever the certificate expired. It also asked for an artifact
+this project never had: the machine that shipped 3.0.0 (23) by hand holds only an
+`Apple Development` identity, because the app has always used automatic signing.
+
 ## Proving the pipeline without shipping
 
 Actions → **Distribute to TestFlight** → Run workflow, with **dry_run** checked (it defaults to
-checked). That archives, exports and validates, then stops before the upload.
+checked). It archives, **signs, exports** and attaches the `.ipa` as a run artifact — then stops
+before the upload.
 
 Use it after any change to the workflow, the signing setup, or the Xcode pin.
+
+**The export step is what a dry run exists to exercise.** It used to be skipped entirely on a dry
+run — the step was gated on `push || !dry_run` — so the run archived and stopped, while this file
+claimed it "archives, exports and validates". Signing happens at export, so the one facility for
+proving the pipeline without shipping could not reach the part most likely to be broken. The step
+now always runs and only its `destination` changes, `export` instead of `upload`.
 
 **There is no Run workflow button until this file is on `main`.** GitHub only offers
 `workflow_dispatch` for workflows present on the **default branch**, and `distribute.yml` lives on

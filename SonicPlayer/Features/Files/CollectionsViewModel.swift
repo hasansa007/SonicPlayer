@@ -154,7 +154,7 @@ final class CollectionsViewModel {
     private func listingFailed(_ error: any Error) {
         isLoading = false
         loadFailed = true
-        operationError = error.localizedDescription
+        operationError = userMessage(error)
     }
 
     private func itemsLoaded(_ loaded: [FileSystemItem]) {
@@ -251,7 +251,7 @@ final class CollectionsViewModel {
             do {
                 try await fileManager.createCollection(name, currentDirectory)
             } catch {
-                self?.operationError = error.localizedDescription
+                self?.operationError = userMessage(error)
                 return
             }
             self?.refreshFiles()
@@ -279,7 +279,7 @@ final class CollectionsViewModel {
             do {
                 try await fileManager.renameItem(itemURL, finalName)
             } catch {
-                self?.operationError = error.localizedDescription
+                self?.operationError = userMessage(error)
                 return
             }
             self?.refreshFiles()
@@ -380,7 +380,7 @@ final class CollectionsViewModel {
                     try FileManager.default.moveItem(at: item.url, to: targetURL)
                 } catch {
                     // Was `print(_:)`, which in a shipping build goes nowhere a user can see.
-                    await MainActor.run { self?.operationError = error.localizedDescription }
+                    await MainActor.run { self?.operationError = userMessage(error) }
                 }
             }
             self?.refreshFiles()

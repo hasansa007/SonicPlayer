@@ -34,7 +34,23 @@ enum DialRoute: Equatable {
     /// to a row and pressing it, and the one place that handed over to UIKit chrome mid-flow was the
     /// only irreversible one — so the gesture you had just been using stopped working exactly where
     /// care mattered most.
+    /// About, and How it works — the last two conventional screens, now dial screens (#50).
+    ///
+    /// **One route each for the list and one shared for the detail**, because the two lists differ
+    /// only in which array they read. The detail carries the entry's **id**, not its index: a list
+    /// reordered later cannot then point at the wrong entry, which is the offset bug this codebase has
+    /// already paid for twice.
+    case about
+    case help
+    case infoDetail(id: String, inHelp: Bool)
+
     case confirmDelete(itemID: String)
+    /// The guard in front of a trim or a cut (#97).
+    ///
+    /// **One case carrying the operation, not two routes.** Keep and remove differ in one verb and
+    /// one effect; a route each would duplicate the rows, the question and the press handling, which
+    /// is how the two commits came to differ in the first place.
+    case confirmEdit(itemID: String, operation: DialScreen.TrimOperation)
 
     /// Choosing a folder to move a recording into.
     ///
@@ -67,7 +83,12 @@ enum DialRoute: Equatable {
         case .nowPlaying: "NOW PLAYING"
         case .recording: "RECORDING"
         case .edit: "EDIT"
+        case .about: "ABOUT"
+        case .help: "HOW IT WORKS"
+        case .infoDetail(let id, let inHelp):
+            (InfoContent.entry(id, in: inHelp ? InfoContent.help : InfoContent.about)?.title ?? "").uppercased()
         case .confirmDelete: "DELETE"
+        case .confirmEdit(_, let operation): operation == .keep ? "TRIM" : "REMOVE"
         case .move: "MOVE"
         }
     }
@@ -106,6 +127,34 @@ enum DialRoute: Equatable {
 
     /// The rows of the delete guard, in order. `Cancel` is first so the highlight rests on it —
     /// the safe answer should be the one a press gives you when you arrived by accident.
+    /// Cancel or go ahead, in that order, for the edit guard (#97).
+    ///
+    /// **Cancel first, exactly as `DeleteChoice` has it.** The wheel arrives on row 0, so the
+    /// harmless answer is the one already under the hub — a press with no turn cannot rewrite a
+    /// recording.
+    enum EditChoice: String, CaseIterable {
+        case cancel
+        case confirm
+
+        func label(_ operation: DialScreen.TrimOperation) -> String {
+            switch self {
+            case .cancel: "Cancel"
+            case .confirm: operation == .keep ? "Trim" : "Remove"
+            }
+        }
+
+        func icon(_ operation: DialScreen.TrimOperation) -> DialScreen.Icon {
+            switch self {
+            // **`.none`, matching `DeleteChoice.cancel`.** This was `.back`, which draws the list
+            // glyph — the same mark the Back chip carries — so the harmless row looked like a
+            // navigation control. The delete guard had already settled this: the safe answer wears
+            // no icon, and only the destructive one is marked.
+            case .cancel: DialScreen.Icon.none
+            case .confirm: operation == .keep ? .trim : .delete
+            }
+        }
+    }
+
     enum DeleteChoice: String, CaseIterable {
         case cancel
         case delete
