@@ -180,6 +180,11 @@ final class AppViewModel {
         case .library, .playerEmpty, .playerLoading, .playerError:
             break
 
+        // Onboarding is presented over the dial by `OnboardingViewModel.ifNeeded`, so there is no
+        // route to drive to and the dial behind it is irrelevant.
+        case .onboarding:
+            break
+
         // **`nowPlaying`, not two presses.** A press *starts* the highlighted recording, which
         // resets the position `seedViewModels` just set — so the old sequence arrived at a player
         // reading 00:00 against a full duration, and every player screenshot showed a track that

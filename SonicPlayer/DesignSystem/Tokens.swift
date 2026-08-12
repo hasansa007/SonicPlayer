@@ -236,6 +236,14 @@ enum Motion {
     /// rather than as an alarm, which matters because it is on screen for the whole recording.
     static let recordPulse: Animation = .easeInOut(duration: 0.7).repeatForever(autoreverses: true)
 
+    /// A first-run page arriving — its art scaling up and its copy sliding into place.
+    static let onboardingEnter: Animation = .easeOut(duration: 0.6)
+    /// The glow behind a first-run illustration, breathing. Deliberately far slower than
+    /// `recordPulse`: nothing is happening, so it must not read as a status.
+    static let onboardingBreathe: Animation = .easeInOut(duration: 2).repeatForever(autoreverses: true)
+    /// A first-run illustration's own loop — the bouncing arrow, the pulsing disc, the sliding file.
+    static let onboardingLoop: Animation = .easeInOut(duration: 1.2).repeatForever(autoreverses: true)
+
     /// The playing-waveform bars. `index` staggers them so they do not pulse in unison.
     ///
     /// A fixed table rather than `Double.random(in: 0.3...0.6)`, which the old
@@ -247,6 +255,46 @@ enum Motion {
             .repeatForever(autoreverses: true)
             .delay(Double(index) * 0.1)
     }
+}
+
+/// The five first-run illustrations (#102).
+///
+/// **These are drawing dimensions, not layout and not type.** Each page shows a small scene — a
+/// glow, a glyph, a level meter — and the numbers only have to agree with *each other*, or the
+/// carousel jumps as you page through it. They already had drifted: four pages drew a 180pt glow
+/// and one drew 200, which is visible as a twitch on the fourth swipe and which nobody chose.
+///
+/// They therefore do **not** go through `@ScaledMetric`, unlike `DialFont`. A glyph here is a
+/// picture of a microphone, not a word — growing it at accessibility sizes pushes the copy beside
+/// it off the card, and the copy is the part that has to stay readable.
+enum OnboardingArt {
+    /// The radial glow every page sits its glyph inside, and the radius its colour fades over.
+    static let glow: CGFloat = 180
+    static let glowFade: CGFloat = 80
+
+    /// The waveform on the welcome page, and one of its bars.
+    static let waveform = CGSize(width: 120, height: 60)
+    static let waveBar: CGFloat = 8
+    /// What a bar collapses to before the animation starts — never zero, or the row vanishes.
+    static let waveBarRest: CGFloat = 12
+
+    /// The mic and play discs, which are the same size so pages 3 and 4 do not jump.
+    static let disc: CGFloat = 56
+    /// The level meter under the mic: nine bars, and the height the row reserves for them.
+    static let levelBar: CGFloat = 4
+    static let levelRow: CGFloat = 30
+    static let levelPeak: CGFloat = 28
+
+    /// A row in the miniature library the dial page draws, and a chip in the row under it.
+    static let listRow = CGSize(width: 104, height: 16)
+    static let chip: CGFloat = 26
+
+    /// How a page enters: the art scales up from here, the copy slides up by this much.
+    static let enterScale: CGFloat = 0.9
+    static let enterOffset: CGFloat = 12
+    /// Body copy on a first-run page is set looser than body copy anywhere else — it is read once,
+    /// slowly, by someone who has not decided to trust the app yet.
+    static let bodyLineSpacing: CGFloat = 5
 }
 
 /// Point sizes the dial navigator draws numerals at, plus the one tracking value its chrome needs.
@@ -296,4 +344,34 @@ enum DialFont {
 enum ControlTint {
     static let off: Double = 0.05
     static let on: Double = 0.1
+}
+
+/// **The card the dial draws its content on** (#102).
+///
+/// Extracted from `DialScreenView.stage`, where it was five modifiers inline. Onboarding needed the
+/// same surface — the point of driving it with the wheel is that the first run looks like the app,
+/// and a card of its own invention would have been a fourth version of "a rounded rectangle in this
+/// app's colours".
+///
+/// One definition, so a change to the corner radius or the border cannot land on one screen and miss
+/// the other. This is the lesson `ControlTint` taught the hard way in #76: a shared value living
+/// inside one component disappears when that component does.
+struct DialCard: ViewModifier {
+    /// Content sits at the top and the card takes the height it is given — a short list leaves an
+    /// empty surface rather than a shorter card, so the wheel below never moves.
+    func body(content: Content) -> some View {
+        content
+            .padding(Spacing.lg)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(Color.sonicSurface, in: RoundedRectangle(cornerRadius: Radius.stage))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radius.stage)
+                    .strokeBorder(Color.sonicBorder, lineWidth: Sizing.hairlineTrackHeight / 2)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radius.stage))
+    }
+}
+
+extension View {
+    func dialCard() -> some View { modifier(DialCard()) }
 }

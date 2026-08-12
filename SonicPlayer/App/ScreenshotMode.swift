@@ -23,6 +23,15 @@ enum ScreenshotMode {
         return Screen(rawValue: ProcessInfo.processInfo.arguments[index + 1])
     }
 
+    /// Which onboarding page to land on, for `-screenshotScreen onboarding`. Defaults to the first.
+    static var page: Int {
+        guard isEnabled,
+              let index = ProcessInfo.processInfo.arguments.firstIndex(of: "-screenshotPage"),
+              index + 1 < ProcessInfo.processInfo.arguments.count
+        else { return 0 }
+        return Int(ProcessInfo.processInfo.arguments[index + 1]) ?? 0
+    }
+
     /// **Named for dial routes, because that is what the app has.**
     ///
     /// This listed `collections`, `editRecording` and `homeWithMiniPlayer`, and by the time anyone
@@ -44,6 +53,14 @@ enum ScreenshotMode {
         case edit
         /// The settings list, reached by its chip the way every screen reaches it.
         case settings
+
+        /// **The first run, which every other target deliberately skips** (#102).
+        ///
+        /// Onboarding is the one screen that cannot be reached twice: `ifNeeded` returns `nil` for
+        /// good the moment it is completed, so seeing page 4 meant deleting the app or editing code
+        /// — and during #102 it meant a temporary launch argument that had to be remembered out
+        /// again before committing. Pair it with `-screenshotPage` to land on one page.
+        case onboarding
 
         // The player's three non-happy states (#6). They exist here because epic #6 requires every
         // screen to have designed empty, loading and error states — and a state nobody can put on
@@ -262,7 +279,7 @@ extension ScreenshotDemoData {
                 localized: "The file could not be read. It may have been moved or deleted."
             )
 
-        case .library, .recording, .edit, .settings:
+        case .library, .recording, .edit, .settings, .onboarding:
             break
         }
     }
