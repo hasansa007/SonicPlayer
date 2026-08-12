@@ -82,6 +82,19 @@ before the upload.
 
 Use it after any change to the workflow, the signing setup, or the Xcode pin.
 
+**One step is invisible to it, and that is where the next bug will hide.** `Set What's New in
+TestFlight` is gated on `push || !dry_run`, so **every dry run skips it** — it is the only step that
+talks to the App Store Connect API, and the facility for proving the pipeline cannot reach it.
+
+That is not hypothetical. 3.0.0 build 24 shipped with no What's New because the step's first `curl`
+exited 3 before making a request: `curl` reads `[` and `]` as URL-globbing metacharacters, so
+`filter[version]=` is a malformed range, and under `bash -e` the failing command substitution killed
+the step in 210ms. Two green dry runs that day both skipped it, as had every dry run before them.
+
+So when you change that step, **the only real test is the next release**. Read the run afterwards
+rather than trusting the green tick on the promotion — and note that the upload succeeds *before*
+this step, so a failure here never means the build did not ship.
+
 **The export step is what a dry run exists to exercise.** It used to be skipped entirely on a dry
 run — the step was gated on `push || !dry_run` — so the run archived and stopped, while this file
 claimed it "archives, exports and validates". Signing happens at export, so the one facility for
