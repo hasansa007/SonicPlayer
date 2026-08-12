@@ -63,10 +63,19 @@ struct DialScreenView: View {
     /// — and it is shorter now precisely so that there is less of it to lose.
     private var stacked: some View {
         VStack(spacing: Spacing.lg) {
+            // **One card height on every screen** (#6). It was content-sized with a `Spacer`
+            // taking the slack, so a folder holding one recording drew a card two rows tall and a
+            // full library drew one eight rows tall — and the wheel moved with them. The wheel's
+            // position is the one thing on this layout the thumb learns without looking, so a card
+            // that resizes per screen costs more than the empty space it saves.
+            //
+            // The empty space is the known trade, and it is why this was reverted once: a short
+            // list leaves a surface with nothing on it. That is the better of the two, because the
+            // alternative puts the same emptiness *between* the card and the controls, where it
+            // reads as a gap rather than as a card.
             stage
+                .frame(maxHeight: .infinity)
                 .layoutPriority(0)
-
-            Spacer(minLength: 0)
 
             controls
                 .layoutPriority(1)
@@ -138,8 +147,15 @@ struct DialScreenView: View {
             .frame(width: Sizing.dialDiameter)
         }
         .environment(\.layoutDirection, .leftToRight)
-        .padding(.horizontal, Spacing.xxl)
-        .padding(.vertical, Spacing.lg)
+        // **20 on three edges; the trailing one keeps its 24.**
+        //
+        // Landscape had 24 horizontal and 16 vertical, and the card is pinned to the wheel's height
+        // — so every point the frame did not use showed up as a band of nothing around a card that
+        // cannot grow into it. Tightening the leading edge and both verticals to a single 20 closes
+        // that without moving the wheel, which keeps its own inset on the trailing side.
+        .padding(.leading, Spacing.xl)
+        .padding(.trailing, Spacing.xxl)
+        .padding(.vertical, Spacing.xl)
         // **After the padding, deliberately.** The chip column pushes Back and Settings to the ends
         // of whatever height it is given, so the height has to be the screen's rather than the
         // tallest sibling's — otherwise the two controls that never move would move by however much
