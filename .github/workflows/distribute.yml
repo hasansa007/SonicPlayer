@@ -283,11 +283,36 @@ jobs:
           VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" SonicPlayer/Info.plist)
           BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" SonicPlayer/Info.plist)
 
+          # **-g on every call, and it is not optional.** curl reads [ and ] as URL GLOBBING
+          # metacharacters, so `filter[version]=` is a malformed range expression: it refuses the
+          # URL without making a request and exits 3. That happens inside `RESPONSE=$(...)` under
+          # `bash -e`, so the step died in 210ms having printed one line and no retries. Build
+          # 3.0.0 (24) uploaded fine and shipped with no What's New because of this.
+          #
+          # **No dry run can catch it**, which is why it survived: this step is gated on
+          # `push || !dry_run`, so every dry run skips the one step that talks to the API. The
+          # facility for proving the pipeline cannot reach it. Change anything here and the only
+          # real test is the next release.
+          api() { curl -gsS -H "Authorization: Bearer $JWT" "$@"; }
+
+          # **filter[app] takes the numeric app id, never the bundle id.** It was
+          # `filter[app]=com.hasan.sonicplayer`, which matches nothing — so even once the URL
+          # parsed, the loop would have timed out and exited 0, reporting success having set
+          # nothing. Two bugs deep, the second one green.
+          APP_ID=$(api "https://api.appstoreconnect.apple.com/v1/apps?filter[bundleId]=com.hasan.sonicplayer" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data'][0]['id'])" 2>/dev/null || echo "")
+
+          if [ -z "$APP_ID" ]; then
+            echo "::error::Could not resolve the app id for com.hasan.sonicplayer."
+            echo "The build IS uploaded — this failure is about What's New only."
+            exit 1
+          fi
+          echo "App id: $APP_ID"
+
           # Wait for build to finish processing
           echo "Waiting for build $VERSION ($BUILD) to finish processing..."
           for i in $(seq 1 30); do
-            RESPONSE=$(curl -s -H "Authorization: Bearer $JWT" \
-              "https://api.appstoreconnect.apple.com/v1/builds?filter[version]=$BUILD&filter[preReleaseVersion.version]=$VERSION&filter[app]=com.hasan.sonicplayer")
+            RESPONSE=$(api "https://api.appstoreconnect.apple.com/v1/builds?filter[version]=$BUILD&filter[preReleaseVersion.version]=$VERSION&filter[app]=$APP_ID")
 
             STATUS=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data'][0]['attributes']['processingState'])" 2>/dev/null || echo "WAITING")
 
@@ -300,25 +325,30 @@ jobs:
             sleep 30
           done
 
+          # **A timeout here is NOT the same as a broken call, and they must not report alike.**
+          # The upload has already succeeded by this point; Apple simply has not finished
+          # processing within 15 minutes, which is ordinary. Failing the run would report a
+          # successful release as a failed one. So: warn loudly, say what to do by hand, exit 0 —
+          # while a call that cannot work at all fails above, where it belongs.
           if [ -z "${BUILD_ID:-}" ]; then
-            echo "Warning: Build not processed yet. Skipping What's New."
+            echo "::warning::Build $VERSION ($BUILD) is uploaded but still processing after 15 minutes."
+            echo "What's New was NOT set. Set it in App Store Connect > TestFlight, or re-run this workflow once processing finishes."
             exit 0
           fi
 
           # Set What's New via beta build localizations
           WHATS_NEW_JSON=$(echo "$WHATS_NEW" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))')
 
-          LOC_RESPONSE=$(curl -s -H "Authorization: Bearer $JWT" \
-            "https://api.appstoreconnect.apple.com/v1/builds/$BUILD_ID/betaBuildLocalizations")
+          LOC_RESPONSE=$(api "https://api.appstoreconnect.apple.com/v1/builds/$BUILD_ID/betaBuildLocalizations")
 
           LOC_ID=$(echo "$LOC_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data'][0]['id'])" 2>/dev/null || echo "")
 
           if [ -n "$LOC_ID" ]; then
-            curl -s -X PATCH -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" \
+            api -X PATCH -H "Content-Type: application/json" \
               "https://api.appstoreconnect.apple.com/v1/betaBuildLocalizations/$LOC_ID" \
               -d "{\"data\":{\"type\":\"betaBuildLocalizations\",\"id\":\"$LOC_ID\",\"attributes\":{\"whatsNew\":$WHATS_NEW_JSON}}}"
           else
-            curl -s -X POST -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" \
+            api -X POST -H "Content-Type: application/json" \
               "https://api.appstoreconnect.apple.com/v1/betaBuildLocalizations" \
               -d "{\"data\":{\"type\":\"betaBuildLocalizations\",\"attributes\":{\"locale\":\"en-US\",\"whatsNew\":$WHATS_NEW_JSON},\"relationships\":{\"build\":{\"data\":{\"type\":\"builds\",\"id\":\"$BUILD_ID\"}}}}}"
           fi
