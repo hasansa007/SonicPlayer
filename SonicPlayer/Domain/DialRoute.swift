@@ -34,6 +34,16 @@ enum DialRoute: Equatable {
     /// to a row and pressing it, and the one place that handed over to UIKit chrome mid-flow was the
     /// only irreversible one — so the gesture you had just been using stopped working exactly where
     /// care mattered most.
+    /// About, and How it works — the last two conventional screens, now dial screens (#50).
+    ///
+    /// **One route each for the list and one shared for the detail**, because the two lists differ
+    /// only in which array they read. The detail carries the entry's **id**, not its index: a list
+    /// reordered later cannot then point at the wrong entry, which is the offset bug this codebase has
+    /// already paid for twice.
+    case about
+    case help
+    case infoDetail(id: String, inHelp: Bool)
+
     case confirmDelete(itemID: String)
     /// The guard in front of a trim or a cut (#97).
     ///
@@ -73,6 +83,10 @@ enum DialRoute: Equatable {
         case .nowPlaying: "NOW PLAYING"
         case .recording: "RECORDING"
         case .edit: "EDIT"
+        case .about: "ABOUT"
+        case .help: "HOW IT WORKS"
+        case .infoDetail(let id, let inHelp):
+            (InfoContent.entry(id, in: inHelp ? InfoContent.help : InfoContent.about)?.title ?? "").uppercased()
         case .confirmDelete: "DELETE"
         case .confirmEdit(_, let operation): operation == .keep ? "TRIM" : "REMOVE"
         case .move: "MOVE"

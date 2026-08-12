@@ -80,21 +80,9 @@ struct AppView: View {
                 app.importPickedFiles(urls)
             }
         }
-        // **About and Help outlived the screen that presented them.** They were pushed from inside
-        // `SettingsView`; Settings is a dial screen now, so they are presented from here — over the
-        // dial rather than inside a navigation stack that no longer exists.
-        .sheet(isPresented: Binding(
-            get: { app.settings.showAbout },
-            set: { if !$0 { app.settings.dismissAbout() } }
-        )) {
-            NavigationStack { AboutView(viewModel: app.settings) }
-        }
-        .sheet(isPresented: Binding(
-            get: { app.settings.showHelp },
-            set: { if !$0 { app.settings.dismissHelp() } }
-        )) {
-            NavigationStack { HelpView(viewModel: app.settings) }
-        }
+        // **About and How it works are dial screens now** (#50). Two `.sheet`s stood here — the last
+        // modals the dial raised over itself, and the last two conventional screens in the app. Both
+        // are routes on the dial's own stack, so there is nothing left to present.
         .onChange(of: scenePhase) { _, newPhase in
             app.scenePhaseChanged(newPhase)
         }
