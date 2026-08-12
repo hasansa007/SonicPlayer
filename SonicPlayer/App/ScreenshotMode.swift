@@ -7,9 +7,14 @@ import SwiftUI
 /// directly to a target screen with stable demo data.
 ///
 /// Launch arguments:
-///   -screenshotMode YES
-///   -screenshotScreen <screenName>
-///   -screenshotUseDemoData YES
+///   -screenshotMode                    presence is the switch; any value is ignored
+///   -screenshotScreen <screenName>     one of `Screen` below
+///   -screenshotPage <n>                onboarding only — which page to land on
+///
+/// **`-screenshotUseDemoData` is gone from here because nothing ever read it.** Both capture
+/// scripts passed it and this list promised it worked; the seeding is unconditional in
+/// `seedViewModels`. An argument documented as a switch that is not one is worse than an
+/// undocumented one, because the next person turns it off and nothing changes.
 enum ScreenshotMode {
     static var isEnabled: Bool {
         ProcessInfo.processInfo.arguments.contains("-screenshotMode")

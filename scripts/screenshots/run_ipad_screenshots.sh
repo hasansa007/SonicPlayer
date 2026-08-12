@@ -76,7 +76,6 @@ capture() {
     xcrun simctl launch booted "$BUNDLE_ID" \
         -screenshotMode YES \
         -screenshotScreen "$screen" \
-        -screenshotUseDemoData YES
 
     # Wait for UI to render (iPad needs a bit more time)
     sleep "$DELAY"
