@@ -154,15 +154,34 @@ extension DialNavigator {
             return .list(list(rows: moveRows(for: itemID), subject: subject(for: itemID)))
 
         case .confirmDelete(let itemID):
-            return .list(list(rows: deleteChoiceRows, subject: subject(for: itemID)))
+            return .list(list(
+                rows: deleteChoiceRows,
+                subject: subject(for: itemID),
+                // **The screen whose whole job is to ask, asking.** It drew a name and two rows
+                // reading Cancel and Delete, and never put the question anywhere (#97).
+                question: content.item(itemID)?.children == nil
+                    ? "Delete this recording?"
+                    : "Delete this folder and everything in it?"
+            ))
+
+        case .confirmEdit(let itemID, let operation):
+            return .list(list(
+                rows: editChoiceRows(operation),
+                subject: subject(for: itemID),
+                question: operation == .keep
+                    ? "Keep only the selection?"
+                    : "Remove the selection?"
+            ))
         }
     }
 
     private func list(
         rows: [DialScreen.List.Row],
-        subject: DialScreen.List.Subject? = nil
+        subject: DialScreen.List.Subject? = nil,
+        question: String? = nil
     ) -> DialScreen.List {
         DialScreen.List(
+            question: question,
             rows: rows,
             // **Out of range on purpose when the wheel is on a chrome stop.**
             //
@@ -285,6 +304,12 @@ extension DialNavigator {
                     : DialTimeFormat.clock(item.duration),
                 subtitle: item.subtitle
             )
+        }
+    }
+
+    private func editChoiceRows(_ operation: DialScreen.TrimOperation) -> [DialScreen.List.Row] {
+        DialRoute.EditChoice.allCases.map {
+            .init(id: $0.rawValue, icon: $0.icon(operation), title: $0.label(operation))
         }
     }
 
@@ -618,7 +643,7 @@ extension DialNavigator {
         // committed, and stopped existing when they went back to arming.
         case .edit:
             return .label("DONE")
-        case .confirmDelete:
+        case .confirmDelete, .confirmEdit:
             return .label("CONFIRM")
         case .move:
             return .label(isOnNewFolderRow ? "NAME IT" : "FILE HERE")
@@ -698,6 +723,10 @@ extension DialNavigator {
         // wrong answer cannot be taken back, so the caption names the outcome.
         case .confirmDelete:
             return "deleting cannot be undone · rotate to choose · press to confirm"
+        // Same reason as the line above it: this rewrites the recording on disk and there is no
+        // undo, so the caption names the outcome rather than the gesture.
+        case .confirmEdit:
+            return "this rewrites the recording · rotate to choose · press to confirm"
         }
     }
 

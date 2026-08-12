@@ -127,6 +127,18 @@ struct DialListView: View {
     /// proxy finds these rows (#91).
     private var rows: some View {
         VStack(spacing: Spacing.xxs) {
+            // **Above the subject, because it is the sentence the screen exists to say.** The guard
+            // drew the recording's name and two rows reading Cancel and Delete, and asked nothing —
+            // leaving the user to infer the question from the answers (#97).
+            if let question = list.question {
+                Text(question)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.sonicTextPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, Spacing.sm)
+            }
+
             if let subject = list.subject {
                 subjectHeader(subject)
             }

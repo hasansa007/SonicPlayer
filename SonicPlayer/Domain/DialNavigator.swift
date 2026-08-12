@@ -336,6 +336,20 @@ struct DialNavigator {
         return DialTrimRange(start: 0, end: editing.duration, duration: editing.duration)
     }
 
+    /// The selection being confirmed, read from the **edit level under the guard**.
+    ///
+    /// `currentTrim` reads `level`, which inside the guard is the guard itself — it has no trim and
+    /// would fall back to the whole file, so confirming a two-second cut would have removed the
+    /// entire recording. The guard is always pushed directly onto the editor, so the level below is
+    /// the one holding the handles (#97).
+    private var trimAtEditDepth: DialTrimRange? {
+        guard stack.count >= 2 else { return nil }
+        let editLevel = stack[stack.count - 2]
+        if let trim = editLevel.trim { return trim }
+        guard let editing = content.editing else { return nil }
+        return DialTrimRange(start: 0, end: editing.duration, duration: editing.duration)
+    }
+
     // MARK: - Press
 
     /// The hub, which means something different on every screen — that is the point of it. There is
@@ -424,14 +438,33 @@ struct DialNavigator {
             // `content.editing`, so the next refresh — carrying the new duration — seeds the
             // handles across the new file. Disarming to `.keep` for the same reason: the delete
             // has happened, and leaving it armed points a second one at the wrong region.
+            // **The hub asks now; it does not write** (#97). Trimming and cutting were the two
+            // least recoverable things in the app and the only two with no gate — while deleting a
+            // whole recording, which at least leaves the rest of the library alone, had one.
+            //
+            // The trim is NOT cleared here any more. It has to survive the guard so the answer can
+            // act on it, and so cancelling returns to the selection the user made rather than to the
+            // whole file. It is cleared where the write actually happens, below.
+            return open(.confirmEdit(itemID: itemID, operation: operation))
+
+        // The answer. `pop()` first, so the effects land with the editor already back on top.
+        case .confirmEdit(let itemID, let operation):
+            guard let trim = trimAtEditDepth else { return pop() + [.feedback(.limit)] }
+            let choices = DialRoute.EditChoice.allCases
+            let choice = choices[min(level.highlighted, choices.count - 1)]
+            let leaving = pop()
+            guard choice == .confirm else { return leaving + [.feedback(.commit)] }
+
+            // Cleared only now, for the reason the old comment gave: the recording underneath has
+            // just been rewritten, so the old start and end describe a file that no longer exists.
             stack[stack.count - 1].trim = nil
             stack[stack.count - 1].trimOperation = .keep
 
             switch operation {
             case .keep:
-                return [.commitTrim(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
+                return leaving + [.commitTrim(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
             case .remove:
-                return [.commitCut(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
+                return leaving + [.commitCut(itemID: itemID, start: trim.start, end: trim.end), .feedback(.commit)]
             }
 
         case .move(let itemID):
@@ -1020,6 +1053,7 @@ struct DialNavigator {
         case .settings: return DialSetting.allCases.count
         case .recordings, .folder: return items.count
         case .confirmDelete: return DialRoute.DeleteChoice.allCases.count
+        case .confirmEdit: return DialRoute.EditChoice.allCases.count
         case .move(let itemID): return MoveDestinations.rows(in: content.recordings, excluding: itemID).count
         case .nowPlaying, .recording, .edit: return 0
         }
