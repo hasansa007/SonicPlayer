@@ -78,10 +78,14 @@ struct DialListView: View {
     /// With six recordings the stack simply overflowed the card, so turning the wheel walked the
     /// highlight off the bottom edge and the screen stopped agreeing with the ring.
     ///
-    /// A `ScrollView` with scrolling **disabled** is what squares that with "it does not scroll":
-    /// the point of the rule was never that content cannot move, it was that a drag must not become
-    /// a second way to change the selection. Here the wheel remains the only thing that moves the
-    /// highlight, and the view merely keeps it in sight.
+    /// **The card scrolls; this view does not** (#91). `DialScreenView.stage` owns the scroll view
+    /// and the `ScrollViewReader` that follows `highlighted`, because that is the view the rows
+    /// actually overflow. A `ScrollView` lived here instead, with scrolling disabled, and it never
+    /// moved anything — nested inside the card's own, it was always handed enough height to fit.
+    ///
+    /// What the rule was ever protecting still holds: a drag must not become a second way to change
+    /// the selection. The wheel remains the only thing that moves the highlight; the card merely
+    /// keeps it in sight.
     var body: some View {
         if isProminent { cards } else { rows }
     }
