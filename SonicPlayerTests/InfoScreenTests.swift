@@ -37,6 +37,17 @@ struct InfoScreenTests {
         #expect(navigator.screen.chrome.breadcrumb.last == "ABOUT")
     }
 
+    /// **The version is the one thing the old screen said that the rewrite dropped.** It was a
+    /// `Text` under the app name; the chrome's status line is the dial's equivalent, and nothing put
+    /// it there until it was noticed on a build.
+    @Test func aboutStatesTheAppVersion() {
+        var navigator = inSettings()
+        open(.about, from: &navigator)
+
+        #expect(navigator.screen.chrome.status == InfoContent.version)
+        #expect(navigator.screen.chrome.status?.isEmpty == false, "the bundle should yield a version")
+    }
+
     @Test func theHelpRowOpensHowItWorks() {
         var navigator = inSettings()
         open(.help, from: &navigator)

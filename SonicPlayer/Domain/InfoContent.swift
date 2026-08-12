@@ -144,6 +144,25 @@ enum InfoContent {
         ]
     }
 
+    // MARK: - Version
+
+    /// `3.0.0 (24)`, or as much of it as the bundle has.
+    ///
+    /// **The one thing the old About screen said that this one dropped.** It was a `Text` under the
+    /// app name; the dial has no such slot, and the chrome's status line is where a screen states
+    /// what it is about — so that is where it goes. Lost in the rewrite and put back after it was
+    /// noticed on a build, which is the argument for looking at screens rather than diffs.
+    static var version: String? {
+        let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        switch (short, build) {
+        case let (short?, build?): return "\(short) (\(build))"
+        case let (short?, nil): return short
+        case let (nil, build?): return build
+        case (nil, nil): return nil
+        }
+    }
+
     // MARK: - Lookup
 
     /// **One lookup for both, keyed by id.** A route carries an id rather than an index, so a list

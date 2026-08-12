@@ -50,6 +50,10 @@ extension DialNavigator {
         switch route {
         case .nowPlaying, .recording, .edit:
             return nil
+        // **About states what it is about.** Everywhere else this line reports playback, which is
+        // the right default; here the version is the fact the screen exists to carry.
+        case .about:
+            return InfoContent.version
         default:
             guard let playback = content.playback else { return nil }
             let state = playback.isPlaying ? "playing" : "paused"
