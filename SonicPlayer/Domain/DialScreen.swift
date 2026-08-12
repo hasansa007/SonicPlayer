@@ -127,6 +127,13 @@ struct DialScreen: Equatable {
             var detail: String?
         }
 
+        /// **What the screen is asking**, when it is asking something.
+        ///
+        /// The delete guard drew the recording's name and two rows reading `Cancel` and `Delete`,
+        /// and never put a question anywhere — so the one screen whose entire job is to ask did not
+        /// ask. `nil` on every ordinary list, which is most of them (#97).
+        var question: String?
+
         var rows: [Row]
         /// Index into `rows`. **Always valid when `rows` is non-empty** — the navigator clamps it,
         /// so the UI never has to decide what an out-of-range highlight looks like.
