@@ -79,7 +79,6 @@ capture() {
     xcrun simctl launch booted "$BUNDLE_ID" \
         -screenshotMode YES \
         -screenshotScreen "$screen" \
-        -screenshotUseDemoData YES
 
     # Wait for UI to render
     sleep "$DELAY"

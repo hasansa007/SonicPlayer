@@ -57,6 +57,23 @@ enum AppColorScheme: String, CaseIterable, Identifiable, Codable {
 
     var id: String { rawValue }
 
+    /// **What the picker shows. `rawValue` is the stored value and must never be shown** (#102).
+    ///
+    /// The theme picker rendered `Text(scheme.rawValue)` — `Text(_: String)`, the initialiser that
+    /// does *not* localise — so System / Light / Dark were English in all nine languages, and two of
+    /// the three were not in the string catalogue at all. It is the same defect `InfoContent` was
+    /// built to fix in #50, surviving in the one place nobody looked: the first screen a new user sees.
+    ///
+    /// Translating `rawValue` instead would have been the tempting one-line version and is a data
+    /// migration — it is what `@AppStorage("colorScheme")` has written to disk since 1.0.
+    var label: String {
+        switch self {
+        case .system: String(localized: "System")
+        case .light: String(localized: "Light")
+        case .dark: String(localized: "Dark")
+        }
+    }
+
     var colorScheme: ColorScheme? {
         switch self {
         case .system: return nil
