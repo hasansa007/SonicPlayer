@@ -111,30 +111,28 @@ struct DialListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
+    /// **A plain stack. The card owns the scrolling.**
+    ///
+    /// This held its own `ScrollView` plus a `ScrollViewReader` that scrolled to the highlight — and
+    /// it never worked, because it was not the view that scrolls. `DialScreenView.stage` wraps this
+    /// in `ViewThatFits { content; ScrollView { content } }`, so once the rows overrun the card the
+    /// OUTER scroll view is the one with an offset, and a `scrollTo` on the inner proxy moves a view
+    /// that already fits. Two nested scroll views, and the reader was attached to the wrong one.
+    ///
+    /// The `.id(index)` stays: `ScrollViewReader` resolves ids anywhere below it, so the card's
+    /// proxy finds these rows (#91).
     private var rows: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.vertical) {
-                VStack(spacing: Spacing.xxs) {
-                    if let subject = list.subject {
-                        subjectHeader(subject)
-                    }
-
-                    ForEach(Array(list.rows.enumerated()), id: \.element.id) { index, row in
-                        rowButton(row, at: index)
-                            .id(index)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .top)
+        VStack(spacing: Spacing.xxs) {
+            if let subject = list.subject {
+                subjectHeader(subject)
             }
-            .scrollDisabled(true)
-            // Bounded, so there is something to scroll within. Sized to its content, a `ScrollView`
-            // is just a `VStack` that overflows — which is how the highlight walked off the bottom.
-            .frame(maxHeight: .infinity)
-            .scrollBounceBehavior(.basedOnSize)
-            .onChange(of: list.highlighted) { _, index in
-                withAnimation(Motion.settle) { proxy.scrollTo(index, anchor: .center) }
+
+            ForEach(Array(list.rows.enumerated()), id: \.element.id) { index, row in
+                rowButton(row, at: index)
+                    .id(index)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .top)
     }
 
     private func rowButton(_ row: DialScreen.List.Row, at index: Int) -> some View {
