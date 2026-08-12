@@ -106,34 +106,30 @@ jobs:
           fi
           echo "Found the $VERSION section."
 
-      - name: Install signing certificate
+      # **`Install signing certificate` and `Install provisioning profile` stood here.**
+      #
+      # They imported a base64 `.p12` into a throwaway keychain and dropped a `.mobileprovision`
+      # into place — four secrets between them, all of which had to be re-exported by hand every
+      # time a certificate expired or the profile drifted from the bundle ID.
+      #
+      # None of that is needed to sign. `-allowProvisioningUpdates` plus an App Store Connect API
+      # key lets the runner fetch or create its own signing assets, which is exactly what Xcode does
+      # locally under automatic signing — and automatic signing is what this project already uses,
+      # so the old path was asking for artifacts that were never produced in the first place. The
+      # machine that shipped build 23 by hand holds only an `Apple Development` identity; there was
+      # no distribution `.p12` to export.
+      #
+      # Seven secrets become three, and the three come from one key.
+
+      - name: Write App Store Connect API key
         env:
-          CERTIFICATE_P12: ${{ secrets.CERTIFICATE_P12 }}
-          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+          ASC_API_KEY: ${{ secrets.ASC_API_KEY }}
         run: |
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
-
-          # Create temporary keychain
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
-          # Import certificate
-          CERT_PATH=$RUNNER_TEMP/certificate.p12
-          echo -n "$CERTIFICATE_P12" | base64 --decode -o "$CERT_PATH"
-          security import "$CERT_PATH" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
-          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security list-keychain -d user -s "$KEYCHAIN_PATH"
-
-      - name: Install provisioning profile
-        env:
-          PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE }}
-        run: |
-          PROFILE_PATH=$RUNNER_TEMP/profile.mobileprovision
-          echo -n "$PROVISIONING_PROFILE" | base64 --decode -o "$PROFILE_PATH"
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp "$PROFILE_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/
+          # **Before the archive, not after.** It used to sit between `Archive` and `Export`, which
+          # was fine while the archive signed itself from an imported certificate. Signing assets
+          # are now fetched with this key, so the archive needs it too.
+          mkdir -p $RUNNER_TEMP/private_keys
+          echo -n "$ASC_API_KEY" | base64 --decode -o "$RUNNER_TEMP/private_keys/AuthKey_${{ secrets.ASC_API_KEY_ID }}.p8"
 
       # `Resolve packages` stood here and is gone with #20. `Package.resolved` pins zero packages,
       # so the step resolved nothing — and a resolution step in a release pipeline is a standing
@@ -146,14 +142,11 @@ jobs:
             -scheme SonicPlayer \
             -destination 'generic/platform=iOS' \
             -archivePath $RUNNER_TEMP/SonicPlayer.xcarchive \
-            -configuration Release
-
-      - name: Write App Store Connect API key
-        env:
-          ASC_API_KEY: ${{ secrets.ASC_API_KEY }}
-        run: |
-          mkdir -p $RUNNER_TEMP/private_keys
-          echo -n "$ASC_API_KEY" | base64 --decode -o "$RUNNER_TEMP/private_keys/AuthKey_${{ secrets.ASC_API_KEY_ID }}.p8"
+            -configuration Release \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/private_keys/AuthKey_${{ secrets.ASC_API_KEY_ID }}.p8" \
+            -authenticationKeyID ${{ secrets.ASC_API_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.ASC_API_ISSUER_ID }}
 
       - name: Read What's New
         run: |
@@ -181,9 +174,32 @@ jobs:
           echo "What's New for $VERSION:"
           cat $RUNNER_TEMP/whats_new.txt
 
-      - name: Export and upload to TestFlight
-        if: ${{ github.event_name == 'push' || !inputs.dry_run }}
+      - name: Export, and upload unless this is a dry run
         run: |
+          # **This step no longer skips on a dry run, and that is the fix.**
+          #
+          # It was gated `push || !dry_run`, so a dry run archived and stopped. Both this file's
+          # header and `docs/deploy-and-staging.md` claimed it "archives, exports and validates,
+          # then stops before the upload" — it did not export, and export is where signing happens.
+          # So the one facility for proving the pipeline without shipping could not prove the part
+          # most likely to be broken. Now the step always runs and only its DESTINATION changes.
+          DESTINATION=upload
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            DESTINATION=export
+            echo "Dry run: exporting a signed .ipa to disk, not uploading."
+          fi
+
+          # **Read from the project rather than a secret.** The team id is not a credential — it is
+          # committed in project.pbxproj, and it is what the app is actually signed with. Holding a
+          # second copy in `secrets.TEAM_ID` created a value that could silently disagree with the
+          # one in the build, and cost a secret to store something already public.
+          TEAM_ID=$(grep -m1 'DEVELOPMENT_TEAM' SonicPlayer.xcodeproj/project.pbxproj | tr -d ' \t;' | cut -d= -f2)
+          if [ -z "$TEAM_ID" ]; then
+            echo "::error::No DEVELOPMENT_TEAM in project.pbxproj — cannot export."
+            exit 1
+          fi
+          echo "Team: $TEAM_ID, destination: $DESTINATION"
+
           cat > $RUNNER_TEMP/ExportOptions.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -192,11 +208,13 @@ jobs:
             <key>method</key>
             <string>app-store-connect</string>
             <key>teamID</key>
-            <string>${{ secrets.TEAM_ID }}</string>
+            <string>$TEAM_ID</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
             <key>uploadSymbols</key>
             <true/>
             <key>destination</key>
-            <string>upload</string>
+            <string>$DESTINATION</string>
           </dict>
           </plist>
           EOF
@@ -205,6 +223,7 @@ jobs:
             -archivePath $RUNNER_TEMP/SonicPlayer.xcarchive \
             -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist \
             -exportPath $RUNNER_TEMP/Export \
+            -allowProvisioningUpdates \
             -authenticationKeyPath "$RUNNER_TEMP/private_keys/AuthKey_${{ secrets.ASC_API_KEY_ID }}.p8" \
             -authenticationKeyID ${{ secrets.ASC_API_KEY_ID }} \
             -authenticationKeyIssuerID ${{ secrets.ASC_API_ISSUER_ID }}
@@ -274,9 +293,20 @@ jobs:
       - name: Report dry run
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
         run: |
-          echo "Dry run: archived and validated, nothing uploaded."
+          echo "Dry run: archived, SIGNED and exported. Nothing uploaded."
+          ls -la $RUNNER_TEMP/Export
           echo "Re-run with dry_run unchecked, or push to main, to ship."
 
-      - name: Clean up keychain
-        if: always()
-        run: security delete-keychain $RUNNER_TEMP/app-signing.keychain-db 2>/dev/null || true
+      # `Clean up keychain` stood here, deleting the throwaway keychain the certificate import
+      # created. No certificate is imported now, so there is no keychain — and a cleanup step for a
+      # thing that is never created reads as a safeguard rather than as dead code, which is how it
+      # would have survived the next reading of this file.
+
+      - name: Upload the exported build as an artifact
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: SonicPlayer-dry-run-ipa
+          path: ${{ runner.temp }}/Export
+          retention-days: 7
+          if-no-files-found: error
