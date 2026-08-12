@@ -113,3 +113,40 @@ struct InfoScreenTests {
         }
     }
 }
+
+/// The Settings chip inside the settings path (#50).
+@Suite
+struct SettingsChipTests {
+
+    private func inSettings() -> DialNavigator {
+        var navigator = DialSample.navigator()
+        _ = navigator.receive(.action("settings"))
+        return navigator
+    }
+
+    @Test func theSettingsChipIsDeadOnTheSettingsScreen() {
+        #expect(!inSettings().isChipEnabled("settings"))
+    }
+
+    /// **The regression this fixes.** About and How it works are pushed on top of Settings, and the
+    /// rule asked only about the current route — so the chip came back to life one level down and
+    /// would have stacked a second Settings on top of the one you were already inside.
+    @Test func theSettingsChipStaysDeadInsideAboutAndHelp() {
+        for setting in [DialSetting.about, .help] {
+            var navigator = inSettings()
+            let index = DialSetting.allCases.firstIndex(of: setting)!
+            _ = navigator.receive(.tick(index))
+            _ = navigator.receive(.press)
+
+            #expect(!navigator.isChipEnabled("settings"), "\(setting) is inside the settings path")
+
+            _ = navigator.receive(.press)   // and on the detail screen below it
+            #expect(!navigator.isChipEnabled("settings"))
+        }
+    }
+
+    /// The complement — it is alive everywhere else, or the rule would be a different bug.
+    @Test func theSettingsChipIsAliveInTheLibrary() {
+        #expect(DialSample.navigator().isChipEnabled("settings"))
+    }
+}

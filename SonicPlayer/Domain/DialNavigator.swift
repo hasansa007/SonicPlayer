@@ -999,8 +999,19 @@ struct DialNavigator {
         switch id {
         case "back": return canGoBack(atDepth: depth)
         case "settings":
-            if case .settings = stack[depth].route { return false }
-            return true
+            // **Anywhere inside the settings path, not only on the settings screen itself.**
+            //
+            // This asked whether the CURRENT route was `.settings`, which was the whole rule while
+            // Settings was a leaf. Once About and How it works became screens pushed on top of it
+            // (#50), the chip came back to life one level down — so from About you could press
+            // Settings and stack a second Settings on top of the one you were already inside.
+            //
+            // Asking about the path rather than the tip means any screen added under Settings later
+            // is covered without anyone remembering this line exists.
+            return !stack.prefix(depth + 1).contains { level in
+                if case .settings = level.route { return true }
+                return false
+            }
         default: return true
         }
     }
