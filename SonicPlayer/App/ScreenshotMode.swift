@@ -206,6 +206,51 @@ enum ScreenshotDemoData {
         ),
     ]
 
+
+    // MARK: - The demo library, as a tree
+
+    /// **What the dial actually browses** (#64).
+    ///
+    /// `seedViewModels` set `home.allFiles` and `filesRoot`, and never `home.libraryTree` — while
+    /// `refreshDial` hands the dial BOTH `allFiles` and `libraryTree`. So the four demo collections
+    /// went into a view model the dial does not read, the demo library was a flat list of seven
+    /// recordings, and **no screenshot could show a folder** — one of 3.0.0's headline features, and
+    /// with it the Move screen and every folder-scoped Record or Import shot.
+    ///
+    /// The original bug reported that opening a demo collection failed because no such directory
+    /// exists on disk. It does not need to: a folder carries its children, so the navigator descends
+    /// inside this snapshot and never asks the filesystem for a level it has just pushed. Creating
+    /// the directories would be solving a problem the tree shape already removed.
+    ///
+    /// Ids are `url.absoluteString`, matching `LibraryTree` — one id space for files and folders, so
+    /// a route holding one resolves without knowing which kind it is.
+    static var libraryTree: [DialContent.Item] {
+        func file(_ audio: AudioFile) -> DialContent.Item {
+            DialContent.Item(
+                id: audio.url.absoluteString, title: audio.title,
+                duration: audio.duration, subtitle: nil, children: nil
+            )
+        }
+        func folder(_ name: String, _ contents: [AudioFile]) -> DialContent.Item {
+            let url = documentsURL.appendingPathComponent(name)
+            let total = contents.reduce(0) { $0 + $1.duration }
+            return DialContent.Item(
+                id: url.absoluteString,
+                title: name,
+                duration: 0,
+                // **The count has to match what is inside.** A folder claiming twelve recordings and
+                // holding five is one more thing a screenshot states falsely.
+                subtitle: "\(contents.count) recordings · \(DialTimeFormat.clock(total))",
+                children: contents.map(file)
+            )
+        }
+        return [
+            folder("Podcasts", Array(collectionFiles.prefix(5))),
+            folder("Lectures", Array(allFiles.suffix(2))),
+            folder("Voice Memos", Array(allFiles.dropFirst(3).prefix(2)))
+        ] + allFiles.prefix(4).map(file)
+    }
+
     // MARK: - State Builders
     //
     // `buildAppState` is gone with #18: `AppFeature.State` is three sheet flags now, and every
@@ -230,6 +275,8 @@ extension ScreenshotDemoData {
         for screen: ScreenshotMode.Screen
     ) {
         home.allFiles = allFiles
+        // The dial browses the tree, not the flat list — see `libraryTree` above (#64).
+        home.libraryTree = libraryTree
         filesRoot.seed(items: collections.map { .folder($0) } + allFiles.prefix(5).map { .file($0) })
 
         switch screen {
