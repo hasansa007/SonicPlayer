@@ -331,11 +331,32 @@ Summarised here for context; **`docs/deploy-and-staging.md` is authoritative** a
 two ever disagree.
 
 Pushing to `main` triggers `.github/workflows/distribute.yml`, which archives, signs and uploads
-to TestFlight. **The merge is the release** — there is no separate promotion step.
+to TestFlight. **For testers, the merge is the release** — there is no promotion step.
+
+**Reaching the public App Store is manual and nothing here does it.** SonicPlayer 3.0.0 (25) has
+been live on the App Store since 2026-08-13; that submission was made by hand in App Store Connect.
+This paragraph used to end at "the merge is the release", which was true only while the app was
+TestFlight-only, and it is the sentence most likely to mislead you into thinking a merge reached
+users. It reaches testers. Three things follow:
+
+- **What's New is two different fields.** The workflow writes the *TestFlight build's*. The App
+  Store version's is per-language and lives in `docs/appstore/<version>/` — see its README.
+- **Tag the shipped commit** once a release is live, bare version, no `v` prefix. A tag push does
+  not trigger the workflow (`push: branches: [main]`).
+- **Guideline 5.2.5 is now removal risk, not rejection risk.** See the compliance section above;
+  the rules are unchanged, the price of breaking them is not.
 
 Before bumping `CFBundleShortVersionString` in `Info.plist`, add a matching section to
 `RELEASE_NOTES.md`. The workflow reads the section whose heading equals `## <version>` and ships it
-as What's New; with no matching section testers get a placeholder and a build warning.
+as What's New; **with no matching section the run fails before the archive.** It used to ship a
+placeholder and log a warning, which is the quiet-failure shape that guard exists to remove.
+
+**The version lives in `SonicPlayer/Info.plist` and nowhere else.** The app target sets
+`GENERATE_INFOPLIST_FILE = NO`, so the plist's literal values ship and every workflow step reads
+them with `PlistBuddy`. The target used to *also* carry `MARKETING_VERSION = 2.3.0` and
+`CURRENT_PROJECT_VERSION = 16` — read by nothing, four versions stale, and exactly what Xcode's
+General tab writes when you bump a version in the UI. They are deleted, and a guard step now fails
+the run if either reappears disagreeing with the plist.
 
 The runner is `macos-26` and pins **Xcode 26.6**. The guard step asserts **two** floors, and the
 distinction is the whole point of it: one that the toolchain can *compile* this project, and one
@@ -366,7 +387,8 @@ To prove a pipeline change without shipping, run the workflow manually from the 
 
 - **`gh-<issue>-<slug>`** — feature branches. PR into `feat`, never into `main`
 - **`feat`** — **pre prod**. Integrated but not shipped
-- **`main`** — **prod**. Pushing here uploads to TestFlight; the merge *is* the release
+- **`main`** — **prod**. Pushing here uploads to TestFlight; the merge is the release *for testers*.
+  The public App Store submission is a separate manual step — see Release above
 
 `feat` is a pre-prod branch with a feature-branch name, so tooling that guesses the branch model
 from names (`staging` → `develop` → `main`) resolves pre prod to `main` — the branch that ships.

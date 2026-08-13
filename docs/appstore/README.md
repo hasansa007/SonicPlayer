@@ -73,3 +73,17 @@ over is not. Check the number, not the verdict.
 
 **The short pair must mirror the long pair.** Both languages open on the same claim in the same
 shape, because a listing that pitches one thing in English and another in Arabic is two products.
+
+## Coverage — 2 of the 9 languages the app ships
+
+`Localizable.xcstrings` localises the app into **ar, bn, en, es, fr, hi, pt, ru, zh-Hans**.
+`3.0.0/` holds copy for **en and ar** only. The remaining seven — bn, es, fr, hi, pt, ru, zh-Hans —
+have **no App Store copy in any file**, so those storefronts fall back to the English listing.
+
+That is a gap, not a decision, and it was invisible while the app was TestFlight-only: TestFlight's
+What's New is not localised, so nothing asked the question until 3.0.0 went public on 2026-08-13.
+A user browsing in Hindi sees a Hindi app described in English.
+
+Adding a language means both files, at both caps, built from the terms
+`Localizable.xcstrings` already ships — the rule under "Translations follow the app" applies to
+every one of them, and so does the five-word rule.

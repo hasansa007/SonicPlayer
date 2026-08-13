@@ -14,14 +14,49 @@ which is why this file exists. See "Why this file exists" at the bottom.
 
 Two stages, not one. A PR based on `main` skips pre prod entirely.
 
-## Merging to `main` is the release
+## Merging to `main` releases to TestFlight — and stops there
 
-There is no separate promotion step, no tag to cut, no button to press afterwards. Pushing to
-`main` triggers `.github/workflows/distribute.yml`, which archives, signs and uploads to
-TestFlight. **The merge is the release.**
+Pushing to `main` triggers `.github/workflows/distribute.yml`, which archives, signs and uploads to
+TestFlight. No button to press afterwards, no promotion step. **For testers, the merge is the
+release.**
 
 Treat a `main` merge with the caution that implies. In particular, never open a feature PR against
 `main` — base it on `feat`.
+
+### Reaching the public App Store is a separate, manual step
+
+**This file said "the merge *is* the release" full stop, and that was true only while the app was
+TestFlight-only.** SonicPlayer 3.0.0 (25) went live on the App Store on 2026-08-13, and nothing in
+this repository performed that submission — it was done by hand in App Store Connect. Nothing
+automates it today.
+
+Two consequences that the old sentence hid:
+
+- **The pipeline's What's New is not the store's.** `Set What's New in TestFlight` writes the
+  *beta build's* localisation. The App Store version has its own *What's New in This Version*
+  field, per language, which no workflow touches. `docs/appstore/<version>/` holds that copy and
+  its README explains the split. Editing `RELEASE_NOTES.md` changes what testers see and nothing
+  a shopper sees.
+- **Guideline 5.2.5 now carries removal risk, not rejection risk.** A rejected upload costs a
+  build number. A live listing taken down costs the listing. The word list in `CLAUDE.md` and the
+  design spec did not change; what changed is the price of getting it wrong.
+
+### Tag the commit that ships
+
+**There is a tag to cut now, and this file previously said there was not.** 3.0.0 was released
+untagged, and reconstructing which commit Apple approved afterwards meant diffing merge commits to
+prove no `SonicPlayer/` file had changed since the build bump.
+
+After an App Store release goes live, tag the commit that produced the approved binary:
+
+```bash
+git tag -a 3.0.1 <sha> -m "3.0.1 (26) — App Store release"
+git push origin 3.0.1
+```
+
+**Bare version, no `v` prefix** — matching `1.1.2` and `1.0.6`. `v1.1.1` is the odd one out and is
+not the pattern to copy. Pushing a tag does not ship anything: the workflow triggers on
+`push: branches: [main]`, which a tag ref does not match.
 
 ## Before bumping the version
 
@@ -101,26 +136,40 @@ claimed it "archives, exports and validates". Signing happens at export, so the 
 proving the pipeline without shipping could not reach the part most likely to be broken. The step
 now always runs and only its `destination` changes, `export` instead of `upload`.
 
-**There is no Run workflow button until this file is on `main`.** GitHub only offers
-`workflow_dispatch` for workflows present on the **default branch**, and `distribute.yml` lives on
-`feat`. So the dry run is unavailable *before* the first promotion and available ever after —
-which is exactly backwards from when it is most wanted. Until then the first promotion merge both
-installs the pipeline and fires it for real.
+**The Run workflow button now exists.** It did not once: GitHub only offers `workflow_dispatch` for
+workflows present on the **default branch**, and `distribute.yml` lived only on `feat`, so the dry
+run was unavailable *before* the first promotion and available ever after — exactly backwards from
+when it is most wanted. `distribute.yml` has been on `main` since the 3.0.0 promotion, and `main`
+is the default branch, so the button is there.
 
-`gh run list --workflow=distribute.yml` says so plainly if you forget: *"workflow distribute.yml not
-found on the default branch"*. That is not a missing file; it is a file on the wrong branch for the
-purpose.
+Kept because the failure mode recurs for any *new* workflow: `gh run list --workflow=<name>.yml`
+reporting *"workflow not found on the default branch"* is not a missing file, it is a file on the
+wrong branch for the purpose.
 
 ## The Xcode pin
 
-The runner pins **Xcode 26.3**, and a guard step asserts up front that the toolchain can build
-the project.
+The runner is `macos-26` and pins **Xcode 26.6**. The guard step asserts **two** floors, and the
+distinction is the whole point of it: one that the toolchain can *compile* this project, and one
+that Apple will *accept the upload*.
 
 **The package constraint that originally forced this is gone.** Until #20 the reason was that
 `ComposableArchitecture` and `swift-sharing` declared `swift-tools-version: 6.1`, so anything below
 Xcode 16.3 failed during package resolution with an error that never mentioned Xcode. The project
-now has zero packages, so that failure mode no longer exists. 26.3 remains the pin because it is
-the newest available on `macos-15` and the closest to the local toolchain.
+now has zero packages, so that failure mode no longer exists.
+
+**This section said 26.3, "the newest available on `macos-15` and the closest to the local
+toolchain", for longer than that was safe — and that exact reasoning is what caused a rejection.**
+3.0.0 build 23 archived, signed and uploaded cleanly under 26.3, then failed automated validation
+with **ITMS-90111, unsupported SDK**, burning a build number that can never be reused.
+
+So the pin is not a free choice between versions that compile. **Apple sets a moving floor on the
+SDK, and an Xcode below it fails only after the upload.** `macos-15` carries nothing above 26.3,
+which is why the image moved to `macos-26` too. When Apple raises the floor again — watch
+`developer.apple.com/news/releases` — raise `REQUIRED_XCODE` in the guard, the `xcode-select` path,
+and the image if it has nothing newer.
+
+Do not re-derive "newest available on the image" from an older copy of this paragraph. That is the
+reasoning that shipped a refused binary.
 
 ## Why this file exists
 
