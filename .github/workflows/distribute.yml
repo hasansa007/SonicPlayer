@@ -106,6 +106,57 @@ jobs:
           fi
           echo "Found the $VERSION section."
 
+      - name: Assert the version lives in exactly one place
+        run: |
+          # **The trap this closes.** The app target sets GENERATE_INFOPLIST_FILE = NO and
+          # INFOPLIST_FILE = SonicPlayer/Info.plist, so the plist's literal values are what ship,
+          # and every step here reads them with PlistBuddy. But the target also carried
+          # MARKETING_VERSION = 2.3.0 and CURRENT_PROJECT_VERSION = 16 — left over, read by
+          # nothing, and four versions behind what was actually on the App Store.
+          #
+          # That matters because Xcode's General tab writes *those* settings. Bump the version
+          # in the UI and it edits a dead key: the field reads 3.0.1, the build ships 3.0.0, and
+          # nothing anywhere disagrees out loud. Deleting them empties the field, which is a
+          # better signal than a wrong number — but typing into it puts the key straight back.
+          #
+          # So the rule, not the instance: the keys may be absent, or they may agree. They may
+          # not silently disagree.
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" SonicPlayer/Info.plist)
+          BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" SonicPlayer/Info.plist)
+
+          # Ask Xcode for the app target's *resolved* settings rather than grepping the pbxproj.
+          # The two targets' config blocks are textually identical apart from the bundle id, and
+          # the test bundle's own MARKETING_VERSION = 1.0 is live and correct — it generates its
+          # plist. Any line-window grep that tries to tell them apart is a guess; this is not.
+          SETTINGS=$(xcodebuild -project SonicPlayer.xcodeproj -target SonicPlayer \
+            -configuration Release -showBuildSettings 2>/dev/null)
+
+          # If that call fails its output is empty, every key reads as "unset", and the check
+          # below passes having verified nothing — a guard that cannot fail, which is the shape
+          # this step exists to remove. Prove the output is real before trusting an absence.
+          if ! printf '%s\n' "$SETTINGS" | grep -q '^ *PRODUCT_BUNDLE_IDENTIFIER = com.hasan.sonicplayer$'; then
+            echo "::error::Could not read the app target's build settings, so the version check"
+            echo "::error::could not run. Treating that as a failure rather than a pass."
+            exit 1
+          fi
+
+          for pair in "MARKETING_VERSION=$VERSION" "CURRENT_PROJECT_VERSION=$BUILD"; do
+            key=${pair%%=*}
+            expected=${pair#*=}
+            found=$(printf '%s\n' "$SETTINGS" | sed -n "s/^ *$key = //p")
+            if [ -z "$found" ]; then
+              echo "$key is unset on the app target — Info.plist is unopposed."
+            elif [ "$found" != "$expected" ]; then
+              echo "::error::The app target sets $key = $found, but Info.plist ships $expected."
+              echo "::error::Xcode's General tab writes $key and this build ignores it."
+              echo "::error::Delete the key from the app target, or make it match Info.plist."
+              exit 1
+            else
+              echo "$key = $found agrees with Info.plist."
+            fi
+          done
+          echo "Version $VERSION ($BUILD) has one source of truth: SonicPlayer/Info.plist."
+
       # **`Install signing certificate` and `Install provisioning profile` stood here.**
       #
       # They imported a base64 `.p12` into a throwaway keychain and dropped a `.mobileprovision`
