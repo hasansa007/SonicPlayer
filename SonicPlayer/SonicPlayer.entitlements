@@ -2,5 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- The app and SonicPlayerShare must name the SAME group, or the share extension writes
+	     into a container the app cannot read and every shared file silently disappears.
+
+	     The group is a queue the app drains, not shared storage: the extension only ever writes
+	     into it, the app only ever moves out of it, and Documents/ stays the library's single
+	     home. See docs/superpowers/specs/2026-08-14-share-import-design.md §5. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.hasan.sonicplayer</string>
+	</array>
 </dict>
 </plist>

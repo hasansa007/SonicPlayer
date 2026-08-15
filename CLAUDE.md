@@ -241,7 +241,18 @@ SonicPlayer/
                  #   ScrubClamp, SelectionSet, ImportFilter, QuickAction
   Utilities/     # ColorPalette, Theme, WaveformView, EmptyStateView, ShareSheet, etc.
   Resources/     # Assets.xcassets, Localizable.xcstrings, Quickstart.json, Info.plist
+
+SonicPlayerShare/  # The share extension (#112) — a SEPARATE TARGET, not part of the app's
+                   #   synchronized group. ShareViewController + its own Info.plist and
+                   #   entitlements. Deliberately thin: it cannot see Documents/ and decides
+                   #   nothing, because the system kills it without notice
 ```
+
+**There are three targets now, not two.** `SonicPlayerShare` is an app extension embedded in the
+app bundle's `PlugIns/`, sharing `group.com.hasan.sonicplayer` with it. The app and the extension
+are separate processes with separate containers — the group is the only thing they share, and it is
+a queue the extension writes and the app drains, never shared storage. See
+`docs/superpowers/specs/2026-08-14-share-import-design.md`.
 
 ## Testing
 
@@ -357,6 +368,16 @@ them with `PlistBuddy`. The target used to *also* carry `MARKETING_VERSION = 2.3
 `CURRENT_PROJECT_VERSION = 16` — read by nothing, four versions stale, and exactly what Xcode's
 General tab writes when you bump a version in the UI. They are deleted, and a guard step now fails
 the run if either reappears disagreeing with the plist.
+
+**"And nowhere else" acquired an exception with the share extension (#112), and it is checked
+rather than trusted.** `SonicPlayerShare/Info.plist` carries its own
+`CFBundleShortVersionString` and `CFBundleVersion`, because an embedded extension has to, and
+App Store Connect **rejects an upload where they disagree with the host app's**. No build setting
+removes the duplication — `$(MARKETING_VERSION)` is precisely the key the paragraph above exists to
+keep deleted. So the same guard step now also asserts the extension's two keys equal the app's, and
+applies the stale-build-setting rule to the extension target as well. **Bump a version and you must
+edit both plists.** The guard is what stops that being discovered after an upload, against a build
+number that can never be reused.
 
 The runner is `macos-26` and pins **Xcode 26.6**. The guard step asserts **two** floors, and the
 distinction is the whole point of it: one that the toolchain can *compile* this project, and one

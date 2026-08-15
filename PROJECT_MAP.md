@@ -22,6 +22,7 @@ Build 25 is the one live on the App Store since 2026-08-13. Read the version fro
 | Media | AVFoundation, MediaPlayer (lock screen / remote commands) |
 | Tests | Swift Testing (`@Suite`/`@Test`/`#expect`) — **never XCTest** (#27). 58 files, 493 cases |
 | Dependencies | **None.** `Package.resolved` pins zero packages |
+| Targets | **Three** — `SonicPlayer` (app), `SonicPlayerShare` (share extension, #112), `SonicPlayerTests`. The extension is embedded in `PlugIns/` and shares `group.com.hasan.sonicplayer` |
 | Localization | `Localizable.xcstrings`, 177 keys × 9 languages (en, es, fr, ar, zh-Hans, hi, pt, ru, bn) |
 | Design system | `DesignSystem/Tokens.swift` + `Typography.swift` + `Components/` (#47). `ColorPalette`/`Theme` stay in `Utilities/` — ADR 0002 |
 

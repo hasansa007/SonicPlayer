@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Sonic Player</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>XPC!</string>
+
+	<!-- These two MUST equal the host app's, in SonicPlayer/Info.plist.
+
+	     App Store Connect rejects an upload whose embedded extension disagrees with its host,
+	     and the disagreement is only discovered after the upload — against a build number that
+	     can never be reused. That is the same shape as the ITMS-90111 rejection that burned
+	     3.0.0 build 23.
+
+	     They are literal here, not $(MARKETING_VERSION), because the app target deliberately
+	     carries no such build setting: it was deleted in the 3.0.0 cleanup and a guard step
+	     fails the run if it reappears. A second guard step now asserts these two keys match the
+	     app's, so the duplication is checked rather than merely intended. -->
+	<key>CFBundleShortVersionString</key>
+	<string>3.0.0</string>
+	<key>CFBundleVersion</key>
+	<string>25</string>
+
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<!-- Audio only, and any number of it.
+
+			     A predicate rather than the NSExtensionActivationSupports* dictionary, because
+			     the dictionary form has no "audio" key: the nearest is
+			     ...SupportsFileWithMaxCount, which offers Sonic Player for PDFs and spreadsheets
+			     too. Being offered for a file the app will then refuse is a worse first
+			     impression than not being offered.
+
+			     UTI-CONFORMS-TO catches the concrete types (public.mp3, public.mpeg-4-audio,
+			     com.microsoft.waveform-audio) without enumerating them, so a format the system
+			     learns about later is included for free. Files whose extension the library
+			     accepts but whose UTI does not conform — the .m4b and .opus edges — are the
+			     reason ImportFilter.isAudio still runs on the drain side. -->
+			<key>NSExtensionActivationRule</key>
+			<string>SUBQUERY(extensionItems, $item, SUBQUERY($item.attachments, $att, ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.audio").@count &gt; 0).@count &gt; 0</string>
+		</dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.share-services</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
+	</dict>
+</dict>
+</plist>
