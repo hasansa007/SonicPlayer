@@ -4,10 +4,16 @@ A navigation aid, created on slice 1 of epic #6 (#47). `ARCHITECTURE.md` says *w
 shaped this way and wins on any conflict; this file says *where things are* and *what is not
 wired up*.
 
-**Version 3.0.0 (build 25) · iOS 18.0+ · zero third-party dependencies**
+**Version 3.0.0 (build 26) · iOS 18.0+ · zero third-party dependencies**
 
-Build 25 is the one live on the App Store since 2026-08-13. Read the version from
-`SonicPlayer/Info.plist`, never from here — this line is a convenience and it has been wrong before.
+**Build 26 is unreleased; build 25 is what is live on the App Store**, since 2026-08-13. The bump
+happened on `gh-112-share-import` because 25 had already been uploaded, and the version guard cannot
+see that — it compares the app and extension plists to each other, so a stale pair that agrees sails
+through and App Store Connect refuses the upload afterwards. **Both plists move together or the
+upload is rejected**; see `docs/deploy-and-staging.md` → *Before bumping the version*.
+
+Read the version from `SonicPlayer/Info.plist`, never from here — this line is a convenience and it
+has been wrong before.
 
 ---
 
