@@ -139,6 +139,81 @@ and `TEAM_ID` — and the two steps that consumed them. That path required expor
 this project never had: the machine that shipped 3.0.0 (23) by hand holds only an
 `Apple Development` identity, because the app has always used automatic signing.
 
+## The App Group is portal setup that CI cannot do for you (#112)
+
+`-allowProvisioningUpdates` creates App IDs and mints profiles. **It cannot create an App Group, and
+it cannot assign one.** That is the whole reason slice 1 of #112 shipped an empty extension and was
+proven by a dry run before anything depended on it.
+
+Done once, on 2026-08-15, and recorded because the failure mode is expensive and unrecognisable:
+
+1. **Identifiers → App Groups → +** — `SonicPlayer Share` / `group.com.hasan.sonicplayer`
+2. **App IDs → `com.hasan.sonicplayer`** → tick **App Groups** → Configure → assign the group → Save
+3. **App IDs → +** → explicit `com.hasan.sonicplayer.share` → same capability, same group
+
+**Step 3 is register-then-edit, and that detail is load-bearing.** The registration form lets you
+tick App Groups but shows no group picker — Configure only appears once the App ID exists. So an App
+ID that CI auto-creates arrives with the capability **on and zero groups assigned**, which fails
+exactly like no capability at all. Anything that recreates these identifiers has to come back and
+assign the group by hand.
+
+### How this failure presents, so nobody spends three runs on it again
+
+Xcode does not say "the App Group is missing". It says:
+
+```
+error: Authentication failed: Make sure a bearer token was provided, it is properly
+       configured and signed, and it has not expired.
+error: No profiles for 'com.hasan.sonicplayer' were found: Xcode couldn't find any
+       iOS App Development provisioning profiles matching 'com.hasan.sonicplayer'.
+```
+
+Both lines are misleading. The credential is fine; Xcode simply cannot mint a profile carrying an
+entitlement the App ID does not have, and it reports the resulting API refusal as an auth failure.
+**The tell is the word "Development" in a Release archive** — it had already fallen back to a profile
+class that could never match. Before suspecting the secrets, check whether the entitlements file
+requests something the App ID does not grant:
+
+```bash
+security cms -D -i <profile>.mobileprovision | plutil -p - | grep -A5 Entitlements
+```
+
+## Every run burns a development certificate, and the account caps at 12
+
+**This is the standing cost of dropping imported certificates in favour of
+`-allowProvisioningUpdates`, and it is invisible until the day it stops the build.**
+
+Each runner is a fresh machine with an empty keychain, so `-allowProvisioningUpdates` cannot *fetch*
+a certificate — it **creates** one, uses it for that archive, and the private key dies with the
+machine. The certificate itself stays on the account forever, named `Created via API`.
+
+Apple caps Apple Development certificates at **12**. On 2026-08-15 the account held 12: two of
+yours and **ten created by CI**, seven from a single day of runs. The next archive failed with:
+
+```
+error: Choose a certificate to revoke. Your account has reached the maximum number of
+       certificates. To create a new one, you must choose a certificate to revoke.
+```
+
+Note what makes this expensive to diagnose: **nothing fails while slots remain**, so the pipeline
+looks healthy for months, and the failure arrives attached to whatever change happened to force a
+fresh mint — in this case #112's App Group, which invalidated the existing profiles. The change gets
+blamed for a debt the pipeline had been quietly accruing.
+
+**To clear it**, revoke every DEVELOPMENT certificate named `Created via API`. They are single-use
+and their private keys are gone; nothing can be signed with them again. Keep the certificates in
+your own name, and keep the DISTRIBUTION certificate — that is the one that ships.
+
+```bash
+# List: GET  /v1/certificates?limit=200   → filter certificateType=DEVELOPMENT, displayName='Created via API'
+# Kill: DELETE /v1/certificates/{id}      → 204
+```
+
+**This buys about ten more runs, it does not fix anything.** The real options are importing a
+signing certificate in CI (what this workflow deliberately removed) or a cleanup step that revokes
+`Created via API` certificates before archiving. Neither is done; pick one before the count climbs
+again.
+
 ## Proving the pipeline without shipping
 
 Actions → **Distribute to TestFlight** → Run workflow, with **dry_run** checked (it defaults to
