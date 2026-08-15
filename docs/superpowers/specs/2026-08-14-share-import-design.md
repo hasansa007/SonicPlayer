@@ -119,7 +119,7 @@ languages.** That is a real cost, accepted knowingly, and it is why §12 slices 
    │    ⟶ atomic rename to <UUID>   ← the commit  │
    └──────────────────────────────────────────────┘
                           │
-                          ▼  app becomes active
+                          ▼  .active OR .background — whichever fires first
    InboxDrain  (Features/Files/ — the I/O half)
    ImportInbox (Domain/ — the decisions)
                           │
@@ -143,6 +143,31 @@ class outright, including the case where a share happens while the app is foregr
 files in the library and the rest still queued; the next activation resumes. This is the same
 concept `Documents/Inbox` already is — iOS's hand-off queue that the app must *drain* rather than
 copy out of, which is what #41 established and what `ImportFilter.isStaged` already tests for.
+
+### When the drain fires — decided at Phase 5, 2026-08-15
+
+**Both `.active` and `.background`, whichever comes first**, in the existing
+`AppViewModel.scenePhaseChanged` (`App/AppViewModel.swift:242`), and skipping while
+`player.isImporting` exactly as the staging drain already does.
+
+This is deliberately *not* the same rule as ADR 0003's, and the difference is the point. That ADR
+puts the **staging** drain on `.background` alone because a launch-time drain races `.onOpenURL` —
+launching by opening a file is precisely when a staged file is waiting. **A group inbox has no such
+hand-off**: nothing delivers its files through `.onOpenURL`, so there is no race to lose, and
+`.background` alone would mean shared files do not appear until you have opened *and then
+backgrounded* the app — missing at the exact moment you went looking for them.
+
+Two entry points are affordable because the drain is idempotent by construction: the atomic
+directory rename means a batch is wholly visible or not at all, and a batch already moved is simply
+not there the second time. The cost is one more path to test, and the interrupted-drain test in §9
+covers both.
+
+**One inherited constraint does transfer.** ADR 0003 measured that a `Task` does not run before the
+app suspends — the first `.background` drain landed on the *next* foreground instead. So the
+`.background` entry point must not rely on async work completing. Either it does its enumeration
+synchronously like `drainStagingDirectory`, or it accepts that `.background` is best-effort and
+`.active` is the guaranteed one. **Resolve this by measuring, not by reasoning** — that is what the
+ADR had to do.
 
 ---
 
@@ -285,6 +310,8 @@ Order chosen so the riskiest thing is proven first and nothing is built on an un
 
 1. **The empty target, signed.** `SonicPlayerShare` doing nothing but appearing in the share sheet,
    plus the App Group on both, plus the extended version guard. Proven by a **dry-run workflow**.
+   ← **in progress on `gh-112-share-import`**, chosen at Phase 5 because a signing failure is the
+   only cost here that cannot be undone: a rejected upload burns a build number permanently.
 2. **The queue.** Extension copies files to the inbox with a root-destination manifest; `InboxDrain`
    and the `Domain/` types file them. No picker yet — everything lands at the library root.
 3. **The picker.** `folders.json`, the extension's folder screen, the destination honoured.
