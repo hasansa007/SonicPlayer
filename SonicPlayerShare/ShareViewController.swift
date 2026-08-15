@@ -1,3 +1,4 @@
+import OSLog
 import SwiftUI
 import UIKit
 
@@ -11,6 +12,11 @@ import UIKit
 ///
 /// # DO NOT PROMOTE THIS TO `main` UNTIL SLICE 2 LANDS
 ///
+/// SHARE-EXTENSION-STUB — **this marker is load-bearing, not decoration.** A guard step in
+/// `distribute.yml` greps for it and fails any run that would actually upload, so the sentence below
+/// is enforced rather than merely written. **Slice 2 deletes this line**, and deleting it is what
+/// permits a TestFlight build. Do not remove it to silence the guard.
+///
 /// This is a real, registered `com.apple.share-services` extension: the activation rule is live and
 /// Sonic Player is offered in the share sheet for any audio file. On `feat` that reaches nobody. **A
 /// merge to `main` uploads to TestFlight**, and from that moment a tester who shares a voice memo is
@@ -19,9 +25,12 @@ import UIKit
 /// true only of the branch, not of the release, and it is the kind of claim that stops being true
 /// without anyone editing it.
 ///
-/// The string below is therefore deliberately **not** localised. Localising it would make a dead end
-/// look like a finished feature, and the nine translations should be spent on the picker's real copy
-/// in slice 5, against final wording, rather than on a placeholder that must be deleted.
+/// The strings below are therefore deliberately **not** localised, which is a **knowing exception to
+/// CLAUDE.md's rule that every user-facing string goes through `Localizable.xcstrings`** — a rule
+/// stated without exceptions. It is recorded as an accepted deviation in ADR 0004, with the
+/// condition that removes it, because an exception argued only in a code comment is indistinguishable
+/// from an oversight. Localising a dead end would make it look like a finished feature, and the nine
+/// translations belong on the picker's real copy in slice 5, against final wording.
 ///
 /// # Why a `UIViewController` in a SwiftUI-only codebase
 ///
@@ -75,8 +84,14 @@ final class ShareViewController: UIViewController {
     /// fallback, and the assertion fires in development where it can still be fixed.
     private func close() {
         guard let extensionContext else {
+            // **`assertionFailure` alone was the same silent no-op in a different costume.** It
+            // compiles out under `-O`, and `dismiss(animated:)` does nothing for a controller the
+            // share host presented cross-process — there is no presentation of ours to undo. So in
+            // a TestFlight build the button did exactly what the paragraph above rejects. The log
+            // is the part that survives Release, and it is the only trace this path can leave.
+            Logger(subsystem: "com.hasan.sonicplayer.share", category: "share")
+                .error("Share extension has no extensionContext; Close cannot cancel the request.")
             assertionFailure("Share extension has no extensionContext; nothing to cancel.")
-            dismiss(animated: true)
             return
         }
         extensionContext.cancelRequest(
@@ -90,7 +105,11 @@ final class ShareViewController: UIViewController {
 /// `DesignSystem/Tokens.swift` — the tokens live in the app target's synchronized group, and adding
 /// cross-target membership to justify a stub would be the tail wagging the dog.
 struct ShareStubView: View {
-    var onClose: () -> Void = {}
+    /// **No default.** `= {}` would hand the only control on a one-button screen a silent no-op —
+    /// the precise failure `close()` above argues against, reintroduced as a convenience. A
+    /// `#Preview`, a test, or slice 3 reusing this view would compile, render a Close button, and
+    /// do nothing when tapped. The one call site already passes it, so the default bought nothing.
+    let onClose: () -> Void
 
     var body: some View {
         VStack {

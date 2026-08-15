@@ -139,6 +139,20 @@ credential or the pipeline is at fault — mint a JWT (ES256, `kid` = key id, `i
 is somewhere else, which on 2026-08-15 it was: the archive was failing over a missing App Group and
 reporting it as an authentication error.
 
+### The two targets configure signing differently, and that is deliberate for now
+
+`SonicPlayer`'s Release config carries `CODE_SIGN_IDENTITY = "Apple Development"` and an empty
+`PROVISIONING_PROFILE_SPECIFIER`; `SonicPlayerShare` carries neither, only `CODE_SIGN_STYLE = Automatic`.
+Both resolve correctly under automatic signing — the 2026-08-15 `dry_run` archived, signed and
+exported both bundles — but they get there by different routes.
+
+A development identity in a Release config is wrong on its face, and it is inert only because
+automatic signing overrides it. The new target was given the minimal correct configuration rather
+than inheriting the mistake. **Removing the keys from the app target as well is the tidy end state
+and is deliberately not done here:** it changes the signing configuration of the bundle that actually
+ships, on a slice that is not about signing, in the one area of this project that has already
+produced an ITMS-90111 rejection and a five-run detour. It wants its own change and its own dry run.
+
 **There is deliberately no `TEAM_ID` secret.** The team id is not a credential — it is committed in
 `project.pbxproj`, and that is what the app is signed with. The export step reads it from there, so
 it cannot drift from the build.

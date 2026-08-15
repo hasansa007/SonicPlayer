@@ -165,7 +165,7 @@ depends on it.
 
 | Declared | State |
 |---|---|
-| `group.com.hasan.sonicplayer` App Group | On both targets' entitlements. **Nothing reads or writes it yet**, and it does not exist in the developer portal — unproven against a real signed archive |
+| `group.com.hasan.sonicplayer` App Group | Registered in the developer portal on 2026-08-15 and enabled on both App IDs; **proven** by a `dry_run` whose exported `.ipa` carries it in the signed entitlements of both binaries. **Nothing reads or writes it yet** — that is slice 2 |
 | `ShareViewController` | A stub. No queue, no picker, no library access |
 
 Still intent, not code — slices 2–5 in `docs/superpowers/specs/2026-08-14-share-import-design.md` §11:
@@ -218,7 +218,7 @@ they all pass literals.
 
 | Gap | Where |
 |---|---|
-| No UI tests, and RTL is where that bites | The 181 tests are unit tests; no screen is asserted on. Two RTL "bugs" (#54, #63) were filed on plausible reasoning and **both were false** — settled only by rendering on a device and measuring. SwiftUI mirrors `.offset(x:)` but **not** gesture `location.x`; the two look alike and behave oppositely. Numbers are in `ScrollingText` and `ScrubGeometry`'s doc comments. Any future RTL claim should be measured before it is filed |
+| No UI tests, and RTL is where that bites | All 493 tests are unit tests; no screen is asserted on. Two RTL "bugs" (#54, #63) were filed on plausible reasoning and **both were false** — settled only by rendering on a device and measuring. SwiftUI mirrors `.offset(x:)` but **not** gesture `location.x`; the two look alike and behave oppositely. Numbers are in `ScrollingText` and `ScrubGeometry`'s doc comments. Any future RTL claim should be measured before it is filed |
 | Lint gate is advisory | `scripts/lint-magic-numbers.sh` — `--all` now reports **1** outstanding literal, down from the 298 recorded here. Still not in CI, so it only runs when someone remembers |
 | The version guard cannot see what is already uploaded | **#115** — it asserts the app and extension plists agree with **each other**. Two stale-but-equal values pass, and the rejection lands after the upload. `RELEASE_NOTES.md`'s `grep -qx "## $VERSION"` passes for the same reason. Closing it means moving the existing `/v1/builds` query before the archive — see `docs/deploy-and-staging.md` |
 | Every release run burns a development certificate | **#114** — a fresh runner has no keychain, so `-allowProvisioningUpdates` creates a certificate rather than fetching one, and Apple caps them at 12. Ten `Created via API` certificates were revoked on 2026-08-15 to unblock #112; the account sits at 3, which is roughly ten runs of headroom. Nothing fails until it does |

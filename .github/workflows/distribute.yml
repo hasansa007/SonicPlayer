@@ -121,8 +121,28 @@ jobs:
           #
           # So the rule, not the instance: the keys may be absent, or they may agree. They may
           # not silently disagree.
-          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" SonicPlayer/Info.plist)
-          BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" SonicPlayer/Info.plist)
+          # **Every plist read goes through this, and the `|| true` is the whole point.**
+          # PlistBuddy exits 1 on a missing key, GitHub runs this block as `bash -e {0}`, and the
+          # exit status of `VAR=$(cmd)` is cmd's — so a missing key killed the step at the
+          # assignment, before any of the hand-written `::error::` lines below could explain it.
+          # That is the same defect fixed for xcodebuild a few lines down, which was reintroduced
+          # here by not applying the rule to every command that can fail.
+          plist_get() {
+            /usr/libexec/PlistBuddy -c "Print :$2" "$1" 2>/dev/null || true
+          }
+
+          require_key() {   # value, plist, key
+            if [ -z "$1" ]; then
+              echo "::error::$2 has no :$3, so the version check could not run."
+              echo "::error::Treating that as a failure rather than a pass."
+              exit 1
+            fi
+          }
+
+          VERSION=$(plist_get SonicPlayer/Info.plist CFBundleShortVersionString)
+          BUILD=$(plist_get SonicPlayer/Info.plist CFBundleVersion)
+          require_key "$VERSION" SonicPlayer/Info.plist CFBundleShortVersionString
+          require_key "$BUILD"   SonicPlayer/Info.plist CFBundleVersion
 
           # Ask Xcode for the app target's *resolved* settings rather than grepping the pbxproj.
           # The two targets' config blocks are textually identical apart from the bundle id, and
@@ -180,8 +200,10 @@ jobs:
             exit 1
           fi
 
-          EXT_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$EXT_PLIST")
-          EXT_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$EXT_PLIST")
+          EXT_VERSION=$(plist_get "$EXT_PLIST" CFBundleShortVersionString)
+          EXT_BUILD=$(plist_get "$EXT_PLIST" CFBundleVersion)
+          require_key "$EXT_VERSION" "$EXT_PLIST" CFBundleShortVersionString
+          require_key "$EXT_BUILD"   "$EXT_PLIST" CFBundleVersion
 
           if [ "$EXT_VERSION" != "$VERSION" ] || [ "$EXT_BUILD" != "$BUILD" ]; then
             echo "::error::SonicPlayerShare ships $EXT_VERSION ($EXT_BUILD); the app ships $VERSION ($BUILD)."
@@ -219,6 +241,41 @@ jobs:
           done
 
           echo "Version $VERSION ($BUILD) is consistent across the app and SonicPlayerShare."
+
+      - name: Refuse to ship a share extension that does nothing (#112)
+        if: ${{ github.event_name == 'push' || !inputs.dry_run }}
+        run: |
+          # **The only hazard in #112 whose cost lands on a person rather than on a build number.**
+          #
+          # SonicPlayerShare is a real, registered com.apple.share-services extension: Sonic Player
+          # is offered for any audio file from the moment the app installs. While slice 1 sits on
+          # `feat` that reaches nobody. The instant it reaches `main` it reaches TestFlight, and a
+          # tester who shares a voice memo is offered Sonic Player, taps it, and is told the feature
+          # is not wired up — in English, in all nine locales.
+          #
+          # That was guarded by a sentence in a doc comment, in the same branch that bumped
+          # CFBundleVersion to 26. This repo's standard is "checked rather than trusted" — the
+          # two-plist guard exists for a strictly cheaper failure than this one.
+          #
+          # Deliberately runs ONLY when the run would really upload, so dry runs stay useful for
+          # proving signing while the extension is still a stub. That is the whole workflow this
+          # slice was built around.
+          MARKER=SHARE-EXTENSION-STUB
+          FILE=SonicPlayerShare/ShareViewController.swift
+
+          if [ ! -f "$FILE" ]; then
+            echo "::error::$FILE is missing, so the stub check could not run."
+            echo "::error::Treating that as a failure rather than a pass."
+            exit 1
+          fi
+
+          if grep -q "$MARKER" "$FILE"; then
+            echo "::error::SonicPlayerShare is still the slice 1 stub and this run would upload it."
+            echo "::error::Testers would be offered a share extension that says it does not work."
+            echo "::error::Land slice 2 of #112 first, then delete the $MARKER line from $FILE."
+            exit 1
+          fi
+          echo "Share extension is past the slice 1 stub — safe to upload."
 
       # **`Install signing certificate` and `Install provisioning profile` stood here.**
       #

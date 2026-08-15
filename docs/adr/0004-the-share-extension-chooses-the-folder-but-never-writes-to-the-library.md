@@ -92,16 +92,42 @@ predicate on `public.audio` is used instead, and its filtering is verified in bo
 
 **Live as of this ADR — slice 1 only.** The target exists, is embedded in `PlugIns/`, is registered
 with the system as a `com.apple.share-services` extension, and appears in the share sheet's app row
-for audio and not for anything else. It shows a stub and cancels the request. **It has no queue, no
-picker and no library access.**
+for a share containing audio. It shows a stub and cancels the request. **It has no queue, no picker
+and no library access.**
+
+Two precisions, because the looser phrasings were both wrong. The rule is **"at least one attachment
+is audio"**, not "every attachment" — a mixed selection activates it, and slice 2 must therefore
+filter attachments at copy time. And it matches `public.mpeg-4` as well as `public.audio`, so a
+**video `.mp4` also offers Sonic Player** and is refused later at playback. That is a knowing trade,
+inherited from `ImportFilter`, which accepts `.mp4` because audiobooks ship as `.m4b` and `.mp4`;
+excluding it would hide the app from the long-form audio this feature exists for. It does sit against
+the argument used to reject the dictionary activation rule above, and the difference is scale: the
+dictionary rule offers Sonic Player for a share of PDFs with no audio in it at all.
+
+**A localisation exception is accepted here, and is recorded rather than argued in a comment.**
+CLAUDE.md requires every user-facing string to go through `Localizable.xcstrings` in nine languages,
+without exceptions. The stub's two strings are English literals. Translating a dead end would make it
+look like a finished feature, and the nine translations belong on the picker's real copy in slice 5
+against final wording. **The condition that ends the exception:** the `SHARE-EXTENSION-STUB` marker
+leaving `ShareViewController.swift`, which is also what the `distribute.yml` guard keys on — so the
+exception cannot outlive the stub without a release failing.
 
 **Intent, not built:** `folders.json`, the manifest, the atomic-rename batch commit, `InboxDrain`,
 `ImportInbox`, the picker UI, the exception screen, and localisation. Slices 2–5 in
 `docs/superpowers/specs/2026-08-14-share-import-design.md` §11.
 
-**Also unproven:** that the App Group survives a real signed archive. Simulator builds sign ad-hoc
-and never exercise entitlements, so nothing has yet tested it. `group.com.hasan.sonicplayer` does not
-exist in the developer portal at time of writing. A `dry_run` of `distribute.yml` is what settles it.
+**Proven, and it was not free.** `group.com.hasan.sonicplayer` was registered in the developer portal
+on 2026-08-15 and enabled on both App IDs, and a `dry_run` of `distribute.yml` then archived, signed
+and exported. The evidence is in the artifact rather than in the green tick: the exported `.ipa`
+carries `PlugIns/SonicPlayerShare.appex`, both bundles at `3.0.0 (26)`, and
+`com.apple.security.application-groups → group.com.hasan.sonicplayer` in the **signed** entitlements
+of both binaries.
+
+Getting there took five runs and cost nothing recoverable, which is the argument for shipping the
+target empty restated. `-allowProvisioningUpdates` cannot create an App Group; Xcode reports the
+resulting refusal as `Authentication failed`, which sends you to debug a credential that is fine; and
+the account had silently filled its 12-certificate cap with one `Created via API` certificate per CI
+run. All three are written up in `docs/deploy-and-staging.md`, and the last two are #114 and #115.
 
 ## Consequences
 

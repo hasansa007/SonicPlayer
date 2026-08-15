@@ -37,13 +37,28 @@
 	<dict>
 		<key>NSExtensionAttributes</key>
 		<dict>
-			<!-- Audio only, and any number of it.
+			<!-- **At least one attachment is audio** — not "every attachment is audio", and the
+			     difference is deliberate. The inner `.@count > 0` is an ANY test; Apple's "only"
+			     form is `.@count == $item.attachments.@count`.
+
+			     This header read "Audio only, and any number of it", which described the strict
+			     form and was not what the predicate did.
+
+			     ANY is the right choice because "only" makes a mixed selection offer nothing at
+			     all: share a folder holding twenty lectures and one PDF and Sonic Player would
+			     simply not appear, with nothing to explain why. Under ANY it appears, takes the
+			     twenty, and the PDF becomes a visible skipped row on the review screen — which is
+			     what that screen is for.
+
+			     **The obligation this creates for slice 2: filter attachments at COPY time.** The
+			     extension is handed every attachment, so it must consume only the audio ones
+			     rather than copying twenty photos into the queue for the app to discard. Nothing
+			     enforces that yet because nothing copies yet.
 
 			     A predicate rather than the NSExtensionActivationSupports* dictionary, because
 			     the dictionary form has no "audio" key: the nearest is
-			     ...SupportsFileWithMaxCount, which offers Sonic Player for PDFs and spreadsheets
-			     too. Being offered for a file the app will then refuse is a worse first
-			     impression than not being offered.
+			     ...SupportsFileWithMaxCount, which offers Sonic Player for a share of PDFs and
+			     spreadsheets containing no audio at all. That is the case this rule excludes.
 
 			     UTI-CONFORMS-TO catches the concrete types without enumerating them, so a
 			     format the system learns about later is included for free. Measured against

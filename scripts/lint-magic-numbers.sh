@@ -33,6 +33,12 @@ MIGRATED=(
   "SonicPlayer/Features/Dial/DialFraction.swift"
   "SonicPlayer/Features/Dial/DialPreviewData.swift"
   "SonicPlayer/App/OnboardingView.swift"
+  # **The share extension is listed here, not just under SOURCE_ROOTS (#112).** SOURCE_ROOTS only
+  # widens `--all`; CLAUDE.md tells contributors to run this script with NO flag before a PR, and
+  # that mode reads MIGRATED alone. Adding the root without adding this line left the default mode
+  # — the one people actually run — blind to the whole new target, which is the exact hole the
+  # SOURCE_ROOTS change was meant to close.
+  "SonicPlayerShare/ShareViewController.swift"
 )
 
 # **Every source root, not the one named `SonicPlayer` (#112).**
@@ -51,8 +57,12 @@ SOURCE_ROOTS=(SonicPlayer SonicPlayerShare)
 if [[ "${1:-}" == "--all" ]]; then
   for root in "${SOURCE_ROOTS[@]}"; do
     if [[ ! -d "$root" ]]; then
+      # **Exit 2, not 1.** The header defines exit 1 as "at least one un-tokenised literal", and
+      # the MIGRATED-missing check below already uses 2 for a broken configuration. Reporting a
+      # renamed source root as exit 1 would tell a CI wrapper that literals were found, when in
+      # fact nothing was scanned — a gate that read nothing reporting as a gate that failed.
       echo "✗ SOURCE_ROOTS lists a directory that does not exist: $root"
-      exit 1
+      exit 2
     fi
   done
   TARGETS=()
