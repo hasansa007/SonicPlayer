@@ -60,6 +60,17 @@ not the pattern to copy. Pushing a tag does not ship anything: the workflow trig
 
 ## Before bumping the version
 
+**A version bump is now TWO plist edits, not one (#112).** `SonicPlayer/Info.plist` is still the
+source of truth, but `SonicPlayerShare/Info.plist` carries its own `CFBundleShortVersionString` and
+`CFBundleVersion`, and **App Store Connect rejects an upload where an embedded extension disagrees
+with its host**. Edit one and not the other and the archive succeeds, the signing succeeds, the
+upload succeeds, and the *validation* fails — against a build number that can never be reused.
+
+No build setting removes the duplication: `$(MARKETING_VERSION)` is exactly the key this project
+deletes on purpose, because Xcode's General tab writes it and the plist is what ships. So the guard
+step asserts the two plists agree, and fails the run before the archive if they do not. Treat the
+guard as the reason you can bump confidently, not as a reason to stop checking.
+
 The workflow reads `RELEASE_NOTES.md` for the section whose heading equals `## <version>`, where
 `<version>` is `CFBundleShortVersionString` from `SonicPlayer/Info.plist`, and ships it as What's
 New.

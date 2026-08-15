@@ -149,6 +149,28 @@ in the same slice.
 | `ColorPalette` / `Theme` outside `DesignSystem/` | Deliberate deferral, ADR 0002. Revisit at epic end |
 | `FileManaging` — 8 of 9 members | Only `metadata(for:)` has a caller (`LivePlaybackRepository`). The rest are exercised by `ClientProtocolConformanceTests` and nothing else |
 
+### The share extension ships and does nothing (#112)
+
+`SonicPlayerShare` is in the bundle, registered with the system, and offered in the share sheet for
+audio — and **it imports nothing**. Tapping it shows a stub and cancels the request. This is slice 1
+of #112 deliberately: a new target changes what CI archives, signs and uploads, and that is the only
+cost in the epic that cannot be undone, so it ships empty and gets proven before any feature code
+depends on it.
+
+| Declared | State |
+|---|---|
+| `group.com.hasan.sonicplayer` App Group | On both targets' entitlements. **Nothing reads or writes it yet**, and it does not exist in the developer portal — unproven against a real signed archive |
+| `ShareViewController` | A stub. No queue, no picker, no library access |
+
+Still intent, not code — slices 2–5 in `docs/superpowers/specs/2026-08-14-share-import-design.md` §11:
+`folders.json`, the batch manifest and its atomic-rename commit, `InboxDrain`, `ImportInbox`, the
+folder picker, the exception screen, and localisation across the nine languages.
+
+**One existing test will need narrowing at slice 2.** `AppViewModelTests.test_becomingActiveOrInactive_neverDrains()`
+asserts that nothing drains on `.active`. That is true of the *staging* drain and is ADR 0003's rule;
+the group-inbox drain lands on `.active` by design (ADR 0004), so the test's name will over-claim
+once it does.
+
 ### Resolved by #41 — iOS's staging directory
 
 `OpenInImport` consumes what iOS stages rather than copying out of it, so `Documents/Inbox` stays

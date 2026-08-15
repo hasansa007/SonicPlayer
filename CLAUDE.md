@@ -230,8 +230,10 @@ needs a package, check `ARCHITECTURE.md` first.
 SonicPlayer/
   App/           # Entry point, AppViewModel (composition root), AppView, quickstart
   Features/      # Dial/ — the only one with a view. Home/, Player/, Files/, Recording/, Settings/
-  Clients/       # AudioPlayerClient, AudioRecorderClient, FileManagerClient, ArtworkClient, AudioTrimmerClient
+  Clients/       # AudioPlayerClient, AudioRecorderClient, FileManagerClient, ArtworkClient,
+                 #   AudioTrimmerClient, HapticsClient — six, not the five this line used to name
                  #   + AudioPlaying / FileManaging — protocols the first two conform to (#44)
+                 #   + ClientErrors
   Models/        # AudioFile, FileSystemItem, PlaybackSpeed
   DesignSystem/  # Tokens (Spacing, Radius, Sizing, Elevation, Motion), DialRing, LiveHues
   Domain/        # The dial: DialNavigator + DialNavigatorScreen, DialScreen, DialCommand, DialEffect,
