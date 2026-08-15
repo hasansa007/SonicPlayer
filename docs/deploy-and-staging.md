@@ -71,7 +71,7 @@ deletes on purpose, because Xcode's General tab writes it and the plist is what 
 step asserts the two plists agree, and fails the run before the archive if they do not. Treat the
 guard as the reason you can bump confidently, not as a reason to stop checking.
 
-### What that guard CANNOT catch: a stale pair that agrees
+### What that guard CANNOT catch: a stale pair that agrees (#115)
 
 **It compares the two plists to each other, never to what is already uploaded.** Leave both at a
 build number that has already shipped and the guard passes cleanly, the archive succeeds, the
@@ -124,10 +124,20 @@ The key needs the **App Manager** role; a weaker role authenticates but cannot c
 assets, and the failure arrives at export as a provisioning error that does not mention the role.
 
 ```bash
-gh secret set ASC_API_KEY < AuthKey_XXXXXXXX.p8    # never paste a key into a chat or a commit
-gh secret set ASC_API_KEY_ID
-gh secret set ASC_API_ISSUER_ID
+# ASC_API_KEY is the BASE64 of the .p8, not the .p8 — the table above says so and this
+# command used to contradict it by piping the raw file. The workflow does
+# `base64 --decode`, so a raw key decodes to garbage, fails the "did not decode to a
+# private key" check, and sends you looking at Apple instead of at this line.
+base64 -i AuthKey_XXXXXXXX.p8 | tr -d '\n' | gh secret set ASC_API_KEY
+gh secret set ASC_API_KEY_ID --body XXXXXXXX
+gh secret set ASC_API_ISSUER_ID --body 00000000-0000-0000-0000-000000000000
 ```
+
+**Verify the triple against Apple before blaming CI.** A local call settles in seconds whether the
+credential or the pipeline is at fault — mint a JWT (ES256, `kid` = key id, `iss` = issuer id,
+`aud` = `appstoreconnect-v1`) and `GET /v1/apps`. A 200 means the credential is good and the problem
+is somewhere else, which on 2026-08-15 it was: the archive was failing over a missing App Group and
+reporting it as an authentication error.
 
 **There is deliberately no `TEAM_ID` secret.** The team id is not a credential — it is committed in
 `project.pbxproj`, and that is what the app is signed with. The export step reads it from there, so
@@ -178,7 +188,7 @@ requests something the App ID does not grant:
 security cms -D -i <profile>.mobileprovision | plutil -p - | grep -A5 Entitlements
 ```
 
-## Every run burns a development certificate, and the account caps at 12
+## Every run burns a development certificate, and the account caps at 12 (#114)
 
 **This is the standing cost of dropping imported certificates in favour of
 `-allowProvisioningUpdates`, and it is invisible until the day it stops the build.**
