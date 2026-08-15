@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Sonic Player</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>XPC!</string>
+
+	<!-- These two MUST equal the host app's, in SonicPlayer/Info.plist.
+
+	     App Store Connect rejects an upload whose embedded extension disagrees with its host,
+	     and the disagreement is only discovered after the upload — against a build number that
+	     can never be reused. That is the same shape as the ITMS-90111 rejection that burned
+	     3.0.0 build 23.
+
+	     They are literal here, not $(MARKETING_VERSION), because the app target deliberately
+	     carries no such build setting: it was deleted in the 3.0.0 cleanup and a guard step
+	     fails the run if it reappears. A second guard step now asserts these two keys match the
+	     app's, so the duplication is checked rather than merely intended. -->
+	<key>CFBundleShortVersionString</key>
+	<string>3.0.0</string>
+	<key>CFBundleVersion</key>
+	<string>26</string>
+
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<!-- **At least one attachment is audio** — not "every attachment is audio", and the
+			     difference is deliberate. The inner `.@count > 0` is an ANY test; Apple's "only"
+			     form is `.@count == $item.attachments.@count`.
+
+			     This header read "Audio only, and any number of it", which described the strict
+			     form and was not what the predicate did.
+
+			     ANY is the right choice because "only" makes a mixed selection offer nothing at
+			     all: share a folder holding twenty lectures and one PDF and Sonic Player would
+			     simply not appear, with nothing to explain why. Under ANY it appears, takes the
+			     twenty, and the PDF becomes a visible skipped row on the review screen — which is
+			     what that screen is for.
+
+			     **The obligation this creates for slice 2: filter attachments at COPY time.** The
+			     extension is handed every attachment, so it must consume only the audio ones
+			     rather than copying twenty photos into the queue for the app to discard. Nothing
+			     enforces that yet because nothing copies yet.
+
+			     A predicate rather than the NSExtensionActivationSupports* dictionary, because
+			     the dictionary form has no "audio" key: the nearest is
+			     ...SupportsFileWithMaxCount, which offers Sonic Player for a share of PDFs and
+			     spreadsheets containing no audio at all. That is the case this rule excludes.
+
+			     UTI-CONFORMS-TO catches the concrete types without enumerating them, so a
+			     format the system learns about later is included for free. Measured against
+			     ImportFilter.audioExtensions, public.audio covers nine of its ten: mp3, m4a,
+			     wav, aac, flac, aiff and m4b all conform, and opus/ogg both resolve to
+			     org.xiph.ogg-audio, which conforms too.
+
+			     **public.mpeg-4 is named separately because .mp4 does NOT conform to
+			     public.audio** — it conforms to public.movie. ImportFilter accepts .mp4 on
+			     purpose, because audiobooks ship as .m4b and .mp4, so omitting it would hide
+			     Sonic Player from exactly the long-form audio this feature exists for — with no
+			     error, and no way for the user to discover why.
+
+			     The cost is that a genuine video .mp4 matches too. That is the trade
+			     ImportFilter already made and documented (accepted here, fails later at
+			     playback), and ImportFilter.isAudio on the drain side is what catches it.
+
+			     Note the direction: that drain-side filter can only NARROW what this rule
+			     admits. A file this predicate rejects never reaches the queue, so no drain-side
+			     check is a remedy for a rule that is too strict. An earlier version of this
+			     comment had that backwards. -->
+			<key>NSExtensionActivationRule</key>
+			<string>SUBQUERY(extensionItems, $item, SUBQUERY($item.attachments, $att, ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.audio" OR ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.mpeg-4").@count &gt; 0).@count &gt; 0</string>
+		</dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.share-services</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
+	</dict>
+</dict>
+</plist>

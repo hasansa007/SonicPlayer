@@ -60,6 +60,36 @@ not the pattern to copy. Pushing a tag does not ship anything: the workflow trig
 
 ## Before bumping the version
 
+**A version bump is now TWO plist edits, not one (#112).** `SonicPlayer/Info.plist` is still the
+source of truth, but `SonicPlayerShare/Info.plist` carries its own `CFBundleShortVersionString` and
+`CFBundleVersion`, and **App Store Connect rejects an upload where an embedded extension disagrees
+with its host**. Edit one and not the other and the archive succeeds, the signing succeeds, the
+upload succeeds, and the *validation* fails — against a build number that can never be reused.
+
+No build setting removes the duplication: `$(MARKETING_VERSION)` is exactly the key this project
+deletes on purpose, because Xcode's General tab writes it and the plist is what ships. So the guard
+step asserts the two plists agree, and fails the run before the archive if they do not. Treat the
+guard as the reason you can bump confidently, not as a reason to stop checking.
+
+### What that guard CANNOT catch: a stale pair that agrees (#115)
+
+**It compares the two plists to each other, never to what is already uploaded.** Leave both at a
+build number that has already shipped and the guard passes cleanly, the archive succeeds, the
+signing succeeds, the upload succeeds — and App Store Connect rejects with *"the bundle version must
+be higher than the previously uploaded version"*, against a run that has done all the expensive work.
+
+`RELEASE_NOTES.md` does not close it either: its check is `grep -qx "## $VERSION"`, so an unchanged
+`CFBundleShortVersionString` finds the section from the release that already shipped and passes,
+handing testers the notes for a build that did not contain the new work.
+
+**So the pre-flight is on you: `CFBundleVersion` must be strictly greater than the highest build
+already uploaded for this `CFBundleShortVersionString`.** 3.0.0 (25) is live as of 2026-08-13.
+
+The workflow already mints an App Store Connect JWT and queries `/v1/builds`, but only *after* the
+upload, to attach What's New. Moving that query before the archive — fail if
+`filter[version]=$BUILD` already returns a build — would close this properly. Not done: it is a
+change to the step ordering of a pipeline that has been wrong twice, and it wants its own dry run.
+
 The workflow reads `RELEASE_NOTES.md` for the section whose heading equals `## <version>`, where
 `<version>` is `CFBundleShortVersionString` from `SonicPlayer/Info.plist`, and ships it as What's
 New.
@@ -94,10 +124,34 @@ The key needs the **App Manager** role; a weaker role authenticates but cannot c
 assets, and the failure arrives at export as a provisioning error that does not mention the role.
 
 ```bash
-gh secret set ASC_API_KEY < AuthKey_XXXXXXXX.p8    # never paste a key into a chat or a commit
-gh secret set ASC_API_KEY_ID
-gh secret set ASC_API_ISSUER_ID
+# ASC_API_KEY is the BASE64 of the .p8, not the .p8 — the table above says so and this
+# command used to contradict it by piping the raw file. The workflow does
+# `base64 --decode`, so a raw key decodes to garbage, fails the "did not decode to a
+# private key" check, and sends you looking at Apple instead of at this line.
+base64 -i AuthKey_XXXXXXXX.p8 | tr -d '\n' | gh secret set ASC_API_KEY
+gh secret set ASC_API_KEY_ID --body XXXXXXXX
+gh secret set ASC_API_ISSUER_ID --body 00000000-0000-0000-0000-000000000000
 ```
+
+**Verify the triple against Apple before blaming CI.** A local call settles in seconds whether the
+credential or the pipeline is at fault — mint a JWT (ES256, `kid` = key id, `iss` = issuer id,
+`aud` = `appstoreconnect-v1`) and `GET /v1/apps`. A 200 means the credential is good and the problem
+is somewhere else, which on 2026-08-15 it was: the archive was failing over a missing App Group and
+reporting it as an authentication error.
+
+### The two targets configure signing differently, and that is deliberate for now
+
+`SonicPlayer`'s Release config carries `CODE_SIGN_IDENTITY = "Apple Development"` and an empty
+`PROVISIONING_PROFILE_SPECIFIER`; `SonicPlayerShare` carries neither, only `CODE_SIGN_STYLE = Automatic`.
+Both resolve correctly under automatic signing — the 2026-08-15 `dry_run` archived, signed and
+exported both bundles — but they get there by different routes.
+
+A development identity in a Release config is wrong on its face, and it is inert only because
+automatic signing overrides it. The new target was given the minimal correct configuration rather
+than inheriting the mistake. **Removing the keys from the app target as well is the tidy end state
+and is deliberately not done here:** it changes the signing configuration of the bundle that actually
+ships, on a slice that is not about signing, in the one area of this project that has already
+produced an ITMS-90111 rejection and a five-run detour. It wants its own change and its own dry run.
 
 **There is deliberately no `TEAM_ID` secret.** The team id is not a credential — it is committed in
 `project.pbxproj`, and that is what the app is signed with. The export step reads it from there, so
@@ -108,6 +162,81 @@ and `TEAM_ID` — and the two steps that consumed them. That path required expor
 `.p12` by hand and re-exporting it whenever the certificate expired. It also asked for an artifact
 this project never had: the machine that shipped 3.0.0 (23) by hand holds only an
 `Apple Development` identity, because the app has always used automatic signing.
+
+## The App Group is portal setup that CI cannot do for you (#112)
+
+`-allowProvisioningUpdates` creates App IDs and mints profiles. **It cannot create an App Group, and
+it cannot assign one.** That is the whole reason slice 1 of #112 shipped an empty extension and was
+proven by a dry run before anything depended on it.
+
+Done once, on 2026-08-15, and recorded because the failure mode is expensive and unrecognisable:
+
+1. **Identifiers → App Groups → +** — `SonicPlayer Share` / `group.com.hasan.sonicplayer`
+2. **App IDs → `com.hasan.sonicplayer`** → tick **App Groups** → Configure → assign the group → Save
+3. **App IDs → +** → explicit `com.hasan.sonicplayer.share` → same capability, same group
+
+**Step 3 is register-then-edit, and that detail is load-bearing.** The registration form lets you
+tick App Groups but shows no group picker — Configure only appears once the App ID exists. So an App
+ID that CI auto-creates arrives with the capability **on and zero groups assigned**, which fails
+exactly like no capability at all. Anything that recreates these identifiers has to come back and
+assign the group by hand.
+
+### How this failure presents, so nobody spends three runs on it again
+
+Xcode does not say "the App Group is missing". It says:
+
+```
+error: Authentication failed: Make sure a bearer token was provided, it is properly
+       configured and signed, and it has not expired.
+error: No profiles for 'com.hasan.sonicplayer' were found: Xcode couldn't find any
+       iOS App Development provisioning profiles matching 'com.hasan.sonicplayer'.
+```
+
+Both lines are misleading. The credential is fine; Xcode simply cannot mint a profile carrying an
+entitlement the App ID does not have, and it reports the resulting API refusal as an auth failure.
+**The tell is the word "Development" in a Release archive** — it had already fallen back to a profile
+class that could never match. Before suspecting the secrets, check whether the entitlements file
+requests something the App ID does not grant:
+
+```bash
+security cms -D -i <profile>.mobileprovision | plutil -p - | grep -A5 Entitlements
+```
+
+## Every run burns a development certificate, and the account caps at 12 (#114)
+
+**This is the standing cost of dropping imported certificates in favour of
+`-allowProvisioningUpdates`, and it is invisible until the day it stops the build.**
+
+Each runner is a fresh machine with an empty keychain, so `-allowProvisioningUpdates` cannot *fetch*
+a certificate — it **creates** one, uses it for that archive, and the private key dies with the
+machine. The certificate itself stays on the account forever, named `Created via API`.
+
+Apple caps Apple Development certificates at **12**. On 2026-08-15 the account held 12: two of
+yours and **ten created by CI**, seven from a single day of runs. The next archive failed with:
+
+```
+error: Choose a certificate to revoke. Your account has reached the maximum number of
+       certificates. To create a new one, you must choose a certificate to revoke.
+```
+
+Note what makes this expensive to diagnose: **nothing fails while slots remain**, so the pipeline
+looks healthy for months, and the failure arrives attached to whatever change happened to force a
+fresh mint — in this case #112's App Group, which invalidated the existing profiles. The change gets
+blamed for a debt the pipeline had been quietly accruing.
+
+**To clear it**, revoke every DEVELOPMENT certificate named `Created via API`. They are single-use
+and their private keys are gone; nothing can be signed with them again. Keep the certificates in
+your own name, and keep the DISTRIBUTION certificate — that is the one that ships.
+
+```bash
+# List: GET  /v1/certificates?limit=200   → filter certificateType=DEVELOPMENT, displayName='Created via API'
+# Kill: DELETE /v1/certificates/{id}      → 204
+```
+
+**This buys about ten more runs, it does not fix anything.** The real options are importing a
+signing certificate in CI (what this workflow deliberately removed) or a cleanup step that revokes
+`Created via API` certificates before archiving. Neither is done; pick one before the count climbs
+again.
 
 ## Proving the pipeline without shipping
 
