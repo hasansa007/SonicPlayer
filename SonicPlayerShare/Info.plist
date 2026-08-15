@@ -45,13 +45,28 @@
 			     too. Being offered for a file the app will then refuse is a worse first
 			     impression than not being offered.
 
-			     UTI-CONFORMS-TO catches the concrete types (public.mp3, public.mpeg-4-audio,
-			     com.microsoft.waveform-audio) without enumerating them, so a format the system
-			     learns about later is included for free. Files whose extension the library
-			     accepts but whose UTI does not conform — the .m4b and .opus edges — are the
-			     reason ImportFilter.isAudio still runs on the drain side. -->
+			     UTI-CONFORMS-TO catches the concrete types without enumerating them, so a
+			     format the system learns about later is included for free. Measured against
+			     ImportFilter.audioExtensions, public.audio covers nine of its ten: mp3, m4a,
+			     wav, aac, flac, aiff and m4b all conform, and opus/ogg both resolve to
+			     org.xiph.ogg-audio, which conforms too.
+
+			     **public.mpeg-4 is named separately because .mp4 does NOT conform to
+			     public.audio** — it conforms to public.movie. ImportFilter accepts .mp4 on
+			     purpose, because audiobooks ship as .m4b and .mp4, so omitting it would hide
+			     Sonic Player from exactly the long-form audio this feature exists for — with no
+			     error, and no way for the user to discover why.
+
+			     The cost is that a genuine video .mp4 matches too. That is the trade
+			     ImportFilter already made and documented (accepted here, fails later at
+			     playback), and ImportFilter.isAudio on the drain side is what catches it.
+
+			     Note the direction: that drain-side filter can only NARROW what this rule
+			     admits. A file this predicate rejects never reaches the queue, so no drain-side
+			     check is a remedy for a rule that is too strict. An earlier version of this
+			     comment had that backwards. -->
 			<key>NSExtensionActivationRule</key>
-			<string>SUBQUERY(extensionItems, $item, SUBQUERY($item.attachments, $att, ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.audio").@count &gt; 0).@count &gt; 0</string>
+			<string>SUBQUERY(extensionItems, $item, SUBQUERY($item.attachments, $att, ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.audio" OR ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.mpeg-4").@count &gt; 0).@count &gt; 0</string>
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.share-services</string>

@@ -97,10 +97,12 @@ earns its place, and the mapping onto a textbook clean-architecture stack. What 
 day-to-day version.
 
 **MVVM with `@Observable`, async/await throughout.** There are no reducers and no `Store`: the
-TCA→MVVM migration (#5) finished at slice 10 (#19). TCA still ships as a dependency because the
-five clients use its `@DependencyClient` macro; #20 removes it.
+TCA→MVVM migration (#5) finished at slice 10 (#19). **TCA is gone** — #20 removed it along with
+13 transitive packages, and `Package.resolved` pins zero. This paragraph read *"TCA still ships as a
+dependency because the five clients use its `@DependencyClient` macro; #20 removes it"* long after
+#20 closed, contradicting the Dependencies section three screens below it.
 
-- **Features/** - one `{Name}ViewModel.swift` + `{Name}View.swift` per feature. A `{Name}Feature.swift` would be a leftover — there are none. Home is an exception: no view file, its UI is inlined in `App/AppView.swift`
+- **Features/** - one `{Name}ViewModel.swift` per feature; a `{Name}Feature.swift` would be a leftover and there are none. **View files are the exception, not the rule** — only `Features/Dial/` has any. This bullet used to promise a `{Name}View.swift` per feature, which the dial epic made false everywhere
 - **Clients/** - structs of closures wrapping system frameworks (AVFoundation, FileManager), each with a `.live` and a `.test`
 - **Models/** - Plain data types (`AudioFile`, `FileSystemItem`, `PlaybackSpeed`)
 - **Domain/** - Pure decision logic, Foundation only. Extracted from reducers so its tests survived the migration unchanged (#11). Add logic here rather than inlining it in a view model.
@@ -120,9 +122,12 @@ unreachable. Three issues were later closed as "unreachable, not fixed" — #55,
 their defects were still in those files. A doc that describes an intention in the present tense is
 worse than one that says nothing, because the next reader greps and believes it.
 
-**The two exceptions are real and live:** `AboutView` and `HelpView` are conventional screens,
-presented as sheets from `AppView` and reached from the dial's Settings rows. They are the last two,
-and #50 owns restructuring them.
+**There are no longer any exceptions, and this paragraph is the second correction.** It read *"the
+two exceptions are real and live: `AboutView` and `HelpView` are conventional screens, presented as
+sheets from `AppView`… #50 owns restructuring them"* — in the present tense, directly beneath the
+warning above about exactly that. #50 closed: both became dial screens and **neither file exists**.
+The two sheets `AppView` still owns are the outbound share (`ActivityView`) and the Files import
+picker (`DocumentPicker`), which are system pickers rather than screens of ours.
 
 What is left is one view rendering one value:
 

@@ -35,12 +35,31 @@ MIGRATED=(
   "SonicPlayer/App/OnboardingView.swift"
 )
 
+# **Every source root, not the one named `SonicPlayer` (#112).**
+#
+# This read `find SonicPlayer …`, which is a directory name, not "the project". When the share
+# extension arrived as a sibling target, `SonicPlayerShare/ShareViewController.swift` matched the
+# `*View*.swift` pattern, carried inline layout literals, and `--all` still reported clean — because
+# the scan never descended into it. CLAUDE.md tells contributors to run this before a PR, so the gate
+# would have gone on passing over a whole target as slices 2–5 build the folder picker there.
+#
+# This is the same lesson the MIGRATED loop below already learned and stated: a gate that counts
+# files it never read is worse than no gate. Roots are listed, so adding a target is a one-line edit
+# here rather than a silent hole.
+SOURCE_ROOTS=(SonicPlayer SonicPlayerShare)
+
 if [[ "${1:-}" == "--all" ]]; then
+  for root in "${SOURCE_ROOTS[@]}"; do
+    if [[ ! -d "$root" ]]; then
+      echo "✗ SOURCE_ROOTS lists a directory that does not exist: $root"
+      exit 1
+    fi
+  done
   TARGETS=()
   while IFS= read -r f; do TARGETS+=("$f"); done < <(
-    find SonicPlayer -name "*View*.swift" -o -name "*Section.swift" | sort
+    find "${SOURCE_ROOTS[@]}" \( -name "*View*.swift" -o -name "*Section.swift" \) | sort
   )
-  echo "Scanning every view file (--all). Un-migrated screens belong to slices #48–#51."
+  echo "Scanning every view file under: ${SOURCE_ROOTS[*]} (--all)."
 else
   TARGETS=("${MIGRATED[@]}")
 fi

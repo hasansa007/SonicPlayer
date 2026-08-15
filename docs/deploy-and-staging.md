@@ -71,6 +71,25 @@ deletes on purpose, because Xcode's General tab writes it and the plist is what 
 step asserts the two plists agree, and fails the run before the archive if they do not. Treat the
 guard as the reason you can bump confidently, not as a reason to stop checking.
 
+### What that guard CANNOT catch: a stale pair that agrees
+
+**It compares the two plists to each other, never to what is already uploaded.** Leave both at a
+build number that has already shipped and the guard passes cleanly, the archive succeeds, the
+signing succeeds, the upload succeeds — and App Store Connect rejects with *"the bundle version must
+be higher than the previously uploaded version"*, against a run that has done all the expensive work.
+
+`RELEASE_NOTES.md` does not close it either: its check is `grep -qx "## $VERSION"`, so an unchanged
+`CFBundleShortVersionString` finds the section from the release that already shipped and passes,
+handing testers the notes for a build that did not contain the new work.
+
+**So the pre-flight is on you: `CFBundleVersion` must be strictly greater than the highest build
+already uploaded for this `CFBundleShortVersionString`.** 3.0.0 (25) is live as of 2026-08-13.
+
+The workflow already mints an App Store Connect JWT and queries `/v1/builds`, but only *after* the
+upload, to attach What's New. Moving that query before the archive — fail if
+`filter[version]=$BUILD` already returns a build — would close this properly. Not done: it is a
+change to the step ordering of a pipeline that has been wrong twice, and it wants its own dry run.
+
 The workflow reads `RELEASE_NOTES.md` for the section whose heading equals `## <version>`, where
 `<version>` is `CFBundleShortVersionString` from `SonicPlayer/Info.plist`, and ships it as What's
 New.

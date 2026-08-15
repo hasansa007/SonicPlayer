@@ -536,7 +536,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SonicPlayerShare/SonicPlayerShare.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = A3JC2SBNCR;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -549,7 +548,6 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.hasan.sonicplayer.share;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -561,7 +559,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SonicPlayerShare/SonicPlayerShare.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = A3JC2SBNCR;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -574,7 +571,6 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.hasan.sonicplayer.share;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;

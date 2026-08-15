@@ -128,8 +128,15 @@ jobs:
           # The two targets' config blocks are textually identical apart from the bundle id, and
           # the test bundle's own MARKETING_VERSION = 1.0 is live and correct — it generates its
           # plist. Any line-window grep that tries to tell them apart is a guess; this is not.
+          # `|| true` is load-bearing, and its absence disabled the guard below.
+          #
+          # GitHub runs each `run:` block as `bash -e {0}`. The exit status of `VAR=$(cmd)` is
+          # cmd's, so a failing xcodebuild killed the step *here* — before the hand-written
+          # "could not read the build settings" error could print — and `2>/dev/null` had already
+          # discarded xcodebuild's own diagnosis. The result was a red step with no annotation and
+          # no output: precisely the silent failure the next twelve lines exist to prevent.
           SETTINGS=$(xcodebuild -project SonicPlayer.xcodeproj -target SonicPlayer \
-            -configuration Release -showBuildSettings 2>/dev/null)
+            -configuration Release -showBuildSettings 2>&1) || true
 
           # If that call fails its output is empty, every key reads as "unset", and the check
           # below passes having verified nothing — a guard that cannot fail, which is the shape
@@ -188,7 +195,7 @@ jobs:
           # reason: Xcode's General tab writes MARKETING_VERSION on whichever target is selected,
           # and a stale key on the extension is exactly as invisible as it was on the app.
           EXT_SETTINGS=$(xcodebuild -project SonicPlayer.xcodeproj -target SonicPlayerShare \
-            -configuration Release -showBuildSettings 2>/dev/null)
+            -configuration Release -showBuildSettings 2>&1) || true
 
           if ! printf '%s\n' "$EXT_SETTINGS" | grep -q '^ *PRODUCT_BUNDLE_IDENTIFIER = com.hasan.sonicplayer.share$'; then
             echo "::error::Could not read SonicPlayerShare's build settings, so its version check"
