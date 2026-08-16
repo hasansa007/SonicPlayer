@@ -61,9 +61,19 @@ enum OpenInImport {
         // branch started deleting, destroying the newer one — and it never fired for the same file
         // re-opened, because iOS had renamed it in the staging directory first.
         //
-        // `contentsEqual` returns false when nothing is there, so this one call covers the empty
-        // slot too, and it does not read anything in that case.
-        if FileManager.default.contentsEqual(atPath: url.path, andPath: sameName.path) {
+        // **Sizes first, and that guard is why this is affordable on the main actor.**
+        // `contentsEqual` reads BOTH files end to end. It is cheap when the destination is empty —
+        // it returns false without reading — but the case it exists for is the one where a
+        // same-named file *is* there, and then a duplicated 500 MB audiobook is a 1 GB read. The
+        // share drain runs synchronously on `.active`, so that read would sit between the user
+        // foregrounding the app and the first frame.
+        //
+        // Two files of different length are never equal, and length comes from metadata already in
+        // the directory listing. So the byte comparison now runs only for same-name, same-size
+        // candidates — which is the case it was always meant to adjudicate. `ImportDedupe` reaches
+        // the same conclusion from the other direction (#6): name plus exact byte count is free.
+        if sameSize(url, sameName),
+            FileManager.default.contentsEqual(atPath: url.path, andPath: sameName.path) {
             // A staged copy still has to go: leaving it is what makes iOS rename the next
             // hand-off. Deliberately not fatal — failing to tidy our own queue must not stop a file
             // the user can already play from opening. The cost of the `try?` is one duplicate next
@@ -88,5 +98,18 @@ enum OpenInImport {
             try FileManager.default.copyItem(at: url, to: destination)
         }
         return destination
+    }
+
+    /// Whether both paths exist and report the same byte count.
+    ///
+    /// False when either is missing, which keeps the caller's short-circuit correct: a destination
+    /// that is not there cannot be a duplicate, and `contentsEqual` would have said so too — just
+    /// after opening both files.
+    private static func sameSize(_ a: URL, _ b: URL) -> Bool {
+        guard
+            let left = try? a.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+            let right = try? b.resourceValues(forKeys: [.fileSizeKey]).fileSize
+        else { return false }
+        return left == right
     }
 }

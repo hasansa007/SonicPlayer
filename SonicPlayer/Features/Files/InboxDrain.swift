@@ -37,6 +37,14 @@ enum InboxDrain {
             /// nothing better to say; the screen should present this as "a shared batch" rather
             /// than showing the id.
             case unreadableBatch(id: String)
+            /// The extension was killed before it could commit this batch, and the app reclaimed it
+            /// after `ShareInbox.partialBatchLifetime`. The file is gone; the user shared it and got
+            /// nothing, so saying so is the only honest option left.
+            case abandoned(fileName: String)
+            /// Shared, but the extension could not take it — no audio type identifier among the
+            /// attachment's registered types. It was never in the queue, so there is nothing to
+            /// retry; the user simply needs to be told it did not come across.
+            case notAccepted(fileName: String)
         }
     }
 
@@ -65,7 +73,38 @@ enum InboxDrain {
             let batch = inbox.appendingPathComponent(batchName)
             drain(batch: batch, into: documentsDirectory, fileManager: fileManager, into: &result)
         }
+
+        reapAbandonedPartials(in: inbox, names: names, fileManager: fileManager, into: &result)
         return result
+    }
+
+    /// Removes `.partial-` batches old enough that the extension that made them is long gone.
+    ///
+    /// **Nothing else ever would.** `isCommittedBatch` refuses dot-prefixed names by design, so a
+    /// batch the extension was killed halfway through writing is invisible to the drain and holds
+    /// its audio forever — a leak bounded only by deleting the app.
+    ///
+    /// The age test is `ShareInbox.isAbandonedPartial`, deliberately generous: the app cannot ask
+    /// whether the extension is still alive, so reclaiming too eagerly destroys a share in flight.
+    /// Reported as pending rather than silently, because the user did share those files and got
+    /// nothing — that is exactly what slice 4's screen is for.
+    private static func reapAbandonedPartials(
+        in inbox: URL, names: [String], fileManager: FileManager, into result: inout Result
+    ) {
+        let now = Date()
+        for name in names {
+            let directory = inbox.appendingPathComponent(name)
+            guard
+                let modified = try? directory.resourceValues(forKeys: [.contentModificationDateKey])
+                    .contentModificationDate,
+                ShareInbox.isAbandonedPartial(name, age: now.timeIntervalSince(modified))
+            else { continue }
+
+            let lost = ((try? fileManager.contentsOfDirectory(atPath: directory.path)) ?? [])
+                .filter { $0 != ShareInbox.manifestFileName }
+            guard (try? fileManager.removeItem(at: directory)) != nil else { continue }
+            result.pending.append(contentsOf: lost.map { .abandoned(fileName: $0) })
+        }
     }
 
     private static func drain(
@@ -79,9 +118,9 @@ enum InboxDrain {
         let manifestData = try? Data(
             contentsOf: batch.appendingPathComponent(ShareInbox.manifestFileName)
         )
-        let destination = InboxManifestCodec.resolvedDestination(
-            InboxManifestCodec.decode(manifestData), under: documentsDirectory
-        )
+        let manifest = InboxManifestCodec.decode(manifestData)
+        let destination = InboxManifestCodec.resolvedDestination(manifest, under: documentsDirectory)
+        result.pending.append(contentsOf: (manifest.rejected ?? []).map { .notAccepted(fileName: $0) })
         // Slice 2 always resolves to the root, but creating the directory is what makes slice 3 a
         // manifest change rather than a code change.
         try? fileManager.createDirectory(at: destination, withIntermediateDirectories: true)

@@ -5,19 +5,21 @@ import UniformTypeIdentifiers
 /// The share extension's entry point — **slice 2 of #112: it copies, and decides nothing.**
 ///
 /// Audio shared from any app is copied into the queue inside the shared App Group container, and
-/// the app files it into the library the next time it runs. There is no UI: the sheet dismisses and
-/// the work happens without a screen.
+/// the app files it into the library the next time it runs.
 ///
-/// **Silence is a design choice, not an omission.** A screen here would need strings, and strings
-/// need nine languages; localisation is slice 5, so any copy shipped now would either be English in
-/// every locale or would hold the whole feature back. There is nothing to say that the app cannot
-/// say better once it has actually filed the files. Slice 3 adds the folder picker, and its strings
-/// arrive with it.
+/// **It shows a spinner and a close button, and ships no strings.** An earlier version of this slice
+/// drew nothing at all, reasoning that a screen needs strings and localisation is slice 5. The
+/// reasoning was right and the conclusion was not: a share of thirty lectures that iCloud must
+/// download first left a blank sheet for tens of seconds with no progress and no way out. The answer
+/// is a `UIActivityIndicatorView` and `UIButton(type: .close)` — a system glyph with a
+/// system-localised accessibility label — which gives the user an exit without a word of ours in any
+/// of the nine languages. Anything worth *saying* is still the app's job, once it has actually filed
+/// the files. Slice 3's picker brings the first strings, and slice 5 translates them.
 ///
 /// **`UIViewController`, in a SwiftUI-only codebase.** `NSExtensionPrincipalClass` is a UIKit
 /// contract — the system instantiates this class through plain `init()`, and `UIHostingController`
-/// declares its own designated initializers, which suppresses that. With no UI to draw there is now
-/// nothing else to justify.
+/// declares its own designated initializers, which suppresses that. What little chrome there is here
+/// is two system controls, so hosting SwiftUI to draw them would be the tail wagging the dog.
 ///
 /// What this deliberately does NOT do:
 ///
@@ -34,13 +36,58 @@ final class ShareViewController: UIViewController {
 
     private let log = Logger(subsystem: "com.hasan.sonicplayer.share", category: "share")
 
+    /// Set when the user taps Close. Checked between attachments so a long copy can be abandoned.
+    private var isCancelled = false
+    /// The batch being written, so cancelling can take it back out.
+    private var partialBatch: URL?
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .clear
+        view.backgroundColor = .systemBackground
+
+        // **A spinner and a system close button, and neither ships a string.**
+        //
+        // The first version of slice 2 drew nothing at all, on the grounds that a screen needs
+        // strings and localisation is slice 5. That reasoning was right about strings and wrong
+        // about the consequence: sharing thirty lectures that iCloud must download first left a
+        // blank sheet for tens of seconds with no progress, no cancel, and no way out short of
+        // force-quitting the host app. The slice-1 stub at least had a Close button.
+        //
+        // `UIButton(type: .close)` is the way to have both: a system glyph with a system-localised
+        // accessibility label, no text of ours in any of the nine languages. The spinner says work
+        // is happening without claiming what.
+        let spinner = UIActivityIndicatorView(style: .large)
+        spinner.startAnimating()
+        spinner.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(spinner)
+
+        let close = UIButton(type: .close)
+        close.addTarget(self, action: #selector(cancel), for: .touchUpInside)
+        close.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(close)
+
+        NSLayoutConstraint.activate([
+            spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            close.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            close.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+        ])
 
         Task { [weak self] in
             await self?.consumeAttachments()
         }
+    }
+
+    /// Abandons the share, taking the half-written batch with it.
+    ///
+    /// The batch is still dot-prefixed at this point, so the app would never have seen it — but
+    /// leaving it would rely on the reaper an hour later. Removing it here is immediate and exact.
+    @objc private func cancel() {
+        isCancelled = true
+        if let partialBatch { try? FileManager.default.removeItem(at: partialBatch) }
+        extensionContext?.cancelRequest(
+            withError: NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError)
+        )
     }
 
     private func consumeAttachments() async {
@@ -85,19 +132,40 @@ final class ShareViewController: UIViewController {
         let partial = inbox.appendingPathComponent(ShareInboxLayout.partialBatchName(id: id))
         try FileManager.default.createDirectory(at: partial, withIntermediateDirectories: true)
 
+        partialBatch = partial
+
         var staged = 0
+        var rejected: [String] = []
         for provider in providers {
-            guard let identifier = audioTypeIdentifier(of: provider) else { continue }
+            if isCancelled { throw CocoaError(.userCancelled) }
+
+            // **Recorded, not just skipped.** `completeRequest` below tells the host the share
+            // succeeded, and a host that believes a file was taken may offer to delete its copy.
+            // The extension has no way to tell the user itself, so the names travel in the manifest
+            // and the app surfaces them.
+            guard let identifier = audioTypeIdentifier(of: provider) else {
+                rejected.append(provider.suggestedName ?? "a shared file")
+                continue
+            }
             do {
-                if try await copy(provider, as: identifier, into: partial) { staged += 1 }
+                if try await copy(provider, as: identifier, into: partial) {
+                    staged += 1
+                } else {
+                    rejected.append(provider.suggestedName ?? "a shared file")
+                }
             } catch {
                 log.error("Skipping one attachment: \(error.localizedDescription, privacy: .public)")
+                rejected.append(provider.suggestedName ?? "a shared file")
             }
         }
 
+        if isCancelled { throw CocoaError(.userCancelled) }
+
         // The manifest is written before the commit so a committed batch always has one. Slice 2
         // has no picker, so the destination is always the library root.
-        let manifest = try JSONEncoder().encode(ShareManifest(destination: nil))
+        let manifest = try JSONEncoder().encode(
+            ShareManifest(destination: nil, rejected: rejected.isEmpty ? nil : rejected)
+        )
         try manifest.write(to: partial.appendingPathComponent(ShareInboxLayout.manifestFileName))
 
         // **The rename IS the commit.** Until this line the batch is dot-prefixed and the app's
@@ -105,6 +173,7 @@ final class ShareViewController: UIViewController {
         // filesystem is atomic, so there is no half-committed state — which is what lets the user
         // share into the app while it is foregrounded and draining.
         try FileManager.default.moveItem(at: partial, to: inbox.appendingPathComponent(id))
+        partialBatch = nil
         return staged
     }
 
@@ -168,15 +237,14 @@ final class ShareViewController: UIViewController {
         return directory.appendingPathComponent("\(base) \(UUID().uuidString).\(ext)")
     }
 
-    private enum ShareError: LocalizedError {
+    /// **Deliberately carries no `errorDescription`.** It conformed to `LocalizedError` with an
+    /// English sentence, which the host app surfaces — a user-facing string outside
+    /// `Localizable.xcstrings`, in a build that ships. ADR 0004's localisation exception ended when
+    /// the stub marker was deleted, so the honest options were to translate it into nine languages
+    /// for a case that should never happen, or to ship no string at all and let the host show its
+    /// own generic failure. This is the second.
+    private enum ShareError: Error {
         case noAppGroupContainer
-
-        var errorDescription: String? {
-            switch self {
-            case .noAppGroupContainer:
-                "The Sonic Player app group is unavailable, so the files could not be queued."
-            }
-        }
     }
 }
 
@@ -184,4 +252,5 @@ final class ShareViewController: UIViewController {
 /// Encoding only; the app owns decoding and its policy for a corrupt one.
 private struct ShareManifest: Encodable {
     var destination: String?
+    var rejected: [String]?
 }

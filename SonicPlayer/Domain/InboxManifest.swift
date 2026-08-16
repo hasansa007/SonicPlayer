@@ -15,8 +15,19 @@ struct InboxManifest: Codable, Equatable, Sendable {
     /// `Documents/` at drain time.
     var destination: String?
 
-    init(destination: String? = nil) {
+    /// Attachments the extension was handed and could not take.
+    ///
+    /// **Written by the extension so the app can say what happened, because the extension cannot.**
+    /// The activation rule fires when *any* attachment is audio, so a mixed share hands over
+    /// everything; anything without an audio type identifier is dropped at copy time. The extension
+    /// then calls `completeRequest`, which tells the host app the share succeeded — and a host that
+    /// believes a file was taken may offer to delete its own copy. Recording the names here is what
+    /// turns a silent drop into something the app can surface.
+    var rejected: [String]?
+
+    init(destination: String? = nil, rejected: [String]? = nil) {
         self.destination = destination
+        self.rejected = rejected
     }
 }
 

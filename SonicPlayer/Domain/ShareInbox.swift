@@ -56,6 +56,31 @@ enum ShareInbox {
         !name.hasPrefix(partialPrefix) && !name.isEmpty
     }
 
+    /// How long a `.partial-` batch may sit before the app reclaims it.
+    ///
+    /// **Something has to reap them or the storage is lost for good.** The extension creates
+    /// `.partial-<id>/`, copies audio into it, and commits with a rename — but it is a process the
+    /// system kills without notice, and it can throw between the copy and the rename. Either way the
+    /// directory survives, full of audio, and nothing ever looks at it again: `isCommittedBatch`
+    /// refuses dot-prefixed names by design, so the drain steps over it forever. Share a 400 MB
+    /// audiobook, get jetsammed twice, and 800 MB is gone until the app is deleted.
+    ///
+    /// **An hour, because the risk runs the other way too.** A partial that is *currently being
+    /// written* must never be reclaimed, and the app cannot ask whether the extension is alive.
+    /// Age is the only signal available. A real share is seconds to minutes old — even a slow iCloud
+    /// download of thirty lectures — so an hour is far outside the working range while still
+    /// bounding the leak. Being wrong here destroys a share in flight, which is why it is not
+    /// tighter.
+    static let partialBatchLifetime: TimeInterval = 60 * 60
+
+    /// True when a `.partial-` batch is old enough to be abandoned rather than in flight.
+    ///
+    /// Takes the age rather than a date so the rule is testable without a clock — the same reason
+    /// `RecordingFilename` takes its date.
+    static func isAbandonedPartial(_ name: String, age: TimeInterval) -> Bool {
+        name.hasPrefix("\(partialPrefix)partial-") && age > partialBatchLifetime
+    }
+
     /// The committed batches among `names`, oldest first by the caller's ordering.
     ///
     /// Order matters only for predictability — two batches never contend for the same destination
