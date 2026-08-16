@@ -39,11 +39,20 @@ enum OpenInImport {
     /// directory is ours to consume.
     ///
     /// Throws whatever `moveItem`/`copyItem` throws. The caller is expected to surface it.
-    static func run(url: URL, into documentsDirectory: URL) throws -> URL {
+    /// - Parameter consume: whether `url` is ours to **move** rather than copy. `nil` — the default,
+    ///   and every caller before #112 — asks `ImportFilter.isStaged`, which is the right question
+    ///   for a hand-off from iOS: it lands in `Documents/Inbox` and anything outside that is the
+    ///   user's own file. The share queue lives in the **App Group container**, so that test says
+    ///   "not ours" about files that are entirely ours; `InboxDrain` passes `true` instead.
+    ///
+    ///   Passed explicitly rather than widening `isStaged` to know about a second directory,
+    ///   because the two queues answer to different owners: iOS fills one, our own extension fills
+    ///   the other, and only the second is safe to consume unconditionally.
+    static func run(url: URL, into documentsDirectory: URL, consume: Bool? = nil) throws -> URL {
         let accessing = url.startAccessingSecurityScopedResource()
         defer { if accessing { url.stopAccessingSecurityScopedResource() } }
 
-        let isStaged = ImportFilter.isStaged(url, under: documentsDirectory)
+        let isStaged = consume ?? ImportFilter.isStaged(url, under: documentsDirectory)
         let sameName = documentsDirectory.appendingPathComponent(url.lastPathComponent)
 
         // **Identity is the bytes, not the name.** This is the only test for "already imported",

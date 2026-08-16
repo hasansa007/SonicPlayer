@@ -90,10 +90,16 @@ predicate on `public.audio` is used instead, and its filtering is verified in bo
 
 ## What is live and what is intent
 
-**Live as of this ADR — slice 1 only.** The target exists, is embedded in `PlugIns/`, is registered
-with the system as a `com.apple.share-services` extension, and appears in the share sheet's app row
-for a share containing audio. It shows a stub and cancels the request. **It has no queue, no picker
-and no library access.**
+**Live as of slices 1 and 2.** The target is embedded in `PlugIns/`, registered as a
+`com.apple.share-services` extension, and appears in the share sheet for a share containing audio.
+It **copies the audio attachments into the queue and commits the batch with an atomic rename**; the
+app drains it on `.active` or `.background` and files everything at the library root. **It still has
+no picker and no library access**, which is the property that makes it safe.
+
+**The extension shows nothing at all**, and that is a decision rather than an omission: a screen
+needs strings, strings need nine languages, and localisation is slice 5. Any copy shipped now would
+be English in every locale or would hold the feature back. The app is a better place to say what
+arrived, because by then it has actually filed it. Slice 3's picker brings its own strings.
 
 Two precisions, because the looser phrasings were both wrong. The rule is **"at least one attachment
 is audio"**, not "every attachment" — a mixed selection activates it, and slice 2 must therefore
@@ -112,9 +118,19 @@ against final wording. **The condition that ends the exception:** the `SHARE-EXT
 leaving `ShareViewController.swift`, which is also what the `distribute.yml` guard keys on — so the
 exception cannot outlive the stub without a release failing.
 
-**Intent, not built:** `folders.json`, the manifest, the atomic-rename batch commit, `InboxDrain`,
-`ImportInbox`, the picker UI, the exception screen, and localisation. Slices 2–5 in
-`docs/superpowers/specs/2026-08-14-share-import-design.md` §11.
+**Intent, not built:** `folders.json`, the picker UI, the exception screen, and localisation —
+slices 3–5. `AppViewModel.shareImportFailures` exists, is populated, and is read by nothing; it is
+the seam slice 4 plugs into, present now because the drain has to put failures *somewhere* and
+dropping them is the failure this design keeps legislating against.
+
+**A duplication was accepted in slice 2 and is policed rather than trusted.** The two targets cannot
+see each other's sources, so `ShareInbox` and `ShareInboxLayout` state the queue contract twice —
+the App Group id, the directory names, the `.partial-` convention, and the accepted audio
+extensions. The alternative was hand-maintained multi-target membership in `project.pbxproj`, which
+fights the synchronized file groups this project uses. `ShareInboxLayoutAgreementTests` reads the
+extension's source and both `.entitlements` as text and fails on any drift, because a silent
+disagreement means the extension writes into a container the app never reads and every shared file
+vanishes with no error anywhere.
 
 **Proven, and it was not free.** `group.com.hasan.sonicplayer` was registered in the developer portal
 on 2026-08-15 and enabled on both App IDs, and a `dry_run` of `distribute.yml` then archived, signed

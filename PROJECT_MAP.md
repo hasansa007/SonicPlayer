@@ -26,7 +26,7 @@ has been wrong before.
 | State | `@Observable` MVVM. No reducers, no `Store` — TCA removed in #20 |
 | Persistence | `UserDefaults` (`@AppStorage`) for preferences; `SessionStore` → `session.json` for playback session |
 | Media | AVFoundation, MediaPlayer (lock screen / remote commands) |
-| Tests | Swift Testing (`@Suite`/`@Test`/`#expect`) — **never XCTest** (#27). 58 files, 493 cases |
+| Tests | Swift Testing (`@Suite`/`@Test`/`#expect`) — **never XCTest** (#27). 62 files, 524 cases |
 | Dependencies | **None.** `Package.resolved` pins zero packages |
 | Targets | **Three** — `SonicPlayer` (app), `SonicPlayerShare` (share extension, #112), `SonicPlayerTests`. The extension is embedded in `PlugIns/` and shares `group.com.hasan.sonicplayer` |
 | Localization | `Localizable.xcstrings`, 177 keys × 9 languages (en, es, fr, ar, zh-Hans, hi, pt, ru, bn) |
@@ -85,13 +85,13 @@ reading another feature's state. The one exception is `.onOpenURL`, which calls
 | Views | `Features/Dial/`, `App/` | 8 — `AppView`, `OnboardingView`, six `Dial*View` |
 | View models | `Features/*/`, `App/` | 9 |
 | Clients (structs of closures, `.live` + `.test`) | `Clients/` | 6 + 2 protocols + `ClientErrors` |
-| Pure decision logic (Foundation only) | `Domain/` | 38 |
+| Pure decision logic (Foundation only) | `Domain/` | 40 |
 | Plain data | `Models/` | 3 |
 | Design system | `DesignSystem/`, `DesignSystem/Components/` | 2 + 2 |
 | Legacy shared UI | `Utilities/` | 10 — incl. `EmptyStateView`, `WaveformView` |
 
 Counts verified against the tree 2026-08-15. Every one of them except Models and Utilities had
-drifted; `Domain/` was recorded as 17 and is 38, which is the drift most likely to make a reader
+drifted; `Domain/` was recorded as 17 and is 40, which is the drift most likely to make a reader
 believe a decision has nowhere to live.
 
 ### A track, from tap to sound
@@ -155,27 +155,39 @@ in the same slice.
 | `ColorPalette` / `Theme` outside `DesignSystem/` | Deliberate deferral, ADR 0002. Revisit at epic end |
 | `FileManaging` — 8 of 9 members | Only `metadata(for:)` has a caller (`LivePlaybackRepository`). The rest are exercised by `ClientProtocolConformanceTests` and nothing else |
 
-### The share extension ships and does nothing (#112)
+### Share import — the queue works, the picker does not (#112)
 
-`SonicPlayerShare` is in the bundle, registered with the system, and offered in the share sheet for
-audio — and **it imports nothing**. Tapping it shows a stub and cancels the request. This is slice 1
-of #112 deliberately: a new target changes what CI archives, signs and uploads, and that is the only
-cost in the epic that cannot be undone, so it ships empty and gets proven before any feature code
-depends on it.
+Audio shared from any app is copied by `SonicPlayerShare` into a queue inside the App Group
+container, and the app files it into the library on the next `.active` **or** `.background`.
+**Everything lands at the library root**, because choosing a folder is slice 3.
 
-| Declared | State |
+```
+share sheet → SonicPlayerShare   writes group/Inbox/.partial-<uuid>/ + manifest.json
+                                 ⟶ renames to <uuid>          ← the commit
+            → AppViewModel.scenePhaseChanged → InboxDrain → Documents/
+```
+
+| Piece | Where |
 |---|---|
-| `group.com.hasan.sonicplayer` App Group | Registered in the developer portal on 2026-08-15 and enabled on both App IDs; **proven** by a `dry_run` whose exported `.ipa` carries it in the signed entitlements of both binaries. **Nothing reads or writes it yet** — that is slice 2 |
-| `ShareViewController` | A stub. No queue, no picker, no library access |
+| Layout, batch predicate | `Domain/ShareInbox.swift` — pure; restated in `SonicPlayerShare/ShareInboxLayout.swift` |
+| Manifest and its decode policy | `Domain/InboxManifest.swift` — corrupt or missing means the root, never a skipped batch |
+| The move | `Features/Files/InboxDrain.swift`, via `OpenInImport.run(consume: true)` |
+| Wiring | `AppViewModel.drainShareInbox()`, skipped while `player.isImporting` |
 
-Still intent, not code — slices 2–5 in `docs/superpowers/specs/2026-08-14-share-import-design.md` §11:
-`folders.json`, the batch manifest and its atomic-rename commit, `InboxDrain`, `ImportInbox`, the
-folder picker, the exception screen, and localisation across the nine languages.
+**The two targets cannot see each other's code, so the queue contract is stated twice.**
+`ShareInboxLayoutAgreementTests` reads the extension's source and both `.entitlements` as text and
+fails on any drift. A silent disagreement means the extension writes where the app never reads and
+every shared file vanishes — no crash, no error, no log.
 
-**One existing test will need narrowing at slice 2.** `AppViewModelTests.test_becomingActiveOrInactive_neverDrains()`
-asserts that nothing drains on `.active`. That is true of the *staging* drain and is ADR 0003's rule;
-the group-inbox drain lands on `.active` by design (ADR 0004), so the test's name will over-claim
-once it does.
+**The extension shows nothing.** No UI means no strings, so slice 5's nine translations go entirely
+on the picker's real copy rather than on placeholder text that would be deleted.
+
+Not built — slices 3–5: `folders.json` and the picker, the exception screen, localisation.
+`AppViewModel.shareImportFailures` is populated and read by nothing; it is the seam slice 4 uses.
+
+**`test_becomingActiveOrInactive_neverDrains` was renamed** to `…neverDrainsTheStagingDirectory`.
+The old name asserted a rule that is ADR 0003's and applies only to iOS's staging directory; the
+share queue drains on `.active` by design (ADR 0004).
 
 ### Resolved by #41 — iOS's staging directory
 
