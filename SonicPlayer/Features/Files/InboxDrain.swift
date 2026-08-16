@@ -44,7 +44,11 @@ enum InboxDrain {
             /// Shared, but the extension could not take it — no audio type identifier among the
             /// attachment's registered types. It was never in the queue, so there is nothing to
             /// retry; the user simply needs to be told it did not come across.
-            case notAccepted(fileName: String)
+            ///
+            /// `nil` when the attachment had no name to offer. **The extension deliberately does not
+            /// invent one**: a placeholder there would be an English string shipping from a target
+            /// with no string catalogue. Naming the unnamed belongs to the screen that renders this.
+            case notAccepted(fileName: String?)
         }
     }
 
@@ -71,6 +75,16 @@ enum InboxDrain {
 
         for batchName in ShareInbox.committedBatches(in: names) {
             let batch = inbox.appendingPathComponent(batchName)
+
+            // **A batch is a directory. A stray file is not an unreadable batch.**
+            // `committedBatches` filters by name, so anything non-dot-prefixed in the inbox root
+            // reached `drain`, failed `contentsOfDirectory`, and was reported as
+            // `.unreadableBatch` — on every scene phase change, forever, with nothing able to
+            // clear it. Slice 4 would show a row naming a file the user never shared and offering
+            // no action. Skipping is right: we did not put it there and it is not ours to delete.
+            guard (try? batch.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
+                continue
+            }
             drain(batch: batch, into: documentsDirectory, fileManager: fileManager, into: &result)
         }
 
@@ -88,6 +102,28 @@ enum InboxDrain {
     /// whether the extension is still alive, so reclaiming too eagerly destroys a share in flight.
     /// Reported as pending rather than silently, because the user did share those files and got
     /// nothing — that is exactly what slice 4's screen is for.
+    /// The most recent modification anywhere in `directory` — the directory itself or any entry.
+    ///
+    /// **The directory's own timestamp is not enough, and the first version relied on it.** A
+    /// directory's mtime advances when an entry is *added*, so a batch receiving one large file
+    /// looks untouched for as long as that copy takes. Taking the newest of the directory and its
+    /// contents covers the multi-file case and the mid-copy case.
+    ///
+    /// **It does not cover everything, and the gap is worth stating.** While
+    /// `loadFileRepresentation` downloads the *first* attachment from iCloud, nothing has been
+    /// written into the batch at all — there is no signal to read, and a download longer than
+    /// `partialBatchLifetime` can still be reaped out from under a live extension. Closing that
+    /// needs the extension to touch a heartbeat file while it works, which is an extension change
+    /// and is deferred rather than guessed at here.
+    private static func newestTouch(in directory: URL, fileManager: FileManager) -> Date? {
+        let keys: Set<URLResourceKey> = [.contentModificationDateKey]
+        let own = try? directory.resourceValues(forKeys: keys).contentModificationDate
+        let children = ((try? fileManager.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: Array(keys)
+        )) ?? []).compactMap { try? $0.resourceValues(forKeys: keys).contentModificationDate }
+        return ([own].compactMap { $0 } + children).max()
+    }
+
     private static func reapAbandonedPartials(
         in inbox: URL, names: [String], fileManager: FileManager, into result: inout Result
     ) {
@@ -95,9 +131,8 @@ enum InboxDrain {
         for name in names {
             let directory = inbox.appendingPathComponent(name)
             guard
-                let modified = try? directory.resourceValues(forKeys: [.contentModificationDateKey])
-                    .contentModificationDate,
-                ShareInbox.isAbandonedPartial(name, age: now.timeIntervalSince(modified))
+                let touched = newestTouch(in: directory, fileManager: fileManager),
+                ShareInbox.isAbandonedPartial(name, age: now.timeIntervalSince(touched))
             else { continue }
 
             let lost = ((try? fileManager.contentsOfDirectory(atPath: directory.path)) ?? [])
@@ -120,7 +155,9 @@ enum InboxDrain {
         )
         let manifest = InboxManifestCodec.decode(manifestData)
         let destination = InboxManifestCodec.resolvedDestination(manifest, under: documentsDirectory)
-        result.pending.append(contentsOf: (manifest.rejected ?? []).map { .notAccepted(fileName: $0) })
+        result.pending.append(
+            contentsOf: (manifest.rejected ?? []).map { .notAccepted(fileName: $0.isEmpty ? nil : $0) }
+        )
         // Slice 2 always resolves to the root, but creating the directory is what makes slice 3 a
         // manifest change rather than a code change.
         try? fileManager.createDirectory(at: destination, withIntermediateDirectories: true)

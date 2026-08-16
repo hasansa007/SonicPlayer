@@ -85,7 +85,19 @@ final class ShareViewController: UIViewController {
     @objc private func cancel() {
         isCancelled = true
         if let partialBatch { try? FileManager.default.removeItem(at: partialBatch) }
-        extensionContext?.cancelRequest(
+        partialBatch = nil
+
+        // **Not optional-chained, and I deleted this guard once already.** Round 2 replaced
+        // `extensionContext?.cancelRequest(...)` with exactly this, on the grounds that optional
+        // chaining turns the only control on the screen into a silent no-op when the context is
+        // gone — no exit, no log, nothing to debug. Round 3's rewrite reintroduced the optional
+        // chain and removed the argument with it.
+        guard let extensionContext else {
+            log.error("Close tapped with no extensionContext; the request cannot be cancelled.")
+            assertionFailure("Share extension has no extensionContext to cancel.")
+            return
+        }
+        extensionContext.cancelRequest(
             withError: NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError)
         )
     }
@@ -106,6 +118,13 @@ final class ShareViewController: UIViewController {
             // failure would invite the host app to treat its own copy as still-pending.
             context.completeRequest(returningItems: [], completionHandler: nil)
         } catch {
+            // **`cancel()` has already answered the context, so this must not answer it again.**
+            // Tapping Close calls `cancelRequest`, and the in-flight `stage()` then throws
+            // `userCancelled` and lands here — a second complete-or-cancel on the same
+            // `NSExtensionContext`, which Apple permits exactly one of. The user-cancelled path is
+            // the only one that arrives already answered, so it is the only one to skip.
+            guard !isCancelled else { return }
+
             // **Cancel, not complete.** `completeRequest` tells the host the share succeeded, and a
             // host that believes a file was taken may offer to delete its own copy. Reporting
             // success for work not done is #33's failure in a place where the cost is someone
@@ -143,19 +162,24 @@ final class ShareViewController: UIViewController {
             // succeeded, and a host that believes a file was taken may offer to delete its copy.
             // The extension has no way to tell the user itself, so the names travel in the manifest
             // and the app surfaces them.
+            //
+            // **An empty string when there is no name, never a placeholder.** This read
+            // `?? "a shared file"` — an English literal, written into the manifest, destined for
+            // slice 4's screen, in a target that had just declared it ships no strings. Naming an
+            // unnamed file is the app's job, where `Localizable.xcstrings` is.
             guard let identifier = audioTypeIdentifier(of: provider) else {
-                rejected.append(provider.suggestedName ?? "a shared file")
+                rejected.append(provider.suggestedName ?? "")
                 continue
             }
             do {
                 if try await copy(provider, as: identifier, into: partial) {
                     staged += 1
                 } else {
-                    rejected.append(provider.suggestedName ?? "a shared file")
+                    rejected.append(provider.suggestedName ?? "")
                 }
             } catch {
                 log.error("Skipping one attachment: \(error.localizedDescription, privacy: .public)")
-                rejected.append(provider.suggestedName ?? "a shared file")
+                rejected.append(provider.suggestedName ?? "")
             }
         }
 

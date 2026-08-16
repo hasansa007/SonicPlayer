@@ -287,20 +287,26 @@ final class AppViewModel {
     private func drainShareInbox() {
         guard !player.isImporting, let container = fileManager.shareInboxContainer() else { return }
         let result = InboxDrain.run(container: container, into: fileManager.documentsDirectory())
-        guard !result.isEmpty else { return }
 
-        // **Kept as state, not logged.** The app uses no logger anywhere, and adding OSLog for one
-        // call would be a new pattern for a single line. More usefully, this is the seam slice 4's
-        // exception screen reads: a name here means the file is still queued and will be retried on
-        // the next phase change, so it is a pending decision rather than a loss.
+        // **Assigned on every drain, including the empty one.** An earlier version returned here
+        // when the result was empty, which meant a pending entry outlived the thing it described:
+        // the reaper removes an abandoned batch and reports it once, the next drain finds nothing,
+        // and the old entry sat there for the process lifetime — promising, in its own doc comment,
+        // a retry that could never happen. Slice 4 would have rendered a file that no longer exists.
         if shareImportPending != result.pending { shareImportPending = result.pending }
+        guard !result.isEmpty else { return }
 
         if !result.imported.isEmpty {
             home.loadAllFiles()
         }
     }
 
-    /// Files the share queue left behind — not audio, failed to move, or an unreadable batch.
+    /// What the share queue could not place — kept as state rather than logged, because the app
+    /// uses no logger anywhere and this is the seam slice 4's exception screen reads.
+    ///
+    /// **Not all of these are retryable, and the screen must not imply they are.** `.notAudio` and
+    /// `.failed` are still in the queue and get another attempt on the next phase change;
+    /// `.abandoned` and `.notAccepted` describe files that are already gone.
     ///
     /// Read by nothing yet: slice 4 of #112 owns the screen. Present now because the drain has to
     /// put them somewhere, and dropping them on the floor is the failure this design keeps

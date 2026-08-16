@@ -46,18 +46,46 @@ struct ShareInboxReapingTests {
         return (container, documents)
     }
 
+    /// **Ages the entries as well as the directory, and that distinction is the whole point.**
+    /// The reaper takes the newest timestamp anywhere in the batch, because a directory's own mtime
+    /// advances only when an entry is *added* — so a batch receiving one large file looks untouched
+    /// for as long as that copy takes. An earlier version of this helper aged only the directory and
+    /// these tests passed against a reaper that would have deleted live batches.
+    ///
+    /// Entries are aged before the directory, since writing into a directory updates its mtime.
     private func writePartial(
         _ name: String, in container: URL, files: [String], agedBy age: TimeInterval
     ) throws -> URL {
         let batch = ShareInbox.inbox(inContainer: container).appendingPathComponent(name)
         try FileManager.default.createDirectory(at: batch, withIntermediateDirectories: true)
+        let aged = Date().addingTimeInterval(-age)
         for file in files {
-            try Data("audio".utf8).write(to: batch.appendingPathComponent(file))
+            let url = batch.appendingPathComponent(file)
+            try Data("audio".utf8).write(to: url)
+            try FileManager.default.setAttributes([.modificationDate: aged], ofItemAtPath: url.path)
         }
-        try FileManager.default.setAttributes(
-            [.modificationDate: Date().addingTimeInterval(-age)], ofItemAtPath: batch.path
-        )
+        try FileManager.default.setAttributes([.modificationDate: aged], ofItemAtPath: batch.path)
         return batch
+    }
+
+    /// The case the directory-only signal was blind to: entries written recently inside a batch
+    /// whose own timestamp is old. That is a copy in progress, and reaping it destroys a live share.
+    @Test func aBatchWithAnOldDirectoryButFreshContentsIsInFlight() throws {
+        let (container, documents) = try makeTree()
+        let name = ShareInbox.partialBatchName(id: "copying")
+        let batch = ShareInbox.inbox(inContainer: container).appendingPathComponent(name)
+        try FileManager.default.createDirectory(at: batch, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(-ShareInbox.partialBatchLifetime - 60)],
+            ofItemAtPath: batch.path
+        )
+        // Written now — the extension is mid-copy.
+        try Data("audio".utf8).write(to: batch.appendingPathComponent("Arriving.m4a"))
+
+        let result = InboxDrain.run(container: container, into: documents)
+
+        #expect(FileManager.default.fileExists(atPath: batch.path), "a live copy must survive")
+        #expect(result.isEmpty)
     }
 
     @Test func aStalePartialIsRemovedAndItsLossReported() throws {
@@ -129,6 +157,24 @@ struct RejectedAttachmentTests {
 
     @Test func aManifestWithoutRejectionsDecodesToNil() {
         #expect(InboxManifestCodec.decode(Data(#"{"destination":null}"#.utf8)).rejected == nil)
+    }
+
+    /// An attachment with no `suggestedName` is recorded as an empty marker, not as an invented
+    /// English placeholder — naming the unnamed belongs to the screen that renders it.
+    @Test func anUnnamedRejectionArrivesAsNilRatherThanAPlaceholder() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Rejected-\(UUID().uuidString)")
+        let container = root.appendingPathComponent("group")
+        let documents = root.appendingPathComponent("Documents")
+        let batch = ShareInbox.inbox(inContainer: container).appendingPathComponent("batch-1")
+        try FileManager.default.createDirectory(at: batch, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+        try InboxManifestCodec.encode(InboxManifest(destination: nil, rejected: [""]))
+            .write(to: batch.appendingPathComponent(ShareInbox.manifestFileName))
+
+        let result = InboxDrain.run(container: container, into: documents)
+
+        #expect(result.pending == [.notAccepted(fileName: nil)])
     }
 
     @Test func theDrainReportsThemAsNotAccepted() throws {

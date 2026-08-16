@@ -315,8 +315,8 @@ Order chosen so the riskiest thing is proven first and nothing is built on an un
    do, the account had silently filled its 12-certificate cap, and the build number was stale.
 2. **The queue.** Extension copies files to the inbox with a root-destination manifest; `InboxDrain`
    and the `Domain/` types file them. No picker yet — everything lands at the library root.
-   ← **in progress on `gh-112-share-queue`.** The extension shows nothing, so no strings ship ahead
-   of slice 5. The queue contract is stated in both targets and policed by
+   ← **in progress on `gh-112-share-queue`.** The extension shows a spinner and a system close
+   button, so no strings of ours ship ahead of slice 5. The queue contract is stated in both targets and policed by
    `ShareInboxLayoutAgreementTests`. Removing the `SHARE-EXTENSION-STUB` marker here is what
    unblocks TestFlight, which slice 1's guard had deliberately closed.
 3. **The picker.** `folders.json`, the extension's folder screen, the destination honoured.
