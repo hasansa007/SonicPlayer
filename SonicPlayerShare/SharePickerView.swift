@@ -97,6 +97,12 @@ struct SharePickerView: View {
                 SystemCloseButton(action: onCancel)
             }
             .padding()
+            // **`.bar`, because an inset reserves space but does not occlude.** Without a
+            // background the HStack is fully transparent, so rows scrolled *underneath* it and
+            // folder names rendered through the close glyph. At rest it looked correct, which is
+            // why the first version shipped: the defect only appears once the list is longer than
+            // the sheet.
+            .background(.bar)
         }
     }
 }

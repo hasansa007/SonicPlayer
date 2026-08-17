@@ -103,11 +103,20 @@ see nothing, open the app to find out. That is the deferred-work problem this AD
 silent options over, reintroduced by accident under a *localisation* justification — nobody noticed
 it was also a feedback decision. Choosing a folder answers "did that work?" at no extra screen.
 
-**And it still ships no strings**, which was the constraint the silence was protecting. The picker
+**It ships no strings of its own — with one exception that is worse than "inherited".** The picker
 has no title and no labels; `UIButton(type: .close)` carries Apple's glyph and its own localised
-label. The one word displayed is the library root's name, which the app publishes and already shows
-untranslated on its own Move screen — a pre-existing gap the picker inherits, and slice 5 owns both
-halves of it.
+label. The one word displayed is the library root, `"Library"`.
+
+That word is untranslated on the app's Move screen already, and the first version of this paragraph
+called it a pre-existing gap the picker merely inherits. **That defence does not hold**, and review
+caught it: the Move screen sits in the app target, where `Localizable.xcstrings` exists and the
+string could be translated tomorrow. `ShareInboxLayout.rootTitle` is a **new declaration in a target
+that has no catalogue at all** — so this extends the gap rather than inheriting it, into the one
+place a first-time user of the feature is guaranteed to look.
+
+It is accepted for slice 3 because giving the extension a catalogue is slice 5's work and doing it
+here would be that slice done badly. **Slice 5 owns both halves**: the extension's catalogue, and
+`MoveDestinations.rootTitle` in the app.
 
 Two precisions, because the looser phrasings were both wrong. The rule is **"at least one attachment
 is audio"**, not "every attachment" — a mixed selection activates it, and slice 2 must therefore

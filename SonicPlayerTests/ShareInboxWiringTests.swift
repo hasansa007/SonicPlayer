@@ -146,7 +146,21 @@ struct ShareInboxWiringTests {
                 at: documents.appendingPathComponent(folder), withIntermediateDirectories: true
             )
         }
+        defer { try? FileManager.default.removeItem(at: root) }
         let app = makeApp(documents: documents, container: container)
+        // The list now comes from the in-memory tree, so the tree is what the test supplies.
+        app.home.libraryTree = [
+            DialContent.Item(
+                id: documents.appendingPathComponent("Lectures").absoluteString,
+                title: "Lectures", duration: 0,
+                children: [
+                    DialContent.Item(
+                        id: documents.appendingPathComponent("Lectures/Week 1").absoluteString,
+                        title: "Week 1", duration: 0, children: []
+                    )
+                ]
+            )
+        ]
 
         app.scenePhaseChanged(.active)
 
@@ -155,10 +169,7 @@ struct ShareInboxWiringTests {
         )
         let published = try JSONDecoder().decode([ShareFolder].self, from: data)
 
-        #expect(
-            published.map(\.relativePath) == ["", "Lectures", "Lectures/Week 1"],
-            "iOS's staging directory must not be offered as a destination"
-        )
+        #expect(published.map(\.relativePath) == ["", "Lectures", "Lectures/Week 1"])
     }
 
     /// The list changes maybe once a week and this runs on every scene phase, so an unchanged tree
@@ -176,13 +187,18 @@ struct ShareInboxWiringTests {
         try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
 
+        defer { try? FileManager.default.removeItem(at: root) }
+
         #expect(
-            ShareFolderListWriter.publish(documentsDirectory: documents, container: container),
-            "the first publish must write"
+            ShareFolderListWriter.publish(
+                documentsDirectory: documents, container: container, items: []
+            ) == .wrote
         )
         #expect(
-            !ShareFolderListWriter.publish(documentsDirectory: documents, container: container),
-            "an identical list must not be rewritten"
+            ShareFolderListWriter.publish(
+                documentsDirectory: documents, container: container, items: []
+            ) == .unchanged,
+            "an identical list must not be rewritten — and .unchanged is distinguishable from .failed"
         )
     }
 
@@ -195,11 +211,16 @@ struct ShareInboxWiringTests {
         try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
 
-        ShareFolderListWriter.publish(documentsDirectory: documents, container: container)
-        try FileManager.default.createDirectory(
-            at: documents.appendingPathComponent("Lectures"), withIntermediateDirectories: true
-        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        let lectures = documents.appendingPathComponent("Lectures")
 
-        #expect(ShareFolderListWriter.publish(documentsDirectory: documents, container: container))
+        ShareFolderListWriter.publish(documentsDirectory: documents, container: container, items: [])
+
+        #expect(
+            ShareFolderListWriter.publish(
+                documentsDirectory: documents, container: container,
+                items: [DialContent.Item(id: lectures.absoluteString, title: "Lectures", duration: 0, children: [])]
+            ) == .wrote
+        )
     }
 }

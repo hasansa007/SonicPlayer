@@ -24,77 +24,41 @@ enum ShareFolderListWriter {
     /// threaded one into the enumeration while the write went through Foundation directly, and no
     /// caller ever passed a substitute. A seam that works for part of the calls advertises a
     /// substitutability that is not there.
-    /// - Returns: whether it wrote. **Returned rather than inferred from the file**, because the
-    ///   first test of the skip asserted on modification dates and could not distinguish "not
-    ///   rewritten" from "never written" — `attributesOfItem` throws when the file is absent, and a
-    ///   thrown error and a failed expectation look identical in the results.
+    /// - Returns: what it did. **An enum, not a Bool, and the Bool was already the second attempt.**
+    ///   The first version compared file modification dates and could not tell "skipped" from "never
+    ///   wrote"; the Bool that replaced it collapsed *unchanged*, *encode failed* and *write failed*
+    ///   into one `false` — the same ambiguity, one layer along, and a test asserting `!publish(...)`
+    ///   passed green whether the file was healthy or had never been written at all.
     @discardableResult
-    static func publish(documentsDirectory: URL, container: URL) -> Bool {
+    static func publish(
+        documentsDirectory: URL, container: URL, items: [DialContent.Item]
+    ) -> Outcome {
         let fileManager = FileManager.default
-        let folders = ShareFolderList.folders(
-            under: documentsDirectory,
-            directories: directories(under: documentsDirectory, fileManager: fileManager)
-        )
-        guard let data = try? ShareFolderList.encode(folders) else { return false }
+        let folders = ShareFolderList.folders(under: documentsDirectory, items: items)
+        guard let data = try? ShareFolderList.encode(folders) else { return .failed }
 
         let destination = container.appendingPathComponent(ShareFolderList.fileName)
 
-        // **Skip the write when nothing changed, which is almost every time.** This runs on every
-        // scene phase; the folder tree changes maybe once a week. An atomic write creates a temp
-        // file and renames it in the shared container, so writing unconditionally meant four of
-        // those per app switch for identical bytes.
-        if let existing = try? Data(contentsOf: destination), existing == data { return false }
-        // Atomic, because the extension may be reading it at this moment — a share can start while
-        // the app is foregrounding. A torn read would show half a list or none.
-        // The container may not exist on a build without the entitlement, and `write` would fail
-        // silently. Creating it is cheap and makes the return value mean what it says.
+        // Skip the write when nothing changed, which is almost every time: this runs on every scene
+        // phase and the folder tree changes maybe once a week. An atomic write creates a temp file
+        // and renames it in the shared container, so writing unconditionally meant several of those
+        // per app switch for identical bytes.
+        if let existing = try? Data(contentsOf: destination), existing == data { return .unchanged }
+
         try? fileManager.createDirectory(at: container, withIntermediateDirectories: true)
         do {
             try data.write(to: destination, options: .atomic)
-            return true
+            return .wrote
         } catch {
-            return false
+            return .failed
         }
     }
 
-    /// Every directory under `documentsDirectory`, at any depth.
-    ///
-    /// Skips iOS's staging directory for the reason `FileManagerClient.listItems` does: it is a
-    /// queue the system owns, not a collection the user made, and offering it as a destination
-    /// would invite filing into something the app empties on `.background` (#41, ADR 0003).
-    ///
-    /// Hidden directories are skipped too — `.partial-` batches do not live here, but `.Trash` and
-    /// friends do turn up, and none of them are places a person files a lecture.
-    private static func directories(under documentsDirectory: URL, fileManager: FileManager) -> [URL] {
-        // **Descends directories instead of enumerating everything.** `FileManager.enumerator`
-        // visits every *file* too, with a `resourceValues` call each — so a library of five
-        // thousand recordings paid five thousand stats to find a handful of folders, on the main
-        // actor, inside the same background window ADR 0003 measured as too short to finish work in.
-        // Directories are typically a rounding error next to files, and `contentsOfDirectory` lets
-        // the recursion see only them.
-        var found: [URL] = []
-        var queue = [documentsDirectory]
-
-        while let directory = queue.popLast() {
-            let children = (try? fileManager.contentsOfDirectory(
-                at: directory,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles, .skipsPackageDescendants]
-            )) ?? []
-
-            for url in children {
-                guard (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
-                else { continue }
-                // iOS owns the staging directory — it is a queue the app empties on `.background`,
-                // not a collection the user made, so offering it as a destination would invite
-                // filing into something that gets deleted (#41, ADR 0003).
-                guard !ImportFilter.isStagingDirectory(url, under: documentsDirectory) else {
-                    continue
-                }
-                found.append(url)
-                queue.append(url)
-            }
-        }
-        return found
+    enum Outcome: Equatable, Sendable {
+        case wrote
+        case unchanged
+        /// Encoding or writing failed. The previous list stays in place and the picker degrades to
+        /// the root — the same direction every other decision in this feature takes.
+        case failed
     }
 }

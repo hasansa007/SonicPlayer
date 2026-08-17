@@ -189,6 +189,11 @@ final class ShareViewController: UIViewController {
     /// The batch is still dot-prefixed at this point, so the app would never have seen it — but
     /// leaving it would rely on the reaper an hour later. Removing it here is immediate and exact.
     @objc private func cancel() {
+        // **Symmetric with `begin`'s guard, and its absence was the same bug in the other door.**
+        // `begin` checks `picker != nil` precisely because two taps in one event batch would answer
+        // a context that permits one answer. Slice 3 added a second, SwiftUI-driven way in here —
+        // the picker's own close button — so a double-tap called `cancelRequest` twice.
+        guard !isCancelled else { return }
         isCancelled = true
 
         // **Deliberately does NOT delete the partial batch, and an earlier version did.**

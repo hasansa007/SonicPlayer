@@ -285,7 +285,7 @@ final class AppViewModel {
     /// a duplicate of a large file reads both in full on the main actor. An earlier comment here
     /// claimed the work was "renames within one volume", which is true only of the common case.
     private func drainShareInbox() {
-        guard !player.isImporting, let container = fileManager.shareInboxContainer() else { return }
+        guard let container = fileManager.shareInboxContainer() else { return }
         let documents = fileManager.documentsDirectory()
 
         // **Published here rather than on every tree change (#112 slice 3).** The extension cannot
@@ -296,8 +296,17 @@ final class AppViewModel {
         //
         // Before the drain, deliberately: the drain can create a destination directory, and the
         // list should describe the library the user last saw rather than one this pass just made.
-        ShareFolderListWriter.publish(documentsDirectory: documents, container: container)
+        // **Published before the import guard, not behind it.** `!player.isImporting` exists to keep
+        // the DRAIN off `Documents/` while `openFromFiles` is moving a file into it. Publishing only
+        // reads the in-memory tree and writes into a different container, so it inherited a
+        // restriction that had nothing to do with it — and the cost was silent: import a large
+        // folder, background the app, share from elsewhere, and the folder you just made is not
+        // offered for the rest of the session with nothing to say why.
+        ShareFolderListWriter.publish(
+            documentsDirectory: documents, container: container, items: home.libraryTree
+        )
 
+        guard !player.isImporting else { return }
         let result = InboxDrain.run(container: container, into: documents)
 
         // **Assigned on every drain, including the empty one.** An earlier version returned here

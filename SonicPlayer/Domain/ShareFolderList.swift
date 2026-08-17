@@ -41,51 +41,50 @@ enum ShareFolderList {
     static let rootTitle = MoveDestinations.rootTitle
     static let separator = MoveDestinations.separator
 
-    /// Every folder under `documentsDirectory`, flattened, root first.
+    /// Every folder the picker can offer, derived from the library tree the app already holds.
     ///
-    /// Takes the directory URLs rather than finding them, so the arithmetic — which is where the
-    /// escaping and the ordering live — is testable without a filesystem.
+    /// **Built from `MoveDestinations`, not from a filesystem walk — and the first version walked.**
+    /// That version cost four separate defects, all of which this deletes:
     ///
-    /// A URL that is not under `documentsDirectory` is dropped rather than producing a path that
-    /// climbs out of it, which is the same guard `ImportFilter.relativeDirectory` applies.
-    static func folders(under documentsDirectory: URL, directories: [URL]) -> [ShareFolder] {
+    /// - it recursed `Documents/` **synchronously on the main actor**, on both `.active` and
+    ///   `.background`, ahead of the drain — consuming the suspension window ADR 0003 measured as
+    ///   too short to finish work in, for every user including those who never share anything;
+    /// - it followed symlinks, so a link pointing at an ancestor looped forever and hung the app;
+    /// - it passed `.skipsPackageDescendants` to `contentsOfDirectory`, where that flag does
+    ///   nothing — it is honoured only by `FileManager.enumerator` — so a `.bundle`'s internals
+    ///   were offered as share destinations;
+    /// - it sorted alphabetically while the app's own Move screen sorts newest-first, so two
+    ///   screens showed the same folders in different orders while each cited the other for
+    ///   consistency.
+    ///
+    /// `home.libraryTree` is a complete tree, refreshed on the same `.active` transition, whose
+    /// folder ids **are** `url.absoluteString`. `MoveDestinations.all` already flattens it root-first
+    /// with this separator and this root title, because it answers this exact question for the Move
+    /// screen. Reusing it means the two screens cannot drift apart, which is what "read as one idea"
+    /// was supposed to mean.
+    ///
+    /// The only thing left to derive is the relative path, because the extension resolves against
+    /// its own idea of `Documents/` and must never be handed an absolute one.
+    static func folders(under documentsDirectory: URL, items: [DialContent.Item]) -> [ShareFolder] {
         let root = documentsDirectory.standardizedFileURL.resolvingSymlinksInPath()
         let prefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
 
-        let nested = directories
-            .map { $0.standardizedFileURL.resolvingSymlinksInPath() }
-            .compactMap { url -> ShareFolder? in
-                guard url.path.hasPrefix(prefix) else { return nil }
-                let relative = String(url.path.dropFirst(prefix.count))
-                guard !relative.isEmpty else { return nil }
-                return ShareFolder(
-                    path: relative.split(separator: "/").joined(separator: separator),
-                    relativePath: relative
-                )
+        return MoveDestinations.all(in: items).compactMap { destination in
+            guard let id = destination.id else {
+                return ShareFolder(path: destination.path, relativePath: "")   // the library root
             }
-            // **Sorted by path COMPONENTS, compared the way a reader would.**
-            //
-            // Two things were wrong with sorting the raw path string. Every character below `/`
-            // (0x2F) sorts before it — space, hyphen, dot — so `Lectures`, `Lectures 2024` and
-            // `Lectures/Week 1` came out in that order, putting an unrelated sibling between a
-            // parent and its own child. The flat list stops reading as a tree exactly where it
-            // matters most.
-            //
-            // And `<` on String compares unicode scalars, not language. This app ships nine
-            // locales and its author files things in Arabic; ordering those by scalar value is the
-            // kind of thing that looks fine to whoever wrote it and wrong to whoever uses it.
-            // `localizedStandardCompare` is what Finder uses, and it also gets `Lecture 2` before
-            // `Lecture 10`.
-            .sorted { left, right in
-                let a = left.relativePath.split(separator: "/")
-                let b = right.relativePath.split(separator: "/")
-                for (x, y) in zip(a, b) where x != y {
-                    return String(x).localizedStandardCompare(String(y)) == .orderedAscending
-                }
-                return a.count < b.count
-            }
+            // The id is a URL string; anything that does not resolve under Documents/ is dropped
+            // rather than turned into a path that climbs out of it — `ImportFilter`'s guard.
+            guard
+                let url = URL(string: id)?.standardizedFileURL.resolvingSymlinksInPath(),
+                url.path.hasPrefix(prefix)
+            else { return nil }
 
-        return [ShareFolder(path: rootTitle, relativePath: "")] + nested
+            return ShareFolder(
+                path: destination.path,
+                relativePath: String(url.path.dropFirst(prefix.count))
+            )
+        }
     }
 
     /// **Encode only — there is deliberately no `decode` here.**

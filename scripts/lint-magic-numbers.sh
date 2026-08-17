@@ -39,6 +39,7 @@ MIGRATED=(
   # — the one people actually run — blind to the whole new target, which is the exact hole the
   # SOURCE_ROOTS change was meant to close.
   "SonicPlayerShare/ShareViewController.swift"
+  "SonicPlayerShare/SharePickerView.swift"
 )
 
 # **Every source root, not the one named `SonicPlayer` (#112).**

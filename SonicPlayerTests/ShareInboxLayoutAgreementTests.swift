@@ -208,11 +208,21 @@ struct ShareInboxLayoutAgreementTests {
         let keys = Set(objects?.first?.keys.map { $0 } ?? [])
 
         #expect(keys == ["path", "relativePath"], "ShareFolder's wire shape changed.")
+
+        // **Name AND type.** The first version checked `contains("var \(key):")`, which passes for
+        // `var path: Int`, for `var path: String?`, and for a type that maps the key away with
+        // `CodingKeys` — so renaming a field to the wrong type would ship a picker whose decode
+        // always fails, falls back to root-only, and leaves this suite green. That is the exact
+        // silent disagreement it exists to make impossible.
         for key in keys {
             #expect(
-                source.contains("var \(key):"),
-                "SharePickerFolder has no `\(key)`, so it cannot decode what the app writes."
+                source.contains("var \(key): String"),
+                "SharePickerFolder has no `var \(key): String`, so it cannot decode what the app writes as one."
             )
         }
+        #expect(
+            !source.contains("CodingKeys"),
+            "SharePickerFolder remaps its coding keys, so matching property names no longer proves it decodes the app's JSON."
+        )
     }
 }
