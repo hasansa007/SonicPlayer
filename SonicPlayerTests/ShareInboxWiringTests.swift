@@ -128,4 +128,99 @@ struct ShareInboxWiringTests {
 
         #expect(app.shareImportPending.isEmpty)
     }
+
+    // MARK: - Publishing the folder list (slice 3)
+
+    /// Nothing covered the writer at all: not that `folders.json` is produced, not that iOS's
+    /// staging directory is kept out of it. Deleting the `isStagingDirectory` guard would offer the
+    /// user a destination the app empties on `.background` (#41, ADR 0003) with the suite green.
+    @MainActor
+    @Test func becomingActivePublishesTheFolderList() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Publish-\(UUID().uuidString)")
+        let container = root.appendingPathComponent("group")
+        let documents = root.appendingPathComponent("Documents")
+        try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+        for folder in ["Lectures", "Lectures/Week 1", "Inbox"] {
+            try FileManager.default.createDirectory(
+                at: documents.appendingPathComponent(folder), withIntermediateDirectories: true
+            )
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+        let app = makeApp(documents: documents, container: container)
+        // The list now comes from the in-memory tree, so the tree is what the test supplies.
+        app.home.libraryTree = [
+            DialContent.Item(
+                id: documents.appendingPathComponent("Lectures").absoluteString,
+                title: "Lectures", duration: 0,
+                children: [
+                    DialContent.Item(
+                        id: documents.appendingPathComponent("Lectures/Week 1").absoluteString,
+                        title: "Week 1", duration: 0, children: []
+                    )
+                ]
+            )
+        ]
+
+        app.scenePhaseChanged(.active)
+
+        let data = try Data(
+            contentsOf: container.appendingPathComponent(ShareFolderList.fileName)
+        )
+        let published = try JSONDecoder().decode([ShareFolder].self, from: data)
+
+        #expect(published.map(\.relativePath) == ["", "Lectures", "Lectures/Week 1"])
+    }
+
+    /// The list changes maybe once a week and this runs on every scene phase, so an unchanged tree
+    /// must not keep rewriting the shared container.
+    ///
+    /// **Asserts the writer's own answer, not the file's timestamp.** The first version compared
+    /// modification dates, which cannot tell "skipped the write" from "never wrote at all" — and
+    /// when it failed, `attributesOfItem` was throwing on a missing file, reported identically to a
+    /// failed expectation. Two hypotheses, one signal, and I spent three runs on the wrong one.
+    @Test func anUnchangedTreeIsNotRepublished() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Publish-\(UUID().uuidString)")
+        let container = root.appendingPathComponent("group")
+        let documents = root.appendingPathComponent("Documents")
+        try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        #expect(
+            ShareFolderListWriter.publish(
+                documentsDirectory: documents, container: container, items: []
+            ) == .wrote
+        )
+        #expect(
+            ShareFolderListWriter.publish(
+                documentsDirectory: documents, container: container, items: []
+            ) == .unchanged,
+            "an identical list must not be rewritten — and .unchanged is distinguishable from .failed"
+        )
+    }
+
+    /// A new folder must reach the picker on the next scene phase.
+    @Test func aChangedTreeIsRepublished() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Publish-\(UUID().uuidString)")
+        let container = root.appendingPathComponent("group")
+        let documents = root.appendingPathComponent("Documents")
+        try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+
+        defer { try? FileManager.default.removeItem(at: root) }
+        let lectures = documents.appendingPathComponent("Lectures")
+
+        ShareFolderListWriter.publish(documentsDirectory: documents, container: container, items: [])
+
+        #expect(
+            ShareFolderListWriter.publish(
+                documentsDirectory: documents, container: container,
+                items: [DialContent.Item(id: lectures.absoluteString, title: "Lectures", duration: 0, children: [])]
+            ) == .wrote
+        )
+    }
 }

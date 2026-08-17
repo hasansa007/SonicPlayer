@@ -90,19 +90,33 @@ predicate on `public.audio` is used instead, and its filtering is verified in bo
 
 ## What is live and what is intent
 
-**Live as of slices 1 and 2.** The target is embedded in `PlugIns/`, registered as a
+**Live as of slices 1, 2 and 3.** The target is embedded in `PlugIns/`, registered as a
 `com.apple.share-services` extension, and appears in the share sheet for a share containing audio.
-It **copies the audio attachments into the queue and commits the batch with an atomic rename**; the
-app drains it on `.active` or `.background` and files everything at the library root. **It still has
-no picker and no library access**, which is the property that makes it safe.
+It **asks which folder**, copies the audio into the queue, and commits the batch with an atomic
+rename; the app drains it on `.active` or `.background` and files it where you chose. **It still has
+no library access** — it is handed a list of folder names and nothing else — which is the property
+that makes it safe.
 
-**The extension shows a spinner and a close button — and ships no strings.** The first attempt drew
-nothing at all, reasoning that a screen needs strings and localisation is slice 5. Right about
-strings, wrong about the consequence: a share of thirty lectures that iCloud must download first
-left a blank sheet for tens of seconds with no progress and no way out, which is worse than the stub
-it replaced. `UIActivityIndicatorView` and `UIButton(type: .close)` give an exit with a
-system-localised label and no words of ours. Anything worth *saying* is still the app's job, once it
-has filed the files. Slice 3's picker brings the first strings; slice 5 translates them.
+**The picker doubles as the confirmation, and that was not the original reason for it.** Slice 2
+shipped a silent extension, and the first real share left the user with nothing to look at: share,
+see nothing, open the app to find out. That is the deferred-work problem this ADR rejected the
+silent options over, reintroduced by accident under a *localisation* justification — nobody noticed
+it was also a feedback decision. Choosing a folder answers "did that work?" at no extra screen.
+
+**It ships no strings of its own — with one exception that is worse than "inherited".** The picker
+has no title and no labels; `UIButton(type: .close)` carries Apple's glyph and its own localised
+label. The one word displayed is the library root, `"Library"`.
+
+That word is untranslated on the app's Move screen already, and the first version of this paragraph
+called it a pre-existing gap the picker merely inherits. **That defence does not hold**, and review
+caught it: the Move screen sits in the app target, where `Localizable.xcstrings` exists and the
+string could be translated tomorrow. `ShareInboxLayout.rootTitle` is a **new declaration in a target
+that has no catalogue at all** — so this extends the gap rather than inheriting it, into the one
+place a first-time user of the feature is guaranteed to look.
+
+It is accepted for slice 3 because giving the extension a catalogue is slice 5's work and doing it
+here would be that slice done badly. **Slice 5 owns both halves**: the extension's catalogue, and
+`MoveDestinations.rootTitle` in the app.
 
 Two precisions, because the looser phrasings were both wrong. The rule is **"at least one attachment
 is audio"**, not "every attachment" — a mixed selection activates it, and slice 2 must therefore
@@ -134,14 +148,32 @@ caught only by review:
 What remains is a spinner and `UIButton(type: .close)`: a system glyph whose accessibility label
 Apple localises into every language the OS ships.
 
-**Two deviations from CLAUDE.md ARE live and are recorded here rather than only in a comment.**
+**One deviation from CLAUDE.md is live; the SwiftUI one closed at slice 3.**
 
-`ShareViewController` builds `UIActivityIndicatorView`, `UIButton` and four `NSLayoutConstraint`s
-directly, against *"SwiftUI only (no UIKit views)"*. An earlier version hosted a SwiftUI body in a
-`UIHostingController` child, and that was the better shape for a screen with content — but what is
-left is two system controls and their constraints, and hosting SwiftUI to place two system controls
-inverts the cost. Revisit at slice 3, when the picker gives the extension a real view worth writing
-in SwiftUI.
+The picker is `SharePickerView`, SwiftUI in a `UIHostingController`, as this paragraph said it
+should be once the extension had a view worth writing that way. What remains UIKit is the shell —
+`NSExtensionPrincipalClass` requires a `UIViewController` — plus a spinner for the copying phase.
+
+**One boundary was learned the expensive way, and it is the useful part of this entry.** The close
+button began in the UIKit shell, constrained against the shell's view, with the hosted list
+constrained below it. On device it rendered halfway down the sheet and pushed the list off the
+bottom. Three layout guides were tried before the guide was ruled out as the cause: the problem was
+**two layout systems driving one screen** — UIKit constraints resolving against a hierarchy SwiftUI
+was independently sizing. Nothing about the guides was wrong.
+
+So the rule for this target: **once a phase is SwiftUI, everything in that phase is SwiftUI.** The
+close button is a `safeAreaInset` inside `SharePickerView`, which lets SwiftUI place the bar, inset
+the list beneath it, and honour the sheet's real safe area — none of which the shell could see. It
+wraps `UIButton(type: .close)` in a `UIViewRepresentable` only because `Button(role: .close)` is
+iOS 26+ and this app targets 18.0, so that is the only route to Apple's glyph and its nine
+translations without writing a string.
+
+**A third string question was settled at slice 3 and is worth writing down.** The picker shows no
+title, no labels and no prose: a title would be a user-facing string, this target has no string
+catalogue until slice 5, and anything written here ships as English in all nine locales. The one
+word it does display is `MoveDestinations.rootTitle` — `"Library"` — which the app already shows
+untranslated on its own Move screen. That is a **pre-existing gap the picker inherits rather than
+creates**, and slice 5 owns both halves of it.
 
 `nonClashing` restates `UniqueNameResolver`'s `" 2"`, `" 3"` scheme, because the extension cannot
 see the app's sources. Unlike the queue constants, **this duplicate is not covered by

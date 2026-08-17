@@ -248,7 +248,7 @@ extension target or shared deliberately. This is the largest single item that is
 | Storage full | The copy throws, the row states *no space*, the file stays queued. No `try?` swallowing it (#33). |
 | Killed mid-drain | Moved files are in the library, the rest are still queued, next activation resumes. |
 | Share while app is draining | Batch isolation plus the atomic rename; the drain cannot see a partial batch. |
-| Destination folder deleted meanwhile | Exception row; the user re-picks. The only case that makes the review screen mandatory. |
+| Destination folder deleted meanwhile | **Recreated and filed into** — decided at slice 3, reversing the row above it. `InboxDrain` calls `createDirectory` unconditionally, so a folder deleted between the pick and the drain reappears holding the file. It honours what the user asked for at share time, and a folder coming back is at least visible; the alternative resurrects nothing but leaves the file somewhere they did not choose. This row previously read *"Exception row; the user re-picks. The only case that makes the review screen mandatory"* — that was written when slice 2 always used the root and the case could not fire. Slice 3 made it reachable and the decision went the other way. |
 | Manifest missing or corrupt | Treated as *no destination chosen* — falls back to the library root as an exception row, never discarded. |
 | `folders.json` missing | Fresh install, or the app has not run since the group was created. The picker shows the library root alone and still works; it is a degraded list, never a blocked share. |
 | Non-audio past the activation rule | Row states *not audio*, defaults to skipped, is not deleted silently. |
@@ -320,6 +320,9 @@ Order chosen so the riskiest thing is proven first and nothing is built on an un
    `ShareInboxLayoutAgreementTests`. Removing the `SHARE-EXTENSION-STUB` marker here is what
    unblocks TestFlight, which slice 1's guard had deliberately closed.
 3. **The picker.** `folders.json`, the extension's folder screen, the destination honoured.
+   ← **in progress on `gh-112-share-picker`.** Flat, not browsable, inheriting `MoveDestinations`'
+   reasoning rather than re-deciding it. SwiftUI in a `UIHostingController`, which closes one of
+   ADR 0004's two recorded deviations.
    **It also carries a requirement slice 2 discovered on device (2026-08-17): the share must confirm
    itself.** Slice 2 shows a spinner and exits, the app does not open, and nothing tells you whether
    it worked — you share and then go looking. That is the deferred-work problem §4 rejected the

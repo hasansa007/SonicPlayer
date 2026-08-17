@@ -160,4 +160,69 @@ struct ShareInboxLayoutAgreementTests {
             "ShareViewController.nonClashing no longer builds names as `<base> <n>.<ext>`, which is the shape UniqueNameResolver produces inside the library."
         )
     }
+
+    // MARK: - The picker's contract (slice 3)
+
+    /// The extension reads the folder list from a filename the app chooses, and decodes a shape the
+    /// app produces. Both are restated across the target boundary, so both belong here.
+    @Test func bothSidesAgreeOnTheFolderListFile() throws {
+        let layout = try Self.source("SonicPlayerShare/ShareInboxLayout.swift")
+        #expect(
+            Self.literal("folderListFileName", in: layout) == ShareFolderList.fileName,
+            "The extension reads a different filename from the one the app writes, so the picker would show only the root and never say why."
+        )
+    }
+
+    /// **The root's name is a fourth cross-target duplicate**, and it is the one shown on the
+    /// fresh-install path — where no published list exists yet. A literal here would silently
+    /// disagree with every published list the moment slice 5 localises the app's `rootTitle`.
+    @Test func bothSidesCallTheLibraryRootTheSameThing() throws {
+        let layout = try Self.source("SonicPlayerShare/ShareInboxLayout.swift")
+        #expect(
+            Self.literal("rootTitle", in: layout) == ShareFolderList.rootTitle,
+            "The picker's fresh-install fallback names the library root differently from every list the app publishes."
+        )
+    }
+
+    /// The extension's `loadFolders` is the **only** reader of `folders.json` that ships, and it is
+    /// in a target this suite cannot link — so its fallback policy is asserted by reading it.
+    /// Without this, dropping a guard there breaks a corrupt-file share and every test still passes.
+    @Test func theExtensionsFallbackStillDegradesToTheRoot() throws {
+        let source = try Self.source("SonicPlayerShare/ShareViewController.swift")
+        for clause in ["try? Data(", "try? JSONDecoder().decode", "!folders.isEmpty", "return [root]"] {
+            #expect(
+                source.contains(clause),
+                "loadFolders no longer guards with `\(clause)`; a missing, corrupt or empty list must still offer the library root rather than blocking the share."
+            )
+        }
+    }
+
+    /// `SharePickerFolder` decodes what `ShareFolder` encodes. The JSON keys are the contract, and
+    /// a rename on either side turns every folder into a silent root-only picker.
+    @Test func thePickerDecodesWhatTheAppEncodes() throws {
+        let source = try Self.source("SonicPlayerShare/SharePickerView.swift")
+        let encoded = try ShareFolderList.encode(
+            [ShareFolder(path: "Lectures", relativePath: "Lectures")]
+        )
+        let objects = (try? JSONSerialization.jsonObject(with: encoded)) as? [[String: Any]]
+        let keys = Set(objects?.first?.keys.map { $0 } ?? [])
+
+        #expect(keys == ["path", "relativePath"], "ShareFolder's wire shape changed.")
+
+        // **Name AND type.** The first version checked `contains("var \(key):")`, which passes for
+        // `var path: Int`, for `var path: String?`, and for a type that maps the key away with
+        // `CodingKeys` — so renaming a field to the wrong type would ship a picker whose decode
+        // always fails, falls back to root-only, and leaves this suite green. That is the exact
+        // silent disagreement it exists to make impossible.
+        for key in keys {
+            #expect(
+                source.contains("var \(key): String"),
+                "SharePickerFolder has no `var \(key): String`, so it cannot decode what the app writes as one."
+            )
+        }
+        #expect(
+            !source.contains("CodingKeys"),
+            "SharePickerFolder remaps its coding keys, so matching property names no longer proves it decodes the app's JSON."
+        )
+    }
 }

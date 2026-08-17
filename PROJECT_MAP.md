@@ -26,7 +26,7 @@ has been wrong before.
 | State | `@Observable` MVVM. No reducers, no `Store` — TCA removed in #20 |
 | Persistence | `UserDefaults` (`@AppStorage`) for preferences; `SessionStore` → `session.json` for playback session |
 | Media | AVFoundation, MediaPlayer (lock screen / remote commands) |
-| Tests | Swift Testing (`@Suite`/`@Test`/`#expect`) — **never XCTest** (#27). 63 files, 536 cases |
+| Tests | Swift Testing (`@Suite`/`@Test`/`#expect`) — **never XCTest** (#27). 64 files, 550 cases |
 | Dependencies | **None.** `Package.resolved` pins zero packages |
 | Targets | **Three** — `SonicPlayer` (app), `SonicPlayerShare` (share extension, #112), `SonicPlayerTests`. The extension is embedded in `PlugIns/` and shares `group.com.hasan.sonicplayer` |
 | Localization | `Localizable.xcstrings`, 177 keys × 9 languages (en, es, fr, ar, zh-Hans, hi, pt, ru, bn) |
@@ -184,7 +184,13 @@ which left a blank sheet for the length of an iCloud download with no way out;
 `UIButton(type: .close)` is a system glyph with a system-localised label, so the exit costs no
 words of ours. Slice 5's nine translations still go entirely on the picker's real copy.
 
-Not built — slices 3–5: `folders.json` and the picker, the exception screen, localisation.
+**Slice 3 added the picker.** The app publishes `group/folders.json` on every scene phase, beside
+the drain — `ShareFolderList` decides its shape, `ShareFolderListWriter` walks `Documents/` — and
+the extension shows a flat SwiftUI list of those folders. Choosing one writes it into the batch
+manifest, which the drain already honoured. **The picker is also the confirmation**: slice 2 shipped
+silence and the first real share left the user with nothing to look at.
+
+Not built — slices 4–5: the exception screen that renders `shareImportPending`, and localisation.
 `AppViewModel.shareImportPending` is populated and read by nothing; it is the seam slice 4 uses. Not every entry is retryable — `.notAudio` and `.failed` are still queued, `.abandoned` and `.notAccepted` describe files already gone.
 
 **`test_becomingActiveOrInactive_neverDrains` was renamed** to `…neverDrainsTheStagingDirectory`.
