@@ -24,8 +24,17 @@ import SwiftUI    // ScenePhase only — this type renders nothing.
 /// `scenePhaseChanged`, when to drain iOS's staging directory. That is app housekeeping no feature
 /// owns — draining belongs to neither the player nor the browser — and its two conditions
 /// (`.background` only, and never while an import is in flight) are lifecycle facts rather than
-/// domain rules, so `Domain/` would not hold them either. ADR 0003 has the reasoning. If a second
-/// such thing appears, that is the signal this rule needs revisiting rather than another exception.
+/// domain rules, so `Domain/` would not hold them either. ADR 0003 has the reasoning.
+///
+/// **A second such thing appeared (#112), and this paragraph said that was the signal to revisit the
+/// rule rather than add another exception.** The share queue drains here too. What the revisit
+/// concluded: the *placement* is right for the same reason the first one is — draining is app
+/// housekeeping no feature owns, and its conditions are lifecycle facts. What was wrong was the
+/// *layering*: the first version reached `FileManager.containerURL` straight from here, bypassing
+/// the client the staging drain goes through, which is why a bespoke test seam had to be invented
+/// and why the pre-existing suite silently drained the real container. Both now go through
+/// `FileManagerClient`. A third lifecycle exception should extract all of it rather than repeat
+/// this.
 @MainActor
 @Observable
 final class AppViewModel {
@@ -246,13 +255,65 @@ final class AppViewModel {
         // so a deliberate background from inside a list does not cost you your place — see
         // `DialViewModel.showNowPlayingIfIdle`.
         if phase == .active {
+            drainShareInbox()
             refreshDial()
             dial.showNowPlayingIfIdle()
         }
 
         guard phase == .background, !player.isImporting else { return }
+        drainShareInbox()
         try? fileManager.drainStagingDirectory()
     }
+
+    /// Files anything the share extension queued, and refreshes the library if it landed.
+    ///
+    /// **Called from `.active` and `.background` only — not `.inactive`, and that was a review
+    /// finding.** The first version put this call above the phase checks, so it also ran on every
+    /// transient interruption: a Control Centre pull, an incoming call, both legs of every app
+    /// switch. The comment above it claimed "BOTH phases" while the code did three, and a single
+    /// app switch could run the drain four times.
+    ///
+    /// **Why two phases and not ADR 0003's one.** That ADR puts the *staging* drain on `.background`
+    /// alone because a launch-time drain races `.onOpenURL` — launching by opening a file is exactly
+    /// when a staged file is waiting. The App Group queue has no such hand-off, so there is no race
+    /// to lose, and `.background` alone would hide a share until you had opened *and then left* the
+    /// app. Affordable because the drain is idempotent: a batch is invisible until the extension
+    /// renames it into place, and each file leaves the queue as it lands. See ADR 0004.
+    ///
+    /// Synchronous, because ADR 0003 measured that a `Task` does not run before the app suspends.
+    /// **That is not free:** `OpenInImport` compares bytes when a same-named file already exists, so
+    /// a duplicate of a large file reads both in full on the main actor. An earlier comment here
+    /// claimed the work was "renames within one volume", which is true only of the common case.
+    private func drainShareInbox() {
+        guard !player.isImporting, let container = fileManager.shareInboxContainer() else { return }
+        let result = InboxDrain.run(container: container, into: fileManager.documentsDirectory())
+
+        // **Assigned on every drain, including the empty one.** An earlier version returned here
+        // when the result was empty, which meant a pending entry outlived the thing it described:
+        // the reaper removes an abandoned batch and reports it once, the next drain finds nothing,
+        // and the old entry sat there for the process lifetime — promising, in its own doc comment,
+        // a retry that could never happen. Slice 4 would have rendered a file that no longer exists.
+        if shareImportPending != result.pending { shareImportPending = result.pending }
+        guard !result.isEmpty else { return }
+
+        if !result.imported.isEmpty {
+            home.loadAllFiles()
+        }
+    }
+
+    /// What the share queue could not place — kept as state rather than logged, because the app
+    /// uses no logger anywhere and this is the seam slice 4's exception screen reads.
+    ///
+    /// **Not all of these are retryable, and the screen must not imply they are.** `.notAudio` and
+    /// `.failed` are still in the queue and get another attempt on the next phase change;
+    /// `.abandoned` and `.notAccepted` describe files that are already gone.
+    ///
+    /// Read by nothing yet: slice 4 of #112 owns the screen. Present now because the drain has to
+    /// put them somewhere, and dropping them on the floor is the failure this design keeps
+    /// legislating against. **Assigned only when it changes**, because the drain runs on every
+    /// `.active` and `.background` and a batch holding one non-audio file is re-reported every
+    /// time — an unconditional write to an `@Observable` property invalidates observers forever.
+    private(set) var shareImportPending: [InboxDrain.Result.Pending] = []
 
     // MARK: - Wiring
 

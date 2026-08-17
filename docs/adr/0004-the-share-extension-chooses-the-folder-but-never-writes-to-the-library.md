@@ -90,10 +90,19 @@ predicate on `public.audio` is used instead, and its filtering is verified in bo
 
 ## What is live and what is intent
 
-**Live as of this ADR — slice 1 only.** The target exists, is embedded in `PlugIns/`, is registered
-with the system as a `com.apple.share-services` extension, and appears in the share sheet's app row
-for a share containing audio. It shows a stub and cancels the request. **It has no queue, no picker
-and no library access.**
+**Live as of slices 1 and 2.** The target is embedded in `PlugIns/`, registered as a
+`com.apple.share-services` extension, and appears in the share sheet for a share containing audio.
+It **copies the audio attachments into the queue and commits the batch with an atomic rename**; the
+app drains it on `.active` or `.background` and files everything at the library root. **It still has
+no picker and no library access**, which is the property that makes it safe.
+
+**The extension shows a spinner and a close button — and ships no strings.** The first attempt drew
+nothing at all, reasoning that a screen needs strings and localisation is slice 5. Right about
+strings, wrong about the consequence: a share of thirty lectures that iCloud must download first
+left a blank sheet for tens of seconds with no progress and no way out, which is worse than the stub
+it replaced. `UIActivityIndicatorView` and `UIButton(type: .close)` give an exit with a
+system-localised label and no words of ours. Anything worth *saying* is still the app's job, once it
+has filed the files. Slice 3's picker brings the first strings; slice 5 translates them.
 
 Two precisions, because the looser phrasings were both wrong. The rule is **"at least one attachment
 is audio"**, not "every attachment" — a mixed selection activates it, and slice 2 must therefore
@@ -104,30 +113,42 @@ excluding it would hide the app from the long-form audio this feature exists for
 the argument used to reject the dictionary activation rule above, and the difference is scale: the
 dictionary rule offers Sonic Player for a share of PDFs with no audio in it at all.
 
-**A localisation exception is accepted here, and is recorded rather than argued in a comment.**
-CLAUDE.md requires every user-facing string to go through `Localizable.xcstrings` in nine languages,
-without exceptions. The stub's two strings are English literals. Translating a dead end would make it
-look like a finished feature, and the nine translations belong on the picker's real copy in slice 5
-against final wording. **The condition that ends the exception:** the `SHARE-EXTENSION-STUB` marker
-leaving `ShareViewController.swift`, which is also what the `distribute.yml` guard keys on — so the
-exception cannot outlive the stub without a release failing.
+**The localisation exception has ENDED, and this paragraph replaces the one that granted it.** It
+read, in the present tense, that the stub's two English strings were an accepted deviation and that
+*"the condition that ends the exception"* was the `SHARE-EXTENSION-STUB` marker leaving
+`ShareViewController.swift`. Slice 2 deleted both the strings and the marker. The exception is over,
+and leaving its text standing would have described a live exemption that no longer applies — the
+failure CLAUDE.md names about intentions written in the present tense.
 
-**Intent, not built:** `folders.json`, the manifest, the atomic-rename batch commit, `InboxDrain`,
-`ImportInbox`, the picker UI, the exception screen, and localisation. Slices 2–5 in
-`docs/superpowers/specs/2026-08-14-share-import-design.md` §11.
+**The extension now ships no user-facing strings at all**, which is what makes that end-state
+honest rather than merely declared. Three would-be strings were removed on the way here, each
+caught only by review:
 
-**Proven, and it was not free.** `group.com.hasan.sonicplayer` was registered in the developer portal
-on 2026-08-15 and enabled on both App IDs, and a `dry_run` of `distribute.yml` then archived, signed
-and exported. The evidence is in the artifact rather than in the green tick: the exported `.ipa`
-carries `PlugIns/SonicPlayerShare.appex`, both bundles at `3.0.0 (26)`, and
-`com.apple.security.application-groups → group.com.hasan.sonicplayer` in the **signed** entitlements
-of both binaries.
+- `ShareError` conformed to `LocalizedError` with an English sentence the host app displays. It is a
+  plain `Error` now; the host shows its own generic failure for a case that should not happen.
+- Rejected attachments with no `suggestedName` were recorded as `"a shared file"` — an English
+  literal written into the manifest and destined for slice 4's screen. The extension now records an
+  empty marker and the app decides what to render, where the string catalogue is.
+- The stub screen's label and button, deleted with the stub.
 
-Getting there took five runs and cost nothing recoverable, which is the argument for shipping the
-target empty restated. `-allowProvisioningUpdates` cannot create an App Group; Xcode reports the
-resulting refusal as `Authentication failed`, which sends you to debug a credential that is fine; and
-the account had silently filled its 12-certificate cap with one `Created via API` certificate per CI
-run. All three are written up in `docs/deploy-and-staging.md`, and the last two are #114 and #115.
+What remains is a spinner and `UIButton(type: .close)`: a system glyph whose accessibility label
+Apple localises into every language the OS ships.
+
+**Two deviations from CLAUDE.md ARE live and are recorded here rather than only in a comment.**
+
+`ShareViewController` builds `UIActivityIndicatorView`, `UIButton` and four `NSLayoutConstraint`s
+directly, against *"SwiftUI only (no UIKit views)"*. An earlier version hosted a SwiftUI body in a
+`UIHostingController` child, and that was the better shape for a screen with content — but what is
+left is two system controls and their constraints, and hosting SwiftUI to place two system controls
+inverts the cost. Revisit at slice 3, when the picker gives the extension a real view worth writing
+in SwiftUI.
+
+`nonClashing` restates `UniqueNameResolver`'s `" 2"`, `" 3"` scheme, because the extension cannot
+see the app's sources. Unlike the queue constants, **this duplicate is not covered by
+`ShareInboxLayoutAgreementTests`** — it polices the layout literals and the accepted extensions and
+nothing about naming. The scheme has drifted before (`UniqueNameResolver` absorbed seven copies of
+it), so this is a known, unguarded risk rather than an oversight; the two names never meet, since
+one resolves within a batch and the other within the library, which is why it is tolerated for now.
 
 ## Consequences
 

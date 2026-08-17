@@ -1,6 +1,6 @@
 # Share Import — audio from any app, filed where you want it
 
-**Status:** DESIGN — approved in brainstorm, filed as an epic, not yet sliced.
+**Status:** IN PROGRESS — slice 1 merged (PR #113), slice 2 on `gh-112-share-queue`. Slices 3–5 outstanding.
 **Date:** 2026-08-14
 **Relates to:** [#112](https://github.com/hasansa007/SonicPlayer/issues/112) — share import epic (`P2`, `ops`)
 **Adjacent:** [#7](https://github.com/hasansa007/SonicPlayer/issues/7) · [#8](https://github.com/hasansa007/SonicPlayer/issues/8) · [#9](https://github.com/hasansa007/SonicPlayer/issues/9) — StudyHub, which owns remote content
@@ -310,11 +310,27 @@ Order chosen so the riskiest thing is proven first and nothing is built on an un
 
 1. **The empty target, signed.** `SonicPlayerShare` doing nothing but appearing in the share sheet,
    plus the App Group on both, plus the extended version guard. Proven by a **dry-run workflow**.
-   ← **in progress on `gh-112-share-import`**, chosen at Phase 5 because a signing failure is the
-   only cost here that cannot be undone: a rejected upload burns a build number permanently.
+   ← **done**, merged in PR #113. Chosen first because a signing failure is the only cost in this
+   epic that cannot be undone, and it earned it: the App Group needed portal registration CI cannot
+   do, the account had silently filled its 12-certificate cap, and the build number was stale.
 2. **The queue.** Extension copies files to the inbox with a root-destination manifest; `InboxDrain`
    and the `Domain/` types file them. No picker yet — everything lands at the library root.
+   ← **in progress on `gh-112-share-queue`.** The extension shows a spinner and a system close
+   button, so no strings of ours ship ahead of slice 5. The queue contract is stated in both targets and policed by
+   `ShareInboxLayoutAgreementTests`. Removing the `SHARE-EXTENSION-STUB` marker here is what
+   unblocks TestFlight, which slice 1's guard had deliberately closed.
 3. **The picker.** `folders.json`, the extension's folder screen, the destination honoured.
+   **It also carries a requirement slice 2 discovered on device (2026-08-17): the share must confirm
+   itself.** Slice 2 shows a spinner and exits, the app does not open, and nothing tells you whether
+   it worked — you share and then go looking. That is the deferred-work problem §4 rejected the
+   silent options over, reintroduced as an interim state, and it was recorded as a *localisation*
+   trade without anyone noticing it was a *feedback* trade too. The picker closes it for free: you
+   see your folders and tap one, and that act is the confirmation. **Do not ship slice 3 with the
+   picker but no acknowledgement** — that would leave the gap while spending the strings.
+
+   Note what is NOT available as a fix: launching the containing app from the extension. Apple
+   provides no supported route, and the responder-chain workaround is not something to ship on a
+   live App Store listing.
 4. **The exception screen.** Duplicates, non-audio, failures, missing destination.
 5. **Localization** across nine languages, RTL verified.
 

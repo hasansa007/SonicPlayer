@@ -20,11 +20,28 @@ struct FileManagerClient: Sendable {
     /// `.onOpenURL` import may be in flight over the same directory.
     var drainStagingDirectory: @Sendable () throws -> Void
     var documentsDirectory: @Sendable () -> URL = { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
+
+    /// The share extension's App Group container, or nil when the entitlement is absent (#112).
+    ///
+    /// **Here rather than as a closure on `AppViewModel`, and that placement was a review finding.**
+    /// The first version reached `FileManager.containerURL` directly from the view model, which
+    /// meant the only way to stop a test draining the *real* container into the *real* Documents
+    /// directory was to remember to override a bespoke seam — and the pre-existing suite did not.
+    /// The unit-test bundle is hosted by the app, which carries the entitlement, so that lookup
+    /// succeeded and any test calling `scenePhaseChanged` moved whatever a developer had actually
+    /// shared. Routing it through the client makes `.test` safe by construction instead.
+    ///
+    /// CLAUDE.md's layering table already said so: a Client is warranted when code touches a system
+    /// framework or the filesystem.
+    var shareInboxContainer: @Sendable () -> URL? = { nil }
 }
 
 extension FileManagerClient {
     static let live: FileManagerClient = {
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let shareInboxContainer = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: ShareInbox.appGroupIdentifier
+        )
 
         @Sendable func stableAudioID(for url: URL) -> UUID {
             let path = url.standardizedFileURL.path
@@ -266,7 +283,11 @@ extension FileManagerClient {
                     try FileManager.default.removeItem(at: item)
                 }
             },
-            documentsDirectory: { documentsDirectory }
+            documentsDirectory: { documentsDirectory },
+            // Resolved once, not per call. `containerURL` is a synchronous cross-process lookup and
+            // the value is fixed for the process lifetime; the drain runs on every scene phase
+            // change, so re-asking was several IPCs per app switch on the main actor.
+            shareInboxContainer: { shareInboxContainer }
         )
     }()
 }

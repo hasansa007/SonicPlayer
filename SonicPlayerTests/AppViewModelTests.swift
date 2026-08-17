@@ -231,8 +231,15 @@ struct AppViewModelTests {
         #expect(!drained.withLock { $0 }, "An in-flight import outranks the drain (#41).")
     }
 
+    /// **Narrowed at #112 slice 2, because its old name over-claimed.** It was
+    /// `test_becomingActiveOrInactive_neverDrains`, asserting that nothing drains before
+    /// `.background`. That is true of *iOS's staging directory* and is ADR 0003's rule — a
+    /// launch-time drain races `.onOpenURL`. It is deliberately false of the share queue, which
+    /// drains on `.active` too (ADR 0004): nothing delivers those files through `.onOpenURL`, so
+    /// there is no race, and `.background` alone would hide a share until you had opened *and then
+    /// backgrounded* the app.
     @MainActor
-    @Test func test_becomingActiveOrInactive_neverDrains() {
+    @Test func test_becomingActiveOrInactive_neverDrainsTheStagingDirectory() {
         let drained = Mutex(false)
         var fileManager = FileManagerClient.test
         fileManager.drainStagingDirectory = { drained.withLock { $0 = true } }
@@ -241,7 +248,7 @@ struct AppViewModelTests {
         app.scenePhaseChanged(.active)
         app.scenePhaseChanged(.inactive)
 
-        #expect(!drained.withLock { $0 }, "Only backgrounding may drain — anything earlier races the open (#41).")
+        #expect(!drained.withLock { $0 }, "Only backgrounding may drain iOS's staging directory — anything earlier races the open (#41).")
     }
 
     private func audioFile(at url: URL) -> AudioFile {

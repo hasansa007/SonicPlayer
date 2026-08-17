@@ -10,3 +10,8 @@ xcuserdata/
 
 # Superpowers brainstorming scratch
 .superpowers/
+
+# Screenshots, mocks and scratch captures. Some are tracked deliberately (27 files
+# predate this); new ones are NOT swept in by a stray `git add -A` — that happened
+# twice on #112 and cost 60 MB each time. Add intentional ones with `git add -f`.
+artifacts/
