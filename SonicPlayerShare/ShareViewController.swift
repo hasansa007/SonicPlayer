@@ -48,6 +48,8 @@ final class ShareViewController: UIViewController {
     private var picker: UIViewController?
     /// Shown only while copying — the picker is what you see first.
     private let spinner = UIActivityIndicatorView(style: .large)
+    /// Held so the picker can be constrained *below* it rather than over it.
+    private let close = UIButton(type: .close)
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -68,7 +70,6 @@ final class ShareViewController: UIViewController {
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
 
-        let close = UIButton(type: .close)
         close.addTarget(self, action: #selector(cancel), for: .touchUpInside)
         close.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(close)
@@ -96,9 +97,21 @@ final class ShareViewController: UIViewController {
             }
         )
         addChild(picker)
-        picker.view.frame = view.bounds
-        picker.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        picker.view.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(picker.view)
+
+        // **Below the close button, not over it.** The first version set `frame = view.bounds` and
+        // called `addSubview`, which appends to the top of the z-order — so an opaque list covered
+        // the close button and swallowed its touches. While the picker was up there was no way to
+        // abandon the share at all, which is the "blank sheet, no way out" regression the spinner
+        // and close button were added to prevent, reintroduced by the screen meant to improve on it.
+        NSLayoutConstraint.activate([
+            picker.view.topAnchor.constraint(equalTo: close.bottomAnchor),
+            picker.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            picker.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            picker.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+        view.bringSubviewToFront(close)
         picker.didMove(toParent: self)
         self.picker = picker
     }
@@ -110,7 +123,12 @@ final class ShareViewController: UIViewController {
     /// all land here — refusing to show a picker because a cache is unreadable would block a share
     /// over a stale JSON file.
     private func loadFolders() -> [SharePickerFolder] {
-        let root = SharePickerFolder(path: "Library", relativePath: "")
+        // **`ShareInboxLayout.rootTitle`, not a literal.** This read `"Library"` inline, which made
+        // it a fourth cross-target duplicate that no agreement test covered — and it is the string
+        // shown on the fresh-install path, which the doc calls the common case. When slice 5
+        // localises the app's `MoveDestinations.rootTitle`, a literal here would silently disagree
+        // with every published list and nothing would fail.
+        let root = SharePickerFolder(path: ShareInboxLayout.rootTitle, relativePath: "")
         guard
             let container = FileManager.default.containerURL(
                 forSecurityApplicationGroupIdentifier: ShareInboxLayout.appGroupIdentifier
@@ -125,6 +143,11 @@ final class ShareViewController: UIViewController {
     }
 
     private func begin(destination: String) {
+        // **Two rows can be tapped in the same event batch**, before the first `removeFromSuperview`
+        // takes effect — two `consumeAttachments` tasks, two committed batches, the same files
+        // imported into two folders, and two `completeRequest` calls on a context that permits one.
+        guard picker != nil else { return }
+
         picker?.willMove(toParent: nil)
         picker?.view.removeFromSuperview()
         picker?.removeFromParent()

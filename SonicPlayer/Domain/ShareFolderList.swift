@@ -63,33 +63,41 @@ enum ShareFolderList {
                     relativePath: relative
                 )
             }
-            // Sorted by the on-disk path so a parent always precedes its children, and so the list
-            // is stable between writes — a picker whose rows move between shares is its own bug.
-            .sorted { $0.relativePath < $1.relativePath }
+            // **Sorted by path COMPONENTS, compared the way a reader would.**
+            //
+            // Two things were wrong with sorting the raw path string. Every character below `/`
+            // (0x2F) sorts before it — space, hyphen, dot — so `Lectures`, `Lectures 2024` and
+            // `Lectures/Week 1` came out in that order, putting an unrelated sibling between a
+            // parent and its own child. The flat list stops reading as a tree exactly where it
+            // matters most.
+            //
+            // And `<` on String compares unicode scalars, not language. This app ships nine
+            // locales and its author files things in Arabic; ordering those by scalar value is the
+            // kind of thing that looks fine to whoever wrote it and wrong to whoever uses it.
+            // `localizedStandardCompare` is what Finder uses, and it also gets `Lecture 2` before
+            // `Lecture 10`.
+            .sorted { left, right in
+                let a = left.relativePath.split(separator: "/")
+                let b = right.relativePath.split(separator: "/")
+                for (x, y) in zip(a, b) where x != y {
+                    return String(x).localizedStandardCompare(String(y)) == .orderedAscending
+                }
+                return a.count < b.count
+            }
 
         return [ShareFolder(path: rootTitle, relativePath: "")] + nested
     }
 
+    /// **Encode only — there is deliberately no `decode` here.**
+    ///
+    /// The app writes this file and never reads it; the only reader is the extension, in its own
+    /// target, with its own `loadFolders`. A `decode` on this side would be code that ships nowhere,
+    /// and a test of it would prove nothing about the behaviour a user meets — the two would be free
+    /// to drift, which is precisely how the root title came to be spelled two different ways.
+    ///
+    /// The extension's fallback policy — missing, truncated, corrupt and empty all mean the library
+    /// root alone — is asserted by `ShareInboxLayoutAgreementTests`, which reads its source.
     static func encode(_ folders: [ShareFolder]) throws -> Data {
         try JSONEncoder().encode(folders)
-    }
-
-    /// **Never throws, and always offers somewhere.** Missing, truncated or corrupt all decode to
-    /// the library root alone.
-    ///
-    /// The list is a convenience the app publishes; the *files* are the user's. Refusing to show a
-    /// picker because a cache is unreadable would block a share over a stale JSON file, which is the
-    /// wrong trade in the same direction `InboxManifestCodec.decode` already refuses to make. A
-    /// root-only picker is degraded and still completes the job.
-    ///
-    /// This is also the fresh-install case, and it is the common one rather than an edge: the app
-    /// has never run, so nothing has published a list, and the very first share still has to work.
-    static func decode(_ data: Data?) -> [ShareFolder] {
-        guard let data, let folders = try? JSONDecoder().decode([ShareFolder].self, from: data),
-            !folders.isEmpty
-        else {
-            return [ShareFolder(path: rootTitle, relativePath: "")]
-        }
-        return folders
     }
 }

@@ -173,6 +173,30 @@ struct ShareInboxLayoutAgreementTests {
         )
     }
 
+    /// **The root's name is a fourth cross-target duplicate**, and it is the one shown on the
+    /// fresh-install path — where no published list exists yet. A literal here would silently
+    /// disagree with every published list the moment slice 5 localises the app's `rootTitle`.
+    @Test func bothSidesCallTheLibraryRootTheSameThing() throws {
+        let layout = try Self.source("SonicPlayerShare/ShareInboxLayout.swift")
+        #expect(
+            Self.literal("rootTitle", in: layout) == ShareFolderList.rootTitle,
+            "The picker's fresh-install fallback names the library root differently from every list the app publishes."
+        )
+    }
+
+    /// The extension's `loadFolders` is the **only** reader of `folders.json` that ships, and it is
+    /// in a target this suite cannot link — so its fallback policy is asserted by reading it.
+    /// Without this, dropping a guard there breaks a corrupt-file share and every test still passes.
+    @Test func theExtensionsFallbackStillDegradesToTheRoot() throws {
+        let source = try Self.source("SonicPlayerShare/ShareViewController.swift")
+        for clause in ["try? Data(", "try? JSONDecoder().decode", "!folders.isEmpty", "return [root]"] {
+            #expect(
+                source.contains(clause),
+                "loadFolders no longer guards with `\(clause)`; a missing, corrupt or empty list must still offer the library root rather than blocking the share."
+            )
+        }
+    }
+
     /// `SharePickerFolder` decodes what `ShareFolder` encodes. The JSON keys are the contract, and
     /// a rename on either side turns every folder into a silent root-only picker.
     @Test func thePickerDecodesWhatTheAppEncodes() throws {

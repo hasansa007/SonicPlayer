@@ -128,4 +128,57 @@ struct ShareInboxWiringTests {
 
         #expect(app.shareImportPending.isEmpty)
     }
+
+    // MARK: - Publishing the folder list (slice 3)
+
+    /// Nothing covered the writer at all: not that `folders.json` is produced, not that iOS's
+    /// staging directory is kept out of it. Deleting the `isStagingDirectory` guard would offer the
+    /// user a destination the app empties on `.background` (#41, ADR 0003) with the suite green.
+    @MainActor
+    @Test func becomingActivePublishesTheFolderList() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Publish-\(UUID().uuidString)")
+        let container = root.appendingPathComponent("group")
+        let documents = root.appendingPathComponent("Documents")
+        try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+        for folder in ["Lectures", "Lectures/Week 1", "Inbox"] {
+            try FileManager.default.createDirectory(
+                at: documents.appendingPathComponent(folder), withIntermediateDirectories: true
+            )
+        }
+        let app = makeApp(documents: documents, container: container)
+
+        app.scenePhaseChanged(.active)
+
+        let data = try Data(
+            contentsOf: container.appendingPathComponent(ShareFolderList.fileName)
+        )
+        let published = try JSONDecoder().decode([ShareFolder].self, from: data)
+
+        #expect(
+            published.map(\.relativePath) == ["", "Lectures", "Lectures/Week 1"],
+            "iOS's staging directory must not be offered as a destination"
+        )
+    }
+
+    /// The list changes maybe once a week and this runs on every scene phase, so an unchanged tree
+    /// must not keep rewriting the shared container.
+    @MainActor
+    @Test func anUnchangedTreeIsNotRepublished() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Publish-\(UUID().uuidString)")
+        let container = root.appendingPathComponent("group")
+        let documents = root.appendingPathComponent("Documents")
+        try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+        let app = makeApp(documents: documents, container: container)
+        let list = container.appendingPathComponent(ShareFolderList.fileName)
+
+        app.scenePhaseChanged(.active)
+        let first = try FileManager.default.attributesOfItem(atPath: list.path)[.modificationDate] as? Date
+        app.scenePhaseChanged(.active)
+        let second = try FileManager.default.attributesOfItem(atPath: list.path)[.modificationDate] as? Date
+
+        #expect(first == second, "an identical list must not be rewritten")
+    }
 }

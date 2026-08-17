@@ -45,4 +45,12 @@ enum ShareInboxLayout {
     ///
     /// Restated from `ShareFolderList.fileName`; covered by the agreement suite like the rest.
     static let folderListFileName = "folders.json"
+
+    /// What the library root is called in the picker.
+    ///
+    /// Restated from `MoveDestinations.rootTitle`, which the app publishes in the list itself — this
+    /// copy is only reached on the fresh-install path, where no list exists yet. Covered by the
+    /// agreement suite, because a disagreement here shows the user a different word depending on
+    /// whether the app has ever run.
+    static let rootTitle = "Library"
 }
