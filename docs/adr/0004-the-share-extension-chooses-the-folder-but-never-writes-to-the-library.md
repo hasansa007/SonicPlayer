@@ -90,19 +90,24 @@ predicate on `public.audio` is used instead, and its filtering is verified in bo
 
 ## What is live and what is intent
 
-**Live as of slices 1 and 2.** The target is embedded in `PlugIns/`, registered as a
+**Live as of slices 1, 2 and 3.** The target is embedded in `PlugIns/`, registered as a
 `com.apple.share-services` extension, and appears in the share sheet for a share containing audio.
-It **copies the audio attachments into the queue and commits the batch with an atomic rename**; the
-app drains it on `.active` or `.background` and files everything at the library root. **It still has
-no picker and no library access**, which is the property that makes it safe.
+It **asks which folder**, copies the audio into the queue, and commits the batch with an atomic
+rename; the app drains it on `.active` or `.background` and files it where you chose. **It still has
+no library access** — it is handed a list of folder names and nothing else — which is the property
+that makes it safe.
 
-**The extension shows a spinner and a close button — and ships no strings.** The first attempt drew
-nothing at all, reasoning that a screen needs strings and localisation is slice 5. Right about
-strings, wrong about the consequence: a share of thirty lectures that iCloud must download first
-left a blank sheet for tens of seconds with no progress and no way out, which is worse than the stub
-it replaced. `UIActivityIndicatorView` and `UIButton(type: .close)` give an exit with a
-system-localised label and no words of ours. Anything worth *saying* is still the app's job, once it
-has filed the files. Slice 3's picker brings the first strings; slice 5 translates them.
+**The picker doubles as the confirmation, and that was not the original reason for it.** Slice 2
+shipped a silent extension, and the first real share left the user with nothing to look at: share,
+see nothing, open the app to find out. That is the deferred-work problem this ADR rejected the
+silent options over, reintroduced by accident under a *localisation* justification — nobody noticed
+it was also a feedback decision. Choosing a folder answers "did that work?" at no extra screen.
+
+**And it still ships no strings**, which was the constraint the silence was protecting. The picker
+has no title and no labels; `UIButton(type: .close)` carries Apple's glyph and its own localised
+label. The one word displayed is the library root's name, which the app publishes and already shows
+untranslated on its own Move screen — a pre-existing gap the picker inherits, and slice 5 owns both
+halves of it.
 
 Two precisions, because the looser phrasings were both wrong. The rule is **"at least one attachment
 is audio"**, not "every attachment" — a mixed selection activates it, and slice 2 must therefore
