@@ -138,8 +138,21 @@ Apple localises into every language the OS ships.
 
 The picker is `SharePickerView`, SwiftUI in a `UIHostingController`, as this paragraph said it
 should be once the extension had a view worth writing that way. What remains UIKit is the shell —
-`NSExtensionPrincipalClass` requires a `UIViewController` — plus a spinner and a close button, which
-are two system controls.
+`NSExtensionPrincipalClass` requires a `UIViewController` — plus a spinner for the copying phase.
+
+**One boundary was learned the expensive way, and it is the useful part of this entry.** The close
+button began in the UIKit shell, constrained against the shell's view, with the hosted list
+constrained below it. On device it rendered halfway down the sheet and pushed the list off the
+bottom. Three layout guides were tried before the guide was ruled out as the cause: the problem was
+**two layout systems driving one screen** — UIKit constraints resolving against a hierarchy SwiftUI
+was independently sizing. Nothing about the guides was wrong.
+
+So the rule for this target: **once a phase is SwiftUI, everything in that phase is SwiftUI.** The
+close button is a `safeAreaInset` inside `SharePickerView`, which lets SwiftUI place the bar, inset
+the list beneath it, and honour the sheet's real safe area — none of which the shell could see. It
+wraps `UIButton(type: .close)` in a `UIViewRepresentable` only because `Button(role: .close)` is
+iOS 26+ and this app targets 18.0, so that is the only route to Apple's glyph and its nine
+translations without writing a string.
 
 **A third string question was settled at slice 3 and is worth writing down.** The picker shows no
 title, no labels and no prose: a title would be a user-facing string, this target has no string
