@@ -286,7 +286,19 @@ final class AppViewModel {
     /// claimed the work was "renames within one volume", which is true only of the common case.
     private func drainShareInbox() {
         guard !player.isImporting, let container = fileManager.shareInboxContainer() else { return }
-        let result = InboxDrain.run(container: container, into: fileManager.documentsDirectory())
+        let documents = fileManager.documentsDirectory()
+
+        // **Published here rather than on every tree change (#112 slice 3).** The extension cannot
+        // see `Documents/`, so the picker is fed a list. Writing it beside the drain means one
+        // trigger instead of an obligation on every rename, delete, create and move — the kind of
+        // per-call-site duty `CollectionsViewModel.onWillRemoveItems` exists to avoid, where one
+        // forgotten site shows a folder that no longer exists.
+        //
+        // Before the drain, deliberately: the drain can create a destination directory, and the
+        // list should describe the library the user last saw rather than one this pass just made.
+        ShareFolderListWriter.publish(documentsDirectory: documents, container: container)
+
+        let result = InboxDrain.run(container: container, into: documents)
 
         // **Assigned on every drain, including the empty one.** An earlier version returned here
         // when the result was empty, which meant a pending entry outlived the thing it described:

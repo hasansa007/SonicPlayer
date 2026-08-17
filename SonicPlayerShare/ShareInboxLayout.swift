@@ -40,4 +40,9 @@ enum ShareInboxLayout {
     static func isAudio(_ url: URL) -> Bool {
         audioExtensions.contains(url.pathExtension.lowercased())
     }
+
+    /// The folder list the app publishes for the picker (#112 slice 3).
+    ///
+    /// Restated from `ShareFolderList.fileName`; covered by the agreement suite like the rest.
+    static let folderListFileName = "folders.json"
 }

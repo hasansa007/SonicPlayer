@@ -134,14 +134,19 @@ caught only by review:
 What remains is a spinner and `UIButton(type: .close)`: a system glyph whose accessibility label
 Apple localises into every language the OS ships.
 
-**Two deviations from CLAUDE.md ARE live and are recorded here rather than only in a comment.**
+**One deviation from CLAUDE.md is live; the SwiftUI one closed at slice 3.**
 
-`ShareViewController` builds `UIActivityIndicatorView`, `UIButton` and four `NSLayoutConstraint`s
-directly, against *"SwiftUI only (no UIKit views)"*. An earlier version hosted a SwiftUI body in a
-`UIHostingController` child, and that was the better shape for a screen with content — but what is
-left is two system controls and their constraints, and hosting SwiftUI to place two system controls
-inverts the cost. Revisit at slice 3, when the picker gives the extension a real view worth writing
-in SwiftUI.
+The picker is `SharePickerView`, SwiftUI in a `UIHostingController`, as this paragraph said it
+should be once the extension had a view worth writing that way. What remains UIKit is the shell —
+`NSExtensionPrincipalClass` requires a `UIViewController` — plus a spinner and a close button, which
+are two system controls.
+
+**A third string question was settled at slice 3 and is worth writing down.** The picker shows no
+title, no labels and no prose: a title would be a user-facing string, this target has no string
+catalogue until slice 5, and anything written here ships as English in all nine locales. The one
+word it does display is `MoveDestinations.rootTitle` — `"Library"` — which the app already shows
+untranslated on its own Move screen. That is a **pre-existing gap the picker inherits rather than
+creates**, and slice 5 owns both halves of it.
 
 `nonClashing` restates `UniqueNameResolver`'s `" 2"`, `" 3"` scheme, because the extension cannot
 see the app's sources. Unlike the queue constants, **this duplicate is not covered by

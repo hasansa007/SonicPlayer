@@ -160,4 +160,35 @@ struct ShareInboxLayoutAgreementTests {
             "ShareViewController.nonClashing no longer builds names as `<base> <n>.<ext>`, which is the shape UniqueNameResolver produces inside the library."
         )
     }
+
+    // MARK: - The picker's contract (slice 3)
+
+    /// The extension reads the folder list from a filename the app chooses, and decodes a shape the
+    /// app produces. Both are restated across the target boundary, so both belong here.
+    @Test func bothSidesAgreeOnTheFolderListFile() throws {
+        let layout = try Self.source("SonicPlayerShare/ShareInboxLayout.swift")
+        #expect(
+            Self.literal("folderListFileName", in: layout) == ShareFolderList.fileName,
+            "The extension reads a different filename from the one the app writes, so the picker would show only the root and never say why."
+        )
+    }
+
+    /// `SharePickerFolder` decodes what `ShareFolder` encodes. The JSON keys are the contract, and
+    /// a rename on either side turns every folder into a silent root-only picker.
+    @Test func thePickerDecodesWhatTheAppEncodes() throws {
+        let source = try Self.source("SonicPlayerShare/SharePickerView.swift")
+        let encoded = try ShareFolderList.encode(
+            [ShareFolder(path: "Lectures", relativePath: "Lectures")]
+        )
+        let objects = (try? JSONSerialization.jsonObject(with: encoded)) as? [[String: Any]]
+        let keys = Set(objects?.first?.keys.map { $0 } ?? [])
+
+        #expect(keys == ["path", "relativePath"], "ShareFolder's wire shape changed.")
+        for key in keys {
+            #expect(
+                source.contains("var \(key):"),
+                "SharePickerFolder has no `\(key)`, so it cannot decode what the app writes."
+            )
+        }
+    }
 }

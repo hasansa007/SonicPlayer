@@ -1,34 +1,38 @@
 import OSLog
+import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
-/// The share extension's entry point — **slice 2 of #112: it copies, and decides nothing.**
+/// The share extension's entry point — **it asks where, copies there, and decides nothing else.**
 ///
-/// Audio shared from any app is copied into the queue inside the shared App Group container, and
-/// the app files it into the library the next time it runs.
+/// You pick a folder; the audio is copied into the queue inside the shared App Group container; the
+/// app files it into that folder the next time it runs.
 ///
-/// **It shows a spinner and a close button, and ships no strings.** An earlier version of this slice
-/// drew nothing at all, reasoning that a screen needs strings and localisation is slice 5. The
-/// reasoning was right and the conclusion was not: a share of thirty lectures that iCloud must
-/// download first left a blank sheet for tens of seconds with no progress and no way out. The answer
-/// is a `UIActivityIndicatorView` and `UIButton(type: .close)` — a system glyph with a
-/// system-localised accessibility label — which gives the user an exit without a word of ours in any
-/// of the nine languages. Anything worth *saying* is still the app's job, once it has actually filed
-/// the files. Slice 3's picker brings the first strings, and slice 5 translates them.
+/// **The picker is the first thing you see, and it is also the confirmation.** Slice 2 copied
+/// immediately and said nothing, and the first person to use it shared a file, saw nothing, and had
+/// to open the app to learn whether it had worked — the deferred-work problem ADR 0004 rejected the
+/// silent options over, reintroduced by accident. Choosing a folder answers "did that work?" at no
+/// cost in extra screens. The spinner appears only after the choice, while copying.
 ///
-/// **`UIViewController`, in a SwiftUI-only codebase.** `NSExtensionPrincipalClass` is a UIKit
-/// contract — the system instantiates this class through plain `init()`, and `UIHostingController`
-/// declares its own designated initializers, which suppresses that. What little chrome there is here
-/// is two system controls, so hosting SwiftUI to draw them would be the tail wagging the dog.
+/// **It still ships no strings.** The picker has no title and no labels: a title would be a
+/// user-facing string, this target has no string catalogue until slice 5, and anything written here
+/// would be English in all nine locales. `UIButton(type: .close)` supplies Apple's own glyph and
+/// localised label. The only word displayed is the library root's name, which comes from the app.
+///
+/// **`UIViewController` shell, SwiftUI content.** `NSExtensionPrincipalClass` is a UIKit contract —
+/// the system instantiates this class through plain `init()`, and `UIHostingController` declares its
+/// own designated initializers, which suppresses that. So the shell stays UIKit and hosts
+/// `SharePickerView`, which closes one of the two deviations ADR 0004 records.
 ///
 /// What this deliberately does NOT do:
 ///
 /// - **It does not read the library.** It cannot see `Documents/`, so it cannot damage it — which is
 ///   what makes it safe for a process the system kills without notice. It writes only inside its own
 ///   queue.
-/// - **It does not decide anything.** No naming, no de-duplication, no destination. Those live in
-///   `Domain/`, where they are testable without a host app. Slice 3's picker records a *choice*; the
-///   app still does the filing.
+/// - **It does not decide anything.** No naming, no de-duplication, no filing. The picker records a
+///   *choice* — a relative path in the manifest — and every rule about what that means lives in
+///   `Domain/`, where it is testable without a host app. `InboxManifestCodec.resolvedDestination` is
+///   what refuses a path that escapes `Documents/`, because a manifest is input, not fact.
 /// - **It never loads a file into memory.** Copies go through `loadFileRepresentation` and
 ///   `FileManager`. Reading an hour-long lecture into `Data` inside an extension is a kill, not an
 ///   error.
@@ -40,6 +44,10 @@ final class ShareViewController: UIViewController {
     private var isCancelled = false
     /// The batch being written, so cancelling can take it back out.
     private var partialBatch: URL?
+    /// The destination picker, removed once a folder is chosen.
+    private var picker: UIViewController?
+    /// Shown only while copying — the picker is what you see first.
+    private let spinner = UIActivityIndicatorView(style: .large)
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -56,8 +64,7 @@ final class ShareViewController: UIViewController {
         // `UIButton(type: .close)` is the way to have both: a system glyph with a system-localised
         // accessibility label, no text of ours in any of the nine languages. The spinner says work
         // is happening without claiming what.
-        let spinner = UIActivityIndicatorView(style: .large)
-        spinner.startAnimating()
+        spinner.hidesWhenStopped = true
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
 
@@ -73,8 +80,59 @@ final class ShareViewController: UIViewController {
             close.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
         ])
 
+        presentPicker()
+    }
+
+    /// Asks where the audio should go, then stages it there.
+    ///
+    /// **The picker replaces the spinner as the first thing you see.** Slice 2 started copying
+    /// immediately and said nothing; the copy now waits for an answer, which is what makes the
+    /// screen a confirmation rather than an extra step.
+    private func presentPicker() {
+        let folders = loadFolders()
+        let picker = UIHostingController(
+            rootView: SharePickerView(folders: folders) { [weak self] folder in
+                self?.begin(destination: folder.relativePath)
+            }
+        )
+        addChild(picker)
+        picker.view.frame = view.bounds
+        picker.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(picker.view)
+        picker.didMove(toParent: self)
+        self.picker = picker
+    }
+
+    /// Reads the list the app published, or offers the library root alone.
+    ///
+    /// **Root-only is the fresh-install case, not an edge.** The app may never have run, so nothing
+    /// has published a list, and the first share still has to work. Missing, truncated and corrupt
+    /// all land here — refusing to show a picker because a cache is unreadable would block a share
+    /// over a stale JSON file.
+    private func loadFolders() -> [SharePickerFolder] {
+        let root = SharePickerFolder(path: "Library", relativePath: "")
+        guard
+            let container = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: ShareInboxLayout.appGroupIdentifier
+            ),
+            let data = try? Data(
+                contentsOf: container.appendingPathComponent(ShareInboxLayout.folderListFileName)
+            ),
+            let folders = try? JSONDecoder().decode([SharePickerFolder].self, from: data),
+            !folders.isEmpty
+        else { return [root] }
+        return folders
+    }
+
+    private func begin(destination: String) {
+        picker?.willMove(toParent: nil)
+        picker?.view.removeFromSuperview()
+        picker?.removeFromParent()
+        picker = nil
+        spinner.startAnimating()
+
         Task { [weak self] in
-            await self?.consumeAttachments()
+            await self?.consumeAttachments(destination: destination)
         }
     }
 
@@ -107,7 +165,7 @@ final class ShareViewController: UIViewController {
         )
     }
 
-    private func consumeAttachments() async {
+    private func consumeAttachments(destination: String) async {
         guard let context = extensionContext else {
             log.error("No extensionContext; nothing to consume.")
             return
@@ -117,7 +175,7 @@ final class ShareViewController: UIViewController {
             .flatMap { $0.attachments ?? [] }
 
         do {
-            let copied = try await stage(providers)
+            let copied = try await stage(providers, destination: destination)
             log.info("Queued \(copied) file(s) for import.")
             // Success even at zero: the user's share was accepted and nothing was lost. Reporting
             // failure would invite the host app to treat its own copy as still-pending.
@@ -144,7 +202,7 @@ final class ShareViewController: UIViewController {
     /// Returns the number of files staged. Throws only when the batch cannot be created or
     /// committed — an individual attachment that fails to load is logged and skipped, because one
     /// unreadable file should not discard the nine beside it.
-    private func stage(_ providers: [NSItemProvider]) async throws -> Int {
+    private func stage(_ providers: [NSItemProvider], destination: String) async throws -> Int {
         guard let container = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: ShareInboxLayout.appGroupIdentifier
         ) else {
@@ -192,10 +250,13 @@ final class ShareViewController: UIViewController {
 
         if isCancelled { throw CocoaError(.userCancelled) }
 
-        // The manifest is written before the commit so a committed batch always has one. Slice 2
-        // has no picker, so the destination is always the library root.
+        // The manifest is written before the commit so a committed batch always has one. An empty
+        // destination means the library root, which is what the root row carries.
         let manifest = try JSONEncoder().encode(
-            ShareManifest(destination: nil, rejected: rejected.isEmpty ? nil : rejected)
+            ShareManifest(
+                destination: destination.isEmpty ? nil : destination,
+                rejected: rejected.isEmpty ? nil : rejected
+            )
         )
         try manifest.write(to: partial.appendingPathComponent(ShareInboxLayout.manifestFileName))
 

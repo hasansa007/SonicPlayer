@@ -320,6 +320,9 @@ Order chosen so the riskiest thing is proven first and nothing is built on an un
    `ShareInboxLayoutAgreementTests`. Removing the `SHARE-EXTENSION-STUB` marker here is what
    unblocks TestFlight, which slice 1's guard had deliberately closed.
 3. **The picker.** `folders.json`, the extension's folder screen, the destination honoured.
+   ← **in progress on `gh-112-share-picker`.** Flat, not browsable, inheriting `MoveDestinations`'
+   reasoning rather than re-deciding it. SwiftUI in a `UIHostingController`, which closes one of
+   ADR 0004's two recorded deviations.
    **It also carries a requirement slice 2 discovered on device (2026-08-17): the share must confirm
    itself.** Slice 2 shows a spinner and exits, the app does not open, and nothing tells you whether
    it worked — you share and then go looking. That is the deferred-work problem §4 rejected the
