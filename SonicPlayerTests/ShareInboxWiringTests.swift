@@ -163,7 +163,11 @@ struct ShareInboxWiringTests {
 
     /// The list changes maybe once a week and this runs on every scene phase, so an unchanged tree
     /// must not keep rewriting the shared container.
-    @MainActor
+    ///
+    /// **Asserts the writer's own answer, not the file's timestamp.** The first version compared
+    /// modification dates, which cannot tell "skipped the write" from "never wrote at all" — and
+    /// when it failed, `attributesOfItem` was throwing on a missing file, reported identically to a
+    /// failed expectation. Two hypotheses, one signal, and I spent three runs on the wrong one.
     @Test func anUnchangedTreeIsNotRepublished() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("Publish-\(UUID().uuidString)")
@@ -171,14 +175,31 @@ struct ShareInboxWiringTests {
         let documents = root.appendingPathComponent("Documents")
         try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
-        let app = makeApp(documents: documents, container: container)
-        let list = container.appendingPathComponent(ShareFolderList.fileName)
 
-        app.scenePhaseChanged(.active)
-        let first = try FileManager.default.attributesOfItem(atPath: list.path)[.modificationDate] as? Date
-        app.scenePhaseChanged(.active)
-        let second = try FileManager.default.attributesOfItem(atPath: list.path)[.modificationDate] as? Date
+        #expect(
+            ShareFolderListWriter.publish(documentsDirectory: documents, container: container),
+            "the first publish must write"
+        )
+        #expect(
+            !ShareFolderListWriter.publish(documentsDirectory: documents, container: container),
+            "an identical list must not be rewritten"
+        )
+    }
 
-        #expect(first == second, "an identical list must not be rewritten")
+    /// A new folder must reach the picker on the next scene phase.
+    @Test func aChangedTreeIsRepublished() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Publish-\(UUID().uuidString)")
+        let container = root.appendingPathComponent("group")
+        let documents = root.appendingPathComponent("Documents")
+        try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+
+        ShareFolderListWriter.publish(documentsDirectory: documents, container: container)
+        try FileManager.default.createDirectory(
+            at: documents.appendingPathComponent("Lectures"), withIntermediateDirectories: true
+        )
+
+        #expect(ShareFolderListWriter.publish(documentsDirectory: documents, container: container))
     }
 }

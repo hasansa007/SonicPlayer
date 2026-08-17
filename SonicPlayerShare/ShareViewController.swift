@@ -51,6 +51,13 @@ final class ShareViewController: UIViewController {
     /// Held so the picker can be constrained *below* it rather than over it.
     private let close = UIButton(type: .close)
 
+    /// Extra gap above the close button, on top of the view's layout margin.
+    ///
+    /// A literal because `DesignSystem/Tokens` is not reachable from an extension target — there is
+    /// no `Spacing` constant to name — and the magic-number lint scans this file, which is what its
+    /// allow-literal escape hatch is for. Named so the next person adjusting it knows what it is.
+    private static let closeTopInset: CGFloat = 12  // lint:allow-literal — DesignSystem/Tokens is not visible from an extension target
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
@@ -77,8 +84,22 @@ final class ShareViewController: UIViewController {
         NSLayoutConstraint.activate([
             spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            close.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            close.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+            // **`layoutMarginsGuide`, plus a little more on top — and the two guides are NOT
+            // interchangeable here.**
+            //
+            // Three configurations were tried on device. `safeAreaLayoutGuide` with no inset put the
+            // glyph flush in the corner, where the sheet's radius clipped it to half an X.
+            // `layoutMarginsGuide` rendered correctly but sat tight under the top edge. Switching
+            // back to `safeAreaLayoutGuide` *with* an inset — changing the guide and the offset in
+            // one step — put the button halfway down the sheet and pushed the list off the bottom.
+            //
+            // So a share extension's root view does not report the safe area a full-screen
+            // controller does, and the margins guide is the one that behaves. This keeps it and
+            // adds the extra top gap only, which is the single variable that was actually wrong.
+            close.topAnchor.constraint(
+                equalTo: view.layoutMarginsGuide.topAnchor, constant: Self.closeTopInset
+            ),
+            close.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
         ])
 
         presentPicker()
@@ -92,26 +113,29 @@ final class ShareViewController: UIViewController {
     private func presentPicker() {
         let folders = loadFolders()
         let picker = UIHostingController(
-            rootView: SharePickerView(folders: folders) { [weak self] folder in
-                self?.begin(destination: folder.relativePath)
-            }
+            rootView: SharePickerView(
+                folders: folders,
+                onChoose: { [weak self] folder in self?.begin(destination: folder.relativePath) },
+                onCancel: { [weak self] in self?.cancel() }
+            )
         )
         addChild(picker)
         picker.view.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(picker.view)
 
-        // **Below the close button, not over it.** The first version set `frame = view.bounds` and
-        // called `addSubview`, which appends to the top of the z-order — so an opaque list covered
-        // the close button and swallowed its touches. While the picker was up there was no way to
-        // abandon the share at all, which is the "blank sheet, no way out" regression the spinner
-        // and close button were added to prevent, reintroduced by the screen meant to improve on it.
+        // **Fills the sheet, and carries its own close button in its toolbar.** An earlier version
+        // put the shell's `UIButton` above it and constrained the list below — which left the
+        // button pinned to the sheet's literal edge, where its corner radius clipped it. The
+        // shell's button is for the copying phase, after this view is gone, so it is hidden while
+        // the picker is up rather than fighting it for the corner.
         NSLayoutConstraint.activate([
-            picker.view.topAnchor.constraint(equalTo: close.bottomAnchor),
+            // Fills the sheet. The picker carries its own close button now — see SharePickerView.
+            picker.view.topAnchor.constraint(equalTo: view.topAnchor),
             picker.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             picker.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             picker.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
-        view.bringSubviewToFront(close)
+        close.isHidden = true
         picker.didMove(toParent: self)
         self.picker = picker
     }
@@ -152,6 +176,7 @@ final class ShareViewController: UIViewController {
         picker?.view.removeFromSuperview()
         picker?.removeFromParent()
         picker = nil
+        close.isHidden = false   // the shell's button takes over for the copying phase
         spinner.startAnimating()
 
         Task { [weak self] in

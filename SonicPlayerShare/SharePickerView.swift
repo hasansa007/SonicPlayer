@@ -1,4 +1,25 @@
 import SwiftUI
+import UIKit
+
+/// `UIButton(type: .close)` as a SwiftUI view.
+///
+/// **Why not a plain SwiftUI button:** the close glyph with Apple's own localised accessibility
+/// label is a UIKit affordance. `Button(role: .close)` is the SwiftUI equivalent and is iOS 26+,
+/// while this app targets 18.0 — so wrapping the UIKit control is the only way to get the system's
+/// glyph and its nine translations without writing a string of our own.
+private struct SystemCloseButton: UIViewRepresentable {
+    let action: () -> Void
+
+    func makeUIView(context: Context) -> UIButton {
+        let button = UIButton(type: .close)
+        button.addAction(UIAction { _ in action() }, for: .touchUpInside)
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentHuggingPriority(.required, for: .vertical)
+        return button
+    }
+
+    func updateUIView(_ uiView: UIButton, context: Context) {}
+}
 
 /// One row of the destination picker, as the extension knows it.
 ///
@@ -41,11 +62,24 @@ struct SharePickerFolder: Decodable, Equatable, Identifiable {
 struct SharePickerView: View {
     let folders: [SharePickerFolder]
     let onChoose: (SharePickerFolder) -> Void
+    let onCancel: () -> Void
 
     var body: some View {
-        // Plain system list styling: legible at every Dynamic Type size without this target owning
-        // a type scale. The app's `DesignSystem` tokens are not visible from here, and importing
-        // them to style one list would be the tail wagging the dog.
+        // **The close button lives HERE, inside the SwiftUI hierarchy, and that is the fix for a
+        // bug three attempts failed to place.**
+        //
+        // It began as a `UIButton` in the UIKit shell, constrained against the shell's view, with
+        // the hosted list constrained below it. On device the button rendered *halfway down the
+        // sheet* and pushed the list off the bottom. Three configurations were tried —
+        // `safeAreaLayoutGuide`, `layoutMarginsGuide`, and `safeAreaLayoutGuide` with an inset —
+        // and swapping between them changed nothing, which is what finally ruled out the guide as
+        // the cause. The problem was never which guide: it was two layout systems driving one
+        // screen, with UIKit constraints resolving against a hierarchy SwiftUI was also sizing.
+        //
+        // A `safeAreaInset` keeps it in one system. SwiftUI places the bar, insets the list below
+        // it so no row hides underneath, and honours the sheet's real safe area — none of which the
+        // shell could see. `.padding()` with no argument is the system's own metric, so there is no
+        // number here for the magic-number lint to catch or for anyone to tune by guesswork.
         List(folders) { folder in
             Button {
                 onChoose(folder)
@@ -57,5 +91,12 @@ struct SharePickerView: View {
             .buttonStyle(.plain)
         }
         .listStyle(.plain)
+        .safeAreaInset(edge: .top) {
+            HStack {
+                Spacer()
+                SystemCloseButton(action: onCancel)
+            }
+            .padding()
+        }
     }
 }

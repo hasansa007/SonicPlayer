@@ -24,13 +24,18 @@ enum ShareFolderListWriter {
     /// threaded one into the enumeration while the write went through Foundation directly, and no
     /// caller ever passed a substitute. A seam that works for part of the calls advertises a
     /// substitutability that is not there.
-    static func publish(documentsDirectory: URL, container: URL) {
+    /// - Returns: whether it wrote. **Returned rather than inferred from the file**, because the
+    ///   first test of the skip asserted on modification dates and could not distinguish "not
+    ///   rewritten" from "never written" — `attributesOfItem` throws when the file is absent, and a
+    ///   thrown error and a failed expectation look identical in the results.
+    @discardableResult
+    static func publish(documentsDirectory: URL, container: URL) -> Bool {
         let fileManager = FileManager.default
         let folders = ShareFolderList.folders(
             under: documentsDirectory,
             directories: directories(under: documentsDirectory, fileManager: fileManager)
         )
-        guard let data = try? ShareFolderList.encode(folders) else { return }
+        guard let data = try? ShareFolderList.encode(folders) else { return false }
 
         let destination = container.appendingPathComponent(ShareFolderList.fileName)
 
@@ -38,10 +43,18 @@ enum ShareFolderListWriter {
         // scene phase; the folder tree changes maybe once a week. An atomic write creates a temp
         // file and renames it in the shared container, so writing unconditionally meant four of
         // those per app switch for identical bytes.
-        if let existing = try? Data(contentsOf: destination), existing == data { return }
+        if let existing = try? Data(contentsOf: destination), existing == data { return false }
         // Atomic, because the extension may be reading it at this moment — a share can start while
         // the app is foregrounding. A torn read would show half a list or none.
-        try? data.write(to: destination, options: .atomic)
+        // The container may not exist on a build without the entitlement, and `write` would fail
+        // silently. Creating it is cheap and makes the return value mean what it says.
+        try? fileManager.createDirectory(at: container, withIntermediateDirectories: true)
+        do {
+            try data.write(to: destination, options: .atomic)
+            return true
+        } catch {
+            return false
+        }
     }
 
     /// Every directory under `documentsDirectory`, at any depth.
