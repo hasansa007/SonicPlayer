@@ -320,6 +320,17 @@ Order chosen so the riskiest thing is proven first and nothing is built on an un
    `ShareInboxLayoutAgreementTests`. Removing the `SHARE-EXTENSION-STUB` marker here is what
    unblocks TestFlight, which slice 1's guard had deliberately closed.
 3. **The picker.** `folders.json`, the extension's folder screen, the destination honoured.
+   **It also carries a requirement slice 2 discovered on device (2026-08-17): the share must confirm
+   itself.** Slice 2 shows a spinner and exits, the app does not open, and nothing tells you whether
+   it worked — you share and then go looking. That is the deferred-work problem §4 rejected the
+   silent options over, reintroduced as an interim state, and it was recorded as a *localisation*
+   trade without anyone noticing it was a *feedback* trade too. The picker closes it for free: you
+   see your folders and tap one, and that act is the confirmation. **Do not ship slice 3 with the
+   picker but no acknowledgement** — that would leave the gap while spending the strings.
+
+   Note what is NOT available as a fix: launching the containing app from the extension. Apple
+   provides no supported route, and the responder-chain workaround is not something to ship on a
+   live App Store listing.
 4. **The exception screen.** Duplicates, non-audio, failures, missing destination.
 5. **Localization** across nine languages, RTL verified.
 
