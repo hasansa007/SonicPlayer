@@ -129,4 +129,35 @@ struct ShareInboxLayoutAgreementTests {
             "The extension's accepted formats differ from ImportFilter's. Only in the extension: \(found.subtracting(ImportFilter.audioExtensions)). Only in the library: \(ImportFilter.audioExtensions.subtracting(found))."
         )
     }
+
+    // MARK: - The naming scheme
+
+    /// **`nonClashing` restates `UniqueNameResolver`'s scheme, and nothing policed it.** This suite
+    /// covered the layout literals and the accepted extensions; the third cross-target duplicate —
+    /// how a name collision is resolved — was outside it, in a target the magic-number lint cannot
+    /// see either.
+    ///
+    /// The scheme has drifted before: `UniqueNameResolver` exists because seven copies of it had
+    /// already diverged. The two names never meet at runtime — one resolves within a batch, the
+    /// other within the library — so a divergence would not corrupt anything; it would just mean a
+    /// file arrives called `Lecture 2.m4a` and lands as `Lecture 3.m4a`, which is the kind of
+    /// confusion nobody can reproduce on demand.
+    @Test func theExtensionResolvesCollisionsTheSameWayTheLibraryDoes() throws {
+        let extensionSource = try Self.source("SonicPlayerShare/ShareViewController.swift")
+        let librarySource = try Self.source("SonicPlayer/Domain/UniqueNameResolver.swift")
+
+        // **Both produce `<base> <n>.<ext>`, but they compose it differently**, so this compares
+        // the shape rather than one literal: the library builds `"<base> <n>"` and appends the
+        // extension in a separate helper, while the extension writes the whole filename at once.
+        // A first version of this test looked for the library's composed form and failed, because
+        // that string does not exist anywhere — the assertion was guessed rather than read.
+        #expect(
+            librarySource.contains(#""\(baseName) \(counter)""#),
+            "UniqueNameResolver no longer separates a collision as `<base> <n>`. The extension's nonClashing still does — reconcile them."
+        )
+        #expect(
+            extensionSource.contains(#""\(base) \(index).\(ext)""#),
+            "ShareViewController.nonClashing no longer builds names as `<base> <n>.<ext>`, which is the shape UniqueNameResolver produces inside the library."
+        )
+    }
 }

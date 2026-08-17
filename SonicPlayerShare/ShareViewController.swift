@@ -84,8 +84,13 @@ final class ShareViewController: UIViewController {
     /// leaving it would rely on the reaper an hour later. Removing it here is immediate and exact.
     @objc private func cancel() {
         isCancelled = true
-        if let partialBatch { try? FileManager.default.removeItem(at: partialBatch) }
-        partialBatch = nil
+
+        // **Deliberately does NOT delete the partial batch, and an earlier version did.**
+        // `copy()`'s continuation body runs on `loadFileRepresentation`'s own queue, so a Close tap
+        // mid-copy tore the directory down underneath a live `copyItem`. The batch is dot-prefixed
+        // and therefore invisible to the app either way; leaving it costs nothing but disk until
+        // `InboxDrain.reapAbandonedPartials` collects it, and that reaper exists precisely because
+        // this process can vanish without cleaning up after itself.
 
         // **Not optional-chained, and I deleted this guard once already.** Round 2 replaced
         // `extensionContext?.cancelRequest(...)` with exactly this, on the grounds that optional
@@ -172,7 +177,9 @@ final class ShareViewController: UIViewController {
                 continue
             }
             do {
-                if try await copy(provider, as: identifier, into: partial) {
+                if try await copy(
+                    provider, as: identifier, preferredName: provider.suggestedName, into: partial
+                ) {
                     staged += 1
                 } else {
                     rejected.append(provider.suggestedName ?? "")
@@ -214,8 +221,19 @@ final class ShareViewController: UIViewController {
         }
     }
 
+    /// - Parameter preferredName: what the user calls this file, from `NSItemProvider.suggestedName`.
+    ///
+    /// **The name decides two things, and an earlier version took it from the wrong place.** It
+    /// filtered and named from `loadFileRepresentation`'s *temp* URL — a filename the system chose.
+    /// Both halves were wrong. Filtering on it meant an attachment whose UTI already conformed to
+    /// `public.audio` could still be refused, because the materialised file happened to carry an
+    /// extension outside our list (an Opus voice note arriving as `.oga`, a data-backed provider
+    /// given a UUID-ish name) — and the refusal was silent, since `completeRequest` still told the
+    /// host the share succeeded. Naming from it meant a system temp name could end up in the user's
+    /// library, while the *rejected* list beside it used `suggestedName`: two notions of the file's
+    /// name in one loop.
     private func copy(
-        _ provider: NSItemProvider, as identifier: String, into directory: URL
+        _ provider: NSItemProvider, as identifier: String, preferredName: String?, into directory: URL
     ) async throws -> Bool {
         try await withCheckedThrowingContinuation { continuation in
             // `loadFileRepresentation` hands over a URL on disk and deletes it when the closure
@@ -226,14 +244,25 @@ final class ShareViewController: UIViewController {
                     continuation.resume(throwing: error)
                     return
                 }
-                guard let url, ShareInboxLayout.isAudio(url) else {
+                guard let url else {
+                    continuation.resume(returning: false)
+                    return
+                }
+
+                // The user's name wins; the temp URL is the fallback and supplies the extension
+                // when `suggestedName` carries none.
+                let name = Self.filename(preferring: preferredName, fallingBackTo: url)
+
+                // `audioTypeIdentifier` has already established this attachment conforms to
+                // `public.audio` or `public.mpeg-4`. This is the app's accept-list applied early so
+                // the queue does not fill with things the drain will only refuse — a narrowing, and
+                // deliberately checked against the name the LIBRARY will see.
+                guard ShareInboxLayout.isAudio(URL(fileURLWithPath: name)) else {
                     continuation.resume(returning: false)
                     return
                 }
                 do {
-                    let destination = Self.nonClashing(
-                        name: url.lastPathComponent, in: directory
-                    )
+                    let destination = Self.nonClashing(name: name, in: directory)
                     try FileManager.default.copyItem(at: url, to: destination)
                     continuation.resume(returning: true)
                 } catch {
@@ -241,6 +270,15 @@ final class ShareViewController: UIViewController {
                 }
             }
         }
+    }
+
+    /// The name to file an attachment under: the user's, with the temp URL's extension when the
+    /// user's carries none.
+    private static func filename(preferring suggested: String?, fallingBackTo url: URL) -> String {
+        guard let suggested, !suggested.isEmpty else { return url.lastPathComponent }
+        guard (suggested as NSString).pathExtension.isEmpty else { return suggested }
+        let ext = url.pathExtension
+        return ext.isEmpty ? suggested : "\(suggested).\(ext)"
     }
 
     /// Resolves a collision *within the batch*, which is the only collision this side can see.
