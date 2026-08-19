@@ -443,13 +443,70 @@ jobs:
           WHATS_NEW=$(cat $RUNNER_TEMP/whats_new.txt)
           KEY_PATH="$RUNNER_TEMP/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
 
+          # **`openssl dgst -sign` does NOT emit a JWS signature, and this line believed it did.**
+          #
+          # For an EC key that command emits ASN.1 DER — `SEQUENCE { INTEGER r, INTEGER s }`,
+          # 70 to 72 bytes. ES256 requires the 64-byte raw form: r and s each zero-padded to
+          # exactly 32 bytes and concatenated, no wrapper. So the token was malformed, Apple
+          # answered 401, and the `2>/dev/null || echo ""` on the app-id lookup below turned that
+          # into an empty APP_ID and the message "Could not resolve the app id" — which points at
+          # the app, the bundle id and the query, and never at the credential.
+          #
+          # **This is the third bug in this step and the reason the first two looked like the
+          # whole story.** Fixing the curl globbing let the request actually be made; fixing
+          # `filter[app]` let it be made correctly; each fix moved the failure one line down to
+          # this one. 3.0.0 (24), 3.0.0 (25) and 3.0.1 (26) all uploaded fine and all shipped with
+          # no What's New. No dry run can reach any of it — the step is gated on
+          # `push || !dry_run`.
+          #
+          # The conversion is stdlib-only on purpose: `cryptography` is not guaranteed on the
+          # runner image, and a pip install in the release path is a new failure mode for a
+          # 12-line parse.
+          cat > "$RUNNER_TEMP/der2raw.py" <<'PY'
+          import base64, sys
+
+          der = sys.stdin.buffer.read()
+          i = 0
+          if not der or der[i] != 0x30:
+              sys.exit("signature is not a DER SEQUENCE")
+          i += 1
+          n = der[i]; i += 1
+          if n & 0x80:                     # long-form length
+              i += n & 0x7F
+          vals = []
+          for _ in range(2):               # r, then s
+              if der[i] != 0x02:
+                  sys.exit("expected a DER INTEGER")
+              i += 1
+              ln = der[i]; i += 1
+              vals.append(int.from_bytes(der[i:i + ln], "big"))
+              i += ln
+          # to_bytes(32) is the load-bearing part. DER stores integers minimally, so a short r or
+          # s arrives with its leading zeros stripped — measured at 185 of 800 signatures. Plain
+          # concatenation yields 63 bytes there and Apple rejects it, intermittently.
+          raw = b"".join(v.to_bytes(32, "big") for v in vals)
+          sys.stdout.write(base64.urlsafe_b64encode(raw).decode().rstrip("="))
+          PY
+
           # Generate JWT
           NOW=$(date +%s)
           EXP=$((NOW + 1200))
           HEADER=$(printf '{"alg":"ES256","kid":"%s","typ":"JWT"}' "$ASC_API_KEY_ID" | base64 | tr -d '=\n' | tr '/+' '_-')
           PAYLOAD=$(printf '{"iss":"%s","exp":%d,"aud":"appstoreconnect-v1"}' "$ASC_API_ISSUER_ID" "$EXP" | base64 | tr -d '=\n' | tr '/+' '_-')
-          SIGNATURE=$(printf '%s.%s' "$HEADER" "$PAYLOAD" | openssl dgst -sha256 -sign "$KEY_PATH" | base64 | tr -d '=\n' | tr '/+' '_-')
+          SIGNATURE=$(printf '%s.%s' "$HEADER" "$PAYLOAD" \
+            | openssl dgst -sha256 -sign "$KEY_PATH" \
+            | python3 "$RUNNER_TEMP/der2raw.py")
           JWT="$HEADER.$PAYLOAD.$SIGNATURE"
+
+          # 64 raw bytes base64url-encoded without padding is always 86 characters. Assert it,
+          # because the failure this replaces was silent: a wrong-length signature is still a
+          # syntactically fine string, and the only symptom was a 401 three calls later wearing
+          # someone else's error message.
+          if [ ${#SIGNATURE} -ne 86 ]; then
+            echo "::error::JWT signature is ${#SIGNATURE} characters, expected 86 (64 raw bytes)."
+            echo "::error::The DER-to-raw conversion is wrong; the token would be rejected as malformed."
+            exit 1
+          fi
 
           VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" SonicPlayer/Info.plist)
           BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" SonicPlayer/Info.plist)
@@ -470,12 +527,20 @@ jobs:
           # `filter[app]=com.hasan.sonicplayer`, which matches nothing — so even once the URL
           # parsed, the loop would have timed out and exited 0, reporting success having set
           # nothing. Two bugs deep, the second one green.
-          APP_ID=$(api "https://api.appstoreconnect.apple.com/v1/apps?filter[bundleId]=com.hasan.sonicplayer" \
+          # **Keep the response, then parse it.** Piping straight into python and discarding
+          # stderr meant Apple's own diagnosis was thrown away: a 401 over the malformed signature
+          # above, an authorisation error, and a genuinely absent app all arrived as the same
+          # empty string wearing the same message. Three releases were spent reading it as a
+          # query problem. The body is app metadata and a JSON:API error title — nothing secret.
+          APPS_RESPONSE=$(api "https://api.appstoreconnect.apple.com/v1/apps?filter[bundleId]=com.hasan.sonicplayer")
+          APP_ID=$(printf '%s' "$APPS_RESPONSE" \
             | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data'][0]['id'])" 2>/dev/null || echo "")
 
           if [ -z "$APP_ID" ]; then
             echo "::error::Could not resolve the app id for com.hasan.sonicplayer."
             echo "The build IS uploaded — this failure is about What's New only."
+            echo "Apple's response, which is what actually says why:"
+            printf '%s\n' "$APPS_RESPONSE" | head -c 2000
             exit 1
           fi
           echo "App id: $APP_ID"

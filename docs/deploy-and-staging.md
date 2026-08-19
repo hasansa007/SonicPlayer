@@ -255,6 +255,24 @@ exited 3 before making a request: `curl` reads `[` and `]` as URL-globbing metac
 `filter[version]=` is a malformed range, and under `bash -e` the failing command substitution killed
 the step in 210ms. Two green dry runs that day both skipped it, as had every dry run before them.
 
+**It has now failed three times, each time for a different reason, and the pattern is the lesson.**
+Fixing the globbing let the request be made. Fixing `filter[app]`, which had been handed a bundle id
+where it takes a numeric app id, let it be made correctly. Each fix moved the failure one line down
+to the next latent bug, and 3.0.0 (24), 3.0.0 (25) and 3.0.1 (26) all uploaded cleanly and all
+shipped with no What's New.
+
+The third was the JWT itself. `openssl dgst -sha256 -sign` emits ASN.1 DER for an EC key —
+`SEQUENCE { INTEGER r, INTEGER s }`, 70 to 72 bytes — while ES256 requires the 64-byte raw form,
+r and s each zero-padded to 32 bytes and concatenated. The token was malformed from the first
+release, Apple answered 401, and `2>/dev/null || echo ""` on the app-id lookup converted that into
+an empty variable and the error *"Could not resolve the app id"* — which names the app, the bundle
+id and the query, and never the credential. **A swallowed error does not stay silent; it comes back
+wearing a different failure's name.** Both are fixed: the signature is converted to raw form and
+asserted to be 86 characters, and Apple's response body is printed before anything parses it.
+
+Note what a lie that error told about *where* to look. Three sessions read it as a query problem
+because it described one.
+
 So when you change that step, **the only real test is the next release**. Read the run afterwards
 rather than trusting the green tick on the promotion — and note that the upload succeeds *before*
 this step, so a failure here never means the build did not ship.
