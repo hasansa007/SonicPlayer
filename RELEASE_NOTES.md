@@ -18,6 +18,24 @@ upload from rejection.
 
 ---
 
+## 3.0.1
+
+Audio from any other app now reaches your library through the share sheet, filed where you want it.
+
+- Share an audio file from Voice Memos, a Telegram chat, Safari, Mail — anything that can share —
+  and Sonic Player is one of the apps offered.
+- Tap it and your folders appear right there in the share sheet. Pick one and that is where the
+  audio goes. No saving to Files first, no importing afterwards, no moving it into place.
+- The files arrive in that folder the next time you open Sonic Player. Share as many as you like
+  before opening it; they queue up and all land together.
+- Share a mixed selection and only the audio is taken, so a folder of lectures with a PDF in it
+  still works.
+- If you delete the folder you picked before the files arrive, it comes back holding them rather
+  than dropping them somewhere you did not choose.
+
+Sharing several hours of audio at once is the case worth trying hardest to break. Share while the
+app is open, share while it is closed, and share again before opening it.
+
 ## 3.0.0
 
 The app is one dial now. Everything is done with the wheel and its centre, and there are no other

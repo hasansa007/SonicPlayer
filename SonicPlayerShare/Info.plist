@@ -29,7 +29,7 @@
 	     fails the run if it reappears. A second guard step now asserts these two keys match the
 	     app's, so the duplication is checked rather than merely intended. -->
 	<key>CFBundleShortVersionString</key>
-	<string>3.0.0</string>
+	<string>3.0.1</string>
 	<key>CFBundleVersion</key>
 	<string>26</string>
 
