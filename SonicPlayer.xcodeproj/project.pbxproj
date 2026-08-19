@@ -6,6 +6,10 @@
 	objectVersion = 70;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		B2000012000000000000001 /* SonicPlayerShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B2000001000000000000001 /* SonicPlayerShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		9FD073A530248C9F0007DEBD /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -14,11 +18,33 @@
 			remoteGlobalIDString = A1000052000000000000001;
 			remoteInfo = SonicPlayer;
 		};
+		B2000013000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A1000056000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B2000004000000000000001;
+			remoteInfo = SonicPlayerShare;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		B2000011000000000000001 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				B2000012000000000000001 /* SonicPlayerShare.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		9FD073A130248C9F0007DEBD /* SonicPlayerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SonicPlayerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000037000000000000001 /* SonicPlayer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SonicPlayer.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B2000001000000000000001 /* SonicPlayerShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SonicPlayerShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -29,11 +55,19 @@
 			);
 			target = A1000052000000000000001 /* SonicPlayer */;
 		};
+		B2000003000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B2000004000000000000001 /* SonicPlayerShare */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		9FD073A230248C9F0007DEBD /* SonicPlayerTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = SonicPlayerTests; sourceTree = "<group>"; };
 		AC000200000000000000001 /* SonicPlayer */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AC000202000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = SonicPlayer; sourceTree = "<group>"; };
+		B2000002000000000000001 /* SonicPlayerShare */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (B2000003000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = SonicPlayerShare; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -51,6 +85,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B2000006000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -58,6 +99,7 @@
 			isa = PBXGroup;
 			children = (
 				AC000200000000000000001 /* SonicPlayer */,
+				B2000002000000000000001 /* SonicPlayerShare */,
 				9FD073A230248C9F0007DEBD /* SonicPlayerTests */,
 				A1000042000000000000001 /* Products */,
 			);
@@ -67,6 +109,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000037000000000000001 /* SonicPlayer.app */,
+				B2000001000000000000001 /* SonicPlayerShare.appex */,
 				9FD073A130248C9F0007DEBD /* SonicPlayerTests.xctest */,
 			);
 			name = Products;
@@ -105,10 +148,12 @@
 				A1000054000000000000001 /* Sources */,
 				A1000039000000000000001 /* Frameworks */,
 				A1000055000000000000001 /* Resources */,
+				B2000011000000000000001 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				B2000014000000000000001 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				AC000200000000000000001 /* SonicPlayer */,
@@ -119,6 +164,28 @@
 			productName = SonicPlayer;
 			productReference = A1000037000000000000001 /* SonicPlayer.app */;
 			productType = "com.apple.product-type.application";
+		};
+		B2000004000000000000001 /* SonicPlayerShare */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B2000010000000000000001 /* Build configuration list for PBXNativeTarget "SonicPlayerShare" */;
+			buildPhases = (
+				B2000005000000000000001 /* Sources */,
+				B2000006000000000000001 /* Frameworks */,
+				B2000007000000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B2000002000000000000001 /* SonicPlayerShare */,
+			);
+			name = SonicPlayerShare;
+			packageProductDependencies = (
+			);
+			productName = SonicPlayerShare;
+			productReference = B2000001000000000000001 /* SonicPlayerShare.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -136,6 +203,9 @@
 					};
 					A1000052000000000000001 = {
 						CreatedOnToolsVersion = 15.0;
+					};
+					B2000004000000000000001 = {
+						CreatedOnToolsVersion = 26.6;
 					};
 				};
 			};
@@ -163,6 +233,7 @@
 			projectRoot = "";
 			targets = (
 				A1000052000000000000001 /* SonicPlayer */,
+				B2000004000000000000001 /* SonicPlayerShare */,
 				9FD073A030248C9F0007DEBD /* SonicPlayerTests */,
 			);
 		};
@@ -177,6 +248,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		A1000055000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B2000007000000000000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -200,6 +278,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B2000005000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -207,6 +292,11 @@
 			isa = PBXTargetDependency;
 			target = A1000052000000000000001 /* SonicPlayer */;
 			targetProxy = 9FD073A530248C9F0007DEBD /* PBXContainerItemProxy */;
+		};
+		B2000014000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B2000004000000000000001 /* SonicPlayerShare */;
+			targetProxy = B2000013000000000000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -390,7 +480,6 @@
 				CODE_SIGN_ENTITLEMENTS = SonicPlayer/SonicPlayer.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SonicPlayer/Info.plist;
@@ -404,7 +493,6 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hasan.sonicplayer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -422,7 +510,6 @@
 				CODE_SIGN_ENTITLEMENTS = SonicPlayer/SonicPlayer.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SonicPlayer/Info.plist;
@@ -436,10 +523,55 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hasan.sonicplayer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		B2000008000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SonicPlayerShare/SonicPlayerShare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = A3JC2SBNCR;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SonicPlayerShare/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.hasan.sonicplayer.share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B2000009000000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SonicPlayerShare/SonicPlayerShare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = A3JC2SBNCR;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SonicPlayerShare/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.hasan.sonicplayer.share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -463,6 +595,15 @@
 			buildConfigurations = (
 				A1000061000000000000001 /* Debug */,
 				A1000062000000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B2000010000000000000001 /* Build configuration list for PBXNativeTarget "SonicPlayerShare" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B2000008000000000000001 /* Debug */,
+				B2000009000000000000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

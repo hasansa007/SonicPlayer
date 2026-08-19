@@ -1,13 +1,40 @@
 # Release Notes
 
-What TestFlight testers see. The distribute workflow reads the section matching
-`CFBundleShortVersionString` from `SonicPlayer/Info.plist` — so **add a section here before
-bumping the version**, or the build ships with a placeholder.
+**What TestFlight testers see — not what App Store shoppers see.** The distribute workflow reads
+the section matching `CFBundleShortVersionString` from `SonicPlayer/Info.plist` and ships it to
+TestFlight, in English only. **Add a section here before bumping the version**, or the run fails
+before the archive.
+
+The App Store's *What's New in This Version* is a different field, localised, and no workflow
+writes it. That copy lives in `docs/appstore/<version>/` — changing a fact means editing it here
+**and** there, in every language present. See `docs/appstore/README.md` for why the split exists.
 
 Written for testers, not for the changelog. Say what changed for someone using the app; leave
 refactors, dependency bumps and test work out.
 
+Everything in `CLAUDE.md`'s App Store compliance section binds this file. The app is publicly
+listed now, so the five words that never appear are protecting a live listing from removal, not an
+upload from rejection.
+
 ---
+
+## 3.0.1
+
+Audio from any other app now reaches your library through the share sheet, filed where you want it.
+
+- Share an audio file from Voice Memos, a Telegram chat, Safari, Mail — anything that can share —
+  and Sonic Player is one of the apps offered.
+- Tap it and your folders appear right there in the share sheet. Pick one and that is where the
+  audio goes. No saving to Files first, no importing afterwards, no moving it into place.
+- The files arrive in that folder the next time you open Sonic Player. Share as many as you like
+  before opening it; they queue up and all land together.
+- Share a mixed selection and only the audio is taken, so a folder of lectures with a PDF in it
+  still works.
+- If you delete the folder you picked before the files arrive, it comes back holding them rather
+  than dropping them somewhere you did not choose.
+
+Sharing several hours of audio at once is the case worth trying hardest to break. Share while the
+app is open, share while it is closed, and share again before opening it.
 
 ## 3.0.0
 

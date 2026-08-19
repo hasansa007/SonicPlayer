@@ -97,10 +97,12 @@ earns its place, and the mapping onto a textbook clean-architecture stack. What 
 day-to-day version.
 
 **MVVM with `@Observable`, async/await throughout.** There are no reducers and no `Store`: the
-TCA→MVVM migration (#5) finished at slice 10 (#19). TCA still ships as a dependency because the
-five clients use its `@DependencyClient` macro; #20 removes it.
+TCA→MVVM migration (#5) finished at slice 10 (#19). **TCA is gone** — #20 removed it along with
+13 transitive packages, and `Package.resolved` pins zero. This paragraph read *"TCA still ships as a
+dependency because the five clients use its `@DependencyClient` macro; #20 removes it"* long after
+#20 closed, contradicting the Dependencies section three screens below it.
 
-- **Features/** - one `{Name}ViewModel.swift` + `{Name}View.swift` per feature. A `{Name}Feature.swift` would be a leftover — there are none. Home is an exception: no view file, its UI is inlined in `App/AppView.swift`
+- **Features/** - one `{Name}ViewModel.swift` per feature; a `{Name}Feature.swift` would be a leftover and there are none. **View files are the exception, not the rule** — only `Features/Dial/` has any. This bullet used to promise a `{Name}View.swift` per feature, which the dial epic made false everywhere
 - **Clients/** - structs of closures wrapping system frameworks (AVFoundation, FileManager), each with a `.live` and a `.test`
 - **Models/** - Plain data types (`AudioFile`, `FileSystemItem`, `PlaybackSpeed`)
 - **Domain/** - Pure decision logic, Foundation only. Extracted from reducers so its tests survived the migration unchanged (#11). Add logic here rather than inlining it in a view model.
@@ -120,9 +122,12 @@ unreachable. Three issues were later closed as "unreachable, not fixed" — #55,
 their defects were still in those files. A doc that describes an intention in the present tense is
 worse than one that says nothing, because the next reader greps and believes it.
 
-**The two exceptions are real and live:** `AboutView` and `HelpView` are conventional screens,
-presented as sheets from `AppView` and reached from the dial's Settings rows. They are the last two,
-and #50 owns restructuring them.
+**There are no longer any exceptions, and this paragraph is the second correction.** It read *"the
+two exceptions are real and live: `AboutView` and `HelpView` are conventional screens, presented as
+sheets from `AppView`… #50 owns restructuring them"* — in the present tense, directly beneath the
+warning above about exactly that. #50 closed: both became dial screens and **neither file exists**.
+The two sheets `AppView` still owns are the outbound share (`ActivityView`) and the Files import
+picker (`DocumentPicker`), which are system pickers rather than screens of ours.
 
 What is left is one view rendering one value:
 
@@ -230,8 +235,10 @@ needs a package, check `ARCHITECTURE.md` first.
 SonicPlayer/
   App/           # Entry point, AppViewModel (composition root), AppView, quickstart
   Features/      # Dial/ — the only one with a view. Home/, Player/, Files/, Recording/, Settings/
-  Clients/       # AudioPlayerClient, AudioRecorderClient, FileManagerClient, ArtworkClient, AudioTrimmerClient
+  Clients/       # AudioPlayerClient, AudioRecorderClient, FileManagerClient, ArtworkClient,
+                 #   AudioTrimmerClient, HapticsClient — six, not the five this line used to name
                  #   + AudioPlaying / FileManaging — protocols the first two conform to (#44)
+                 #   + ClientErrors
   Models/        # AudioFile, FileSystemItem, PlaybackSpeed
   DesignSystem/  # Tokens (Spacing, Radius, Sizing, Elevation, Motion), DialRing, LiveHues
   Domain/        # The dial: DialNavigator + DialNavigatorScreen, DialScreen, DialCommand, DialEffect,
@@ -241,7 +248,18 @@ SonicPlayer/
                  #   ScrubClamp, SelectionSet, ImportFilter, QuickAction
   Utilities/     # ColorPalette, Theme, WaveformView, EmptyStateView, ShareSheet, etc.
   Resources/     # Assets.xcassets, Localizable.xcstrings, Quickstart.json, Info.plist
+
+SonicPlayerShare/  # The share extension (#112) — a SEPARATE TARGET, not part of the app's
+                   #   synchronized group. ShareViewController + its own Info.plist and
+                   #   entitlements. Deliberately thin: it cannot see Documents/ and decides
+                   #   nothing, because the system kills it without notice
 ```
+
+**There are three targets now, not two.** `SonicPlayerShare` is an app extension embedded in the
+app bundle's `PlugIns/`, sharing `group.com.hasan.sonicplayer` with it. The app and the extension
+are separate processes with separate containers — the group is the only thing they share, and it is
+a queue the extension writes and the app drains, never shared storage. See
+`docs/superpowers/specs/2026-08-14-share-import-design.md`.
 
 ## Testing
 
@@ -331,11 +349,42 @@ Summarised here for context; **`docs/deploy-and-staging.md` is authoritative** a
 two ever disagree.
 
 Pushing to `main` triggers `.github/workflows/distribute.yml`, which archives, signs and uploads
-to TestFlight. **The merge is the release** — there is no separate promotion step.
+to TestFlight. **For testers, the merge is the release** — there is no promotion step.
+
+**Reaching the public App Store is manual and nothing here does it.** SonicPlayer 3.0.0 (25) has
+been live on the App Store since 2026-08-13; that submission was made by hand in App Store Connect.
+This paragraph used to end at "the merge is the release", which was true only while the app was
+TestFlight-only, and it is the sentence most likely to mislead you into thinking a merge reached
+users. It reaches testers. Three things follow:
+
+- **What's New is two different fields.** The workflow writes the *TestFlight build's*. The App
+  Store version's is per-language and lives in `docs/appstore/<version>/` — see its README.
+- **Tag the shipped commit** once a release is live, bare version, no `v` prefix. A tag push does
+  not trigger the workflow (`push: branches: [main]`).
+- **Guideline 5.2.5 is now removal risk, not rejection risk.** See the compliance section above;
+  the rules are unchanged, the price of breaking them is not.
 
 Before bumping `CFBundleShortVersionString` in `Info.plist`, add a matching section to
 `RELEASE_NOTES.md`. The workflow reads the section whose heading equals `## <version>` and ships it
-as What's New; with no matching section testers get a placeholder and a build warning.
+as What's New; **with no matching section the run fails before the archive.** It used to ship a
+placeholder and log a warning, which is the quiet-failure shape that guard exists to remove.
+
+**The version lives in `SonicPlayer/Info.plist` and nowhere else.** The app target sets
+`GENERATE_INFOPLIST_FILE = NO`, so the plist's literal values ship and every workflow step reads
+them with `PlistBuddy`. The target used to *also* carry `MARKETING_VERSION = 2.3.0` and
+`CURRENT_PROJECT_VERSION = 16` — read by nothing, four versions stale, and exactly what Xcode's
+General tab writes when you bump a version in the UI. They are deleted, and a guard step now fails
+the run if either reappears disagreeing with the plist.
+
+**"And nowhere else" acquired an exception with the share extension (#112), and it is checked
+rather than trusted.** `SonicPlayerShare/Info.plist` carries its own
+`CFBundleShortVersionString` and `CFBundleVersion`, because an embedded extension has to, and
+App Store Connect **rejects an upload where they disagree with the host app's**. No build setting
+removes the duplication — `$(MARKETING_VERSION)` is precisely the key the paragraph above exists to
+keep deleted. So the same guard step now also asserts the extension's two keys equal the app's, and
+applies the stale-build-setting rule to the extension target as well. **Bump a version and you must
+edit both plists.** The guard is what stops that being discovered after an upload, against a build
+number that can never be reused.
 
 The runner is `macos-26` and pins **Xcode 26.6**. The guard step asserts **two** floors, and the
 distinction is the whole point of it: one that the toolchain can *compile* this project, and one
@@ -366,7 +415,8 @@ To prove a pipeline change without shipping, run the workflow manually from the 
 
 - **`gh-<issue>-<slug>`** — feature branches. PR into `feat`, never into `main`
 - **`feat`** — **pre prod**. Integrated but not shipped
-- **`main`** — **prod**. Pushing here uploads to TestFlight; the merge *is* the release
+- **`main`** — **prod**. Pushing here uploads to TestFlight; the merge is the release *for testers*.
+  The public App Store submission is a separate manual step — see Release above
 
 `feat` is a pre-prod branch with a feature-branch name, so tooling that guesses the branch model
 from names (`staging` → `develop` → `main`) resolves pre prod to `main` — the branch that ships.

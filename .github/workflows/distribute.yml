@@ -106,6 +106,177 @@ jobs:
           fi
           echo "Found the $VERSION section."
 
+      - name: Assert the version lives in exactly one place
+        run: |
+          # **The trap this closes.** The app target sets GENERATE_INFOPLIST_FILE = NO and
+          # INFOPLIST_FILE = SonicPlayer/Info.plist, so the plist's literal values are what ship,
+          # and every step here reads them with PlistBuddy. But the target also carried
+          # MARKETING_VERSION = 2.3.0 and CURRENT_PROJECT_VERSION = 16 — left over, read by
+          # nothing, and four versions behind what was actually on the App Store.
+          #
+          # That matters because Xcode's General tab writes *those* settings. Bump the version
+          # in the UI and it edits a dead key: the field reads 3.0.1, the build ships 3.0.0, and
+          # nothing anywhere disagrees out loud. Deleting them empties the field, which is a
+          # better signal than a wrong number — but typing into it puts the key straight back.
+          #
+          # So the rule, not the instance: the keys may be absent, or they may agree. They may
+          # not silently disagree.
+          # **Every plist read goes through this, and the `|| true` is the whole point.**
+          # PlistBuddy exits 1 on a missing key, GitHub runs this block as `bash -e {0}`, and the
+          # exit status of `VAR=$(cmd)` is cmd's — so a missing key killed the step at the
+          # assignment, before any of the hand-written `::error::` lines below could explain it.
+          # That is the same defect fixed for xcodebuild a few lines down, which was reintroduced
+          # here by not applying the rule to every command that can fail.
+          plist_get() {
+            /usr/libexec/PlistBuddy -c "Print :$2" "$1" 2>/dev/null || true
+          }
+
+          require_key() {   # value, plist, key
+            if [ -z "$1" ]; then
+              echo "::error::$2 has no :$3, so the version check could not run."
+              echo "::error::Treating that as a failure rather than a pass."
+              exit 1
+            fi
+          }
+
+          VERSION=$(plist_get SonicPlayer/Info.plist CFBundleShortVersionString)
+          BUILD=$(plist_get SonicPlayer/Info.plist CFBundleVersion)
+          require_key "$VERSION" SonicPlayer/Info.plist CFBundleShortVersionString
+          require_key "$BUILD"   SonicPlayer/Info.plist CFBundleVersion
+
+          # Ask Xcode for the app target's *resolved* settings rather than grepping the pbxproj.
+          # The two targets' config blocks are textually identical apart from the bundle id, and
+          # the test bundle's own MARKETING_VERSION = 1.0 is live and correct — it generates its
+          # plist. Any line-window grep that tries to tell them apart is a guess; this is not.
+          # `|| true` is load-bearing, and its absence disabled the guard below.
+          #
+          # GitHub runs each `run:` block as `bash -e {0}`. The exit status of `VAR=$(cmd)` is
+          # cmd's, so a failing xcodebuild killed the step *here* — before the hand-written
+          # "could not read the build settings" error could print — and `2>/dev/null` had already
+          # discarded xcodebuild's own diagnosis. The result was a red step with no annotation and
+          # no output: precisely the silent failure the next twelve lines exist to prevent.
+          SETTINGS=$(xcodebuild -project SonicPlayer.xcodeproj -target SonicPlayer \
+            -configuration Release -showBuildSettings 2>&1) || true
+
+          # If that call fails its output is empty, every key reads as "unset", and the check
+          # below passes having verified nothing — a guard that cannot fail, which is the shape
+          # this step exists to remove. Prove the output is real before trusting an absence.
+          if ! printf '%s\n' "$SETTINGS" | grep -q '^ *PRODUCT_BUNDLE_IDENTIFIER = com.hasan.sonicplayer$'; then
+            echo "::error::Could not read the app target's build settings, so the version check"
+            echo "::error::could not run. Treating that as a failure rather than a pass."
+            exit 1
+          fi
+
+          for pair in "MARKETING_VERSION=$VERSION" "CURRENT_PROJECT_VERSION=$BUILD"; do
+            key=${pair%%=*}
+            expected=${pair#*=}
+            found=$(printf '%s\n' "$SETTINGS" | sed -n "s/^ *$key = //p")
+            if [ -z "$found" ]; then
+              echo "$key is unset on the app target — Info.plist is unopposed."
+            elif [ "$found" != "$expected" ]; then
+              echo "::error::The app target sets $key = $found, but Info.plist ships $expected."
+              echo "::error::Xcode's General tab writes $key and this build ignores it."
+              echo "::error::Delete the key from the app target, or make it match Info.plist."
+              exit 1
+            else
+              echo "$key = $found agrees with Info.plist."
+            fi
+          done
+
+          # **The share extension makes "exactly one place" literally false, and that is why this
+          # half exists.** SonicPlayerShare is an embedded bundle with its own Info.plist, and
+          # App Store Connect REJECTS an upload whose extension disagrees with its host. There is
+          # no build setting that can remove the duplication — $(MARKETING_VERSION) is exactly the
+          # key the block above exists to keep deleted — so the second copy is literal and checked
+          # here instead of merely intended.
+          #
+          # The cost of not checking is the expensive kind: the disagreement surfaces after the
+          # archive, after the signing, after the upload, against a build number that can never be
+          # reused. That is the shape of the ITMS-90111 rejection that burned 3.0.0 (23).
+          EXT_PLIST=SonicPlayerShare/Info.plist
+          if [ ! -f "$EXT_PLIST" ]; then
+            echo "::error::$EXT_PLIST is missing, so the extension's version could not be checked."
+            echo "::error::Treating that as a failure rather than a pass."
+            exit 1
+          fi
+
+          EXT_VERSION=$(plist_get "$EXT_PLIST" CFBundleShortVersionString)
+          EXT_BUILD=$(plist_get "$EXT_PLIST" CFBundleVersion)
+          require_key "$EXT_VERSION" "$EXT_PLIST" CFBundleShortVersionString
+          require_key "$EXT_BUILD"   "$EXT_PLIST" CFBundleVersion
+
+          if [ "$EXT_VERSION" != "$VERSION" ] || [ "$EXT_BUILD" != "$BUILD" ]; then
+            echo "::error::SonicPlayerShare ships $EXT_VERSION ($EXT_BUILD); the app ships $VERSION ($BUILD)."
+            echo "::error::App Store Connect rejects an upload whose embedded extension disagrees"
+            echo "::error::with its host. Update $EXT_PLIST to match SonicPlayer/Info.plist."
+            exit 1
+          fi
+          echo "SonicPlayerShare $EXT_VERSION ($EXT_BUILD) agrees with the app."
+
+          # The extension target gets the same treatment as the app target above, for the same
+          # reason: Xcode's General tab writes MARKETING_VERSION on whichever target is selected,
+          # and a stale key on the extension is exactly as invisible as it was on the app.
+          EXT_SETTINGS=$(xcodebuild -project SonicPlayer.xcodeproj -target SonicPlayerShare \
+            -configuration Release -showBuildSettings 2>&1) || true
+
+          if ! printf '%s\n' "$EXT_SETTINGS" | grep -q '^ *PRODUCT_BUNDLE_IDENTIFIER = com.hasan.sonicplayer.share$'; then
+            echo "::error::Could not read SonicPlayerShare's build settings, so its version check"
+            echo "::error::could not run. Treating that as a failure rather than a pass."
+            exit 1
+          fi
+
+          for pair in "MARKETING_VERSION=$VERSION" "CURRENT_PROJECT_VERSION=$BUILD"; do
+            key=${pair%%=*}
+            expected=${pair#*=}
+            found=$(printf '%s\n' "$EXT_SETTINGS" | sed -n "s/^ *$key = //p")
+            if [ -z "$found" ]; then
+              echo "$key is unset on SonicPlayerShare — its Info.plist is unopposed."
+            elif [ "$found" != "$expected" ]; then
+              echo "::error::SonicPlayerShare sets $key = $found, but its Info.plist ships $expected."
+              echo "::error::Delete the key from the extension target, or make it match."
+              exit 1
+            else
+              echo "$key = $found agrees with the extension's Info.plist."
+            fi
+          done
+
+          echo "Version $VERSION ($BUILD) is consistent across the app and SonicPlayerShare."
+
+      - name: Refuse to ship a share extension that does nothing (#112)
+        if: ${{ github.event_name == 'push' || !inputs.dry_run }}
+        run: |
+          # **The only hazard in #112 whose cost lands on a person rather than on a build number.**
+          #
+          # SonicPlayerShare is a real, registered com.apple.share-services extension: Sonic Player
+          # is offered for any audio file from the moment the app installs. While slice 1 sits on
+          # `feat` that reaches nobody. The instant it reaches `main` it reaches TestFlight, and a
+          # tester who shares a voice memo is offered Sonic Player, taps it, and is told the feature
+          # is not wired up — in English, in all nine locales.
+          #
+          # That was guarded by a sentence in a doc comment, in the same branch that bumped
+          # CFBundleVersion to 26. This repo's standard is "checked rather than trusted" — the
+          # two-plist guard exists for a strictly cheaper failure than this one.
+          #
+          # Deliberately runs ONLY when the run would really upload, so dry runs stay useful for
+          # proving signing while the extension is still a stub. That is the whole workflow this
+          # slice was built around.
+          MARKER=SHARE-EXTENSION-STUB
+          FILE=SonicPlayerShare/ShareViewController.swift
+
+          if [ ! -f "$FILE" ]; then
+            echo "::error::$FILE is missing, so the stub check could not run."
+            echo "::error::Treating that as a failure rather than a pass."
+            exit 1
+          fi
+
+          if grep -q "$MARKER" "$FILE"; then
+            echo "::error::SonicPlayerShare is still the slice 1 stub and this run would upload it."
+            echo "::error::Testers would be offered a share extension that says it does not work."
+            echo "::error::Land slice 2 of #112 first, then delete the $MARKER line from $FILE."
+            exit 1
+          fi
+          echo "Share extension is past the slice 1 stub — safe to upload."
+
       # **`Install signing certificate` and `Install provisioning profile` stood here.**
       #
       # They imported a base64 `.p12` into a throwaway keychain and dropped a `.mobileprovision`

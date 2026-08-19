@@ -113,7 +113,13 @@ extension FileManagerClient {
             )
         },
         drainStagingDirectory: {},
-        documentsDirectory: { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
+        documentsDirectory: { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] },
+        // **nil, and this is the whole fix for a destructive review finding.** The unit-test bundle
+        // is hosted by the app, which carries the App Group entitlement, so a live lookup here
+        // resolves — and every pre-existing test that calls `scenePhaseChanged` would then drain the
+        // developer's REAL shared container into their REAL Documents directory. Safe by
+        // construction beats safe by remembering to override a seam.
+        shareInboxContainer: { nil }
     )
 }
 

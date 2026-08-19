@@ -41,9 +41,13 @@ exact. Every continuous value in the app is driven by both — drag to get near,
 
 **Not a reproduction of Apple's iPod interface.** App Store Review Guideline 5.2.5 prohibits an app
 that "appears confusingly similar to an existing Apple product, interface…". Apple removed *Rewound*
-from the App Store in 2020 for recreating the iPod interface. This project ships to TestFlight
-today, so the risk is currently theoretical — but the design clears the guideline anyway, because
-retrofitting distance later is more expensive than starting with it.
+from the App Store in 2020 for recreating the iPod interface.
+
+**The risk is no longer theoretical.** This paragraph used to say "this project ships to TestFlight
+today, so the risk is currently theoretical" — and the reason for clearing the guideline anyway was
+that retrofitting distance later costs more than starting with it. That bet paid: 3.0.0 (25) passed
+review and has been publicly listed since 2026-08-13. What is at stake now is a live listing being
+pulled, which is the outcome *Rewound* actually suffered — not an upload being refused.
 
 What creates the distance, concretely:
 
