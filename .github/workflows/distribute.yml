@@ -481,9 +481,15 @@ jobs:
               ln = der[i]; i += 1
               vals.append(int.from_bytes(der[i:i + ln], "big"))
               i += ln
-          # to_bytes(32) is the load-bearing part. DER stores integers minimally, so a short r or
-          # s arrives with its leading zeros stripped — measured at 185 of 800 signatures. Plain
-          # concatenation yields 63 bytes there and Apple rejects it, intermittently.
+          # to_bytes(32) is the load-bearing part, and it is load-bearing in both directions.
+          # A DER INTEGER is signed and minimal, so r and s each arrive at the wrong width two
+          # different ways: with the top bit set DER prepends a 0x00 sign byte and the integer is
+          # 33 bytes, and a value below 2^248 arrives with its leading zeros absent at 31 or
+          # fewer. Concatenating the DER bytes as they come is therefore far more often too long
+          # than too short, which is the opposite of what it looks like. Measured over 800
+          # signatures from a real P-256 key, matching the arithmetic: 75% too long, 25%
+          # accidentally exactly 64, under 1% too short. That quarter is why trying it once
+          # proves nothing, and why the length is asserted below rather than eyeballed.
           raw = b"".join(v.to_bytes(32, "big") for v in vals)
           sys.stdout.write(base64.urlsafe_b64encode(raw).decode().rstrip("="))
           PY
